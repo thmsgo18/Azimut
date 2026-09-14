@@ -202,7 +202,10 @@ class TestModulesNouveautes(unittest.TestCase):
         reglages.definir_dossier_donnees(str(personnalise), chemin_db=self.chemin_db)
         chemin = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db)
         self.assertIsNotNone(chemin)
-        self.assertTrue(str(personnalise) in chemin)
+        # definir_dossier_donnees() résout le chemin (symlinks, formes courtes
+        # Windows) : comparer les deux côtés résolus pour rester indépendant
+        # de la représentation exacte du dossier temporaire de l'OS.
+        self.assertTrue(str(personnalise.resolve()) in chemin)
         self.assertTrue((personnalise / "sauvegardes").exists())
 
     # --- notes d'entretien : fiche + export/import ---
@@ -278,6 +281,7 @@ class TestApiNouveautes(unittest.TestCase):
         telechargement = self.client.get(f"/api/documents/{id_doc}/telecharger")
         self.assertEqual(telechargement.status_code, 200)
         self.assertEqual(telechargement.data, b"faux pdf")
+        telechargement.close()  # libère le fichier avant suppression (verrou sous Windows)
         self.assertEqual(self.client.delete(f"/api/documents/{id_doc}").status_code, 200)
         sans_fichier = self.client.post(f"/api/candidatures/{numero}/documents")
         self.assertEqual(sans_fichier.status_code, 400)

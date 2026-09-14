@@ -1,7 +1,12 @@
 """Tests du widget de barre de menus (menu_barre.py) - instancié sans lancer
 la boucle GUI (jamais .run()), en pointant db.CHEMIN_DB vers une base
-temporaire (le widget lit toujours la base par défaut, sans chemin_db)."""
+temporaire (le widget lit toujours la base par défaut, sans chemin_db).
 
+Le widget n'existe que sur macOS (bibliothèque rumps) : ce module entier est
+sauté ailleurs plutôt que d'importer un module absent - voir CLAUDE.md,
+section Portabilité."""
+
+import platform
 import sys
 import tempfile
 import unittest
@@ -10,11 +15,15 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import db
-import menu_barre
-from candidatures import ajouter_candidature
+MACOS = platform.system() == "Darwin"
+
+if MACOS:
+    import db
+    import menu_barre
+    from candidatures import ajouter_candidature
 
 
+@unittest.skipUnless(MACOS, "widget de barre de menus : macOS uniquement (rumps)")
 class TestWidgetAzimut(unittest.TestCase):
     def setUp(self):
         self.dossier = tempfile.TemporaryDirectory()

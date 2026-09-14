@@ -168,7 +168,7 @@ class TestCliRelances(unittest.TestCase):
     def _cli(self, *arguments):
         return subprocess.run(
             [sys.executable, "cli.py", "--db", self.chemin_db, *arguments],
-            capture_output=True, text=True, cwd=PROJET,
+            capture_output=True, text=True, encoding="utf-8", cwd=PROJET,
         )
 
     def test_relancer_et_relances(self):

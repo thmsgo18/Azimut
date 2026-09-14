@@ -535,4 +535,9 @@ def principal(arguments=None):
 
 
 if __name__ == "__main__":
+    # Windows utilise par défaut l'encodage de la console (cp1252/cp850, pas
+    # UTF-8) : les accents et symboles (✓, °, «…») lèvent UnicodeEncodeError
+    # sans ce forçage. Sans effet sur macOS/Linux, déjà en UTF-8.
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     principal()

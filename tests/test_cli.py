@@ -22,6 +22,7 @@ class TestCli(unittest.TestCase):
             [sys.executable, "cli.py", "--db", self.chemin_db, *arguments],
             capture_output=True,
             text=True,
+            encoding="utf-8",  # cli.py force sa sortie en UTF-8 (accents, ✓) ; le lire pareil
             cwd=PROJET,
         )
         return resultat

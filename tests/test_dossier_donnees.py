@@ -73,7 +73,7 @@ class TestDossierDonnees(unittest.TestCase):
 
         chemin = _chemin_reel("documents/abc123-vieux.pdf")
         self.assertTrue(chemin.is_absolute())
-        self.assertTrue(str(chemin).endswith("documents/abc123-vieux.pdf"))
+        self.assertEqual(chemin.parts[-2:], ("documents", "abc123-vieux.pdf"))
 
     def test_dossier_impossible_a_creer_leve_erreur_claire(self):
         # Un fichier existant à la place d'un dossier ne peut pas être transformé en dossier.
