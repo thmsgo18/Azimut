@@ -100,6 +100,8 @@ entreprises_similaires(nom, exclure_id=None) / paires_entreprises_suspectes()
 # candidatures.py - alimente automatiquement le journal (evenements.py)
 verifier_doublon_candidature(entreprise_nom, poste) -> id | None
 ajouter_candidature(entreprise_nom, poste, **champs) -> id
+# déclenche aussi sauvegarde.sauvegarder_base() tous les INTERVALLE_SAUVEGARDE_AUTO
+# (4) candidatures - best effort, ne lève jamais si la sauvegarde échoue
 modifier_candidature(id, **champs)         # changement de statut → événement journalisé
 supprimer_candidature(id)                  # supprime aussi journal + documents liés
 lister_candidatures(statut=None, sous_domaine=None, priorite=None)

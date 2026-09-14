@@ -107,7 +107,7 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 
 **Data & privacy**
 - **Excel export / import**: a readable backup and restore, duplicates ignored and never overwritten, a detailed report after import.
-- **Automatic backup** of the database on every launch (rotated over the last 10).
+- **Automatic backup** of the database on every launch, and also every 4 applications added (rotated over the last 5).
 - **Configurable data folder**: choose where documents and backups live (handy to have them synced by iCloud Drive or Dropbox) - visible and updated live in Finder, like any other folder.
 - **Optional AI assistant**, with the key of any provider - see below.
 

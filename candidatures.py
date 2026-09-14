@@ -4,9 +4,12 @@ listing - chaque étape marquante alimente automatiquement le journal (evenement
 import db
 import documents
 import evenements
+import sauvegarde
 from entreprises import _trouver_par_nom, ajouter_ou_recuperer_entreprise
 from exceptions import DoublonCandidature, EntiteIntrouvable, ValeurNonAutorisee
 from valeurs import normaliser, valider_champs
+
+INTERVALLE_SAUVEGARDE_AUTO = 4  # une sauvegarde auto tous les N candidatures (en plus de celle au lancement)
 
 
 def _date_fr(iso):
@@ -107,9 +110,16 @@ def ajouter_candidature(entreprise_nom, poste, chemin_db=None, **champs):
             f"Candidature créée - statut « {valides.get('statut', 'À préparer')} »",
         )
         conn.commit()
-        return curseur.lastrowid
+        nouvel_id = curseur.lastrowid
+        total = conn.execute("SELECT COUNT(*) FROM candidatures").fetchone()[0]
     finally:
         conn.close()
+    if total % INTERVALLE_SAUVEGARDE_AUTO == 0:
+        try:
+            sauvegarde.sauvegarder_base(chemin_db=chemin_db)
+        except OSError:
+            pass  # une sauvegarde ratée ne doit jamais empêcher d'ajouter une candidature
+    return nouvel_id
 
 
 def modifier_candidature(id_candidature, chemin_db=None, **champs):

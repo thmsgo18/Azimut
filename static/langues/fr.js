@@ -363,7 +363,7 @@ window.LANGUES.fr = {
     revenir_par_defaut: "Revenir à l'emplacement par défaut",
     dossier_note: "Les fichiers déjà présents dans l'ancien emplacement n'y sont pas déplacés automatiquement - seuls les prochains y sont écrits.",
     sauvegardes_titre: "Sauvegardes",
-    sauvegardes_texte: "Une copie datée de la base est créée automatiquement à chaque lancement de l'appli (les 10 dernières sont conservées). L'export Excel est la sauvegarde lisible et partageable ; la copie de la base est la sauvegarde intégrale (mots de passe et réglages compris).",
+    sauvegardes_texte: "Une copie datée de la base est créée automatiquement à chaque lancement de l'appli, et aussi tous les 4 candidatures ajoutées (les 5 dernières sont conservées). L'export Excel est la sauvegarde lisible et partageable ; la copie de la base est la sauvegarde intégrale (mots de passe et réglages compris).",
     sauvegarder_maintenant: "Sauvegarder maintenant",
     objectif_texte: "Un nombre de candidatures à envoyer chaque semaine (lundi-dimanche), la progression s'affiche dans Statistiques. Laisser vide pour désactiver.",
     objectif_label: "Candidatures envoyées / semaine",

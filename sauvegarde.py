@@ -9,7 +9,7 @@ import db
 import reglages
 
 DOSSIER_SAUVEGARDES_DEFAUT = Path(__file__).parent / "sauvegardes"
-NOMBRE_CONSERVE = 10
+NOMBRE_CONSERVE = 5
 
 
 def dossier_sauvegardes(chemin_db=None):
@@ -30,8 +30,16 @@ def sauvegarder_base(chemin_db=None, garder=NOMBRE_CONSERVE):
         return None
     dossier = dossier_sauvegardes(chemin_db)
     dossier.mkdir(parents=True, exist_ok=True)
-    horodatage = datetime.now().strftime("%Y%m%d-%H%M%S")
+    # Microsecondes (%f) : depuis qu'une sauvegarde peut aussi être déclenchée
+    # tous les N candidatures (en plus de celle au lancement), deux
+    # sauvegardes peuvent tomber dans la même seconde - jamais écraser une
+    # sauvegarde existante en silence.
+    horodatage = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     destination = dossier / f"{source.stem}-{horodatage}.db"
+    compteur = 1
+    while destination.exists():
+        destination = dossier / f"{source.stem}-{horodatage}-{compteur}.db"
+        compteur += 1
     shutil.copy2(source, destination)
     existantes = sorted(dossier.glob(f"{source.stem}-*.db"))
     for ancienne in existantes[:-garder] if garder > 0 else []:

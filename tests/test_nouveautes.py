@@ -197,12 +197,71 @@ class TestModulesNouveautes(unittest.TestCase):
                 chemin = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=3)
                 self.assertIsNotNone(chemin)
                 chemins.add(chemin)
+            # Chaque appel doit produire un fichier distinct, même déclenchés
+            # coup sur coup dans la même seconde (voir le correctif microsecondes).
+            self.assertEqual(len(chemins), 4)
             restantes = list(sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT.glob("*.db"))
             self.assertLessEqual(len(restantes), 3)
             absente = sauvegarde.sauvegarder_base(
                 chemin_db=str(Path(self.dossier.name) / "inexistante.db")
             )
             self.assertIsNone(absente)
+        finally:
+            sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = dossier_origine
+
+    def test_sauvegarde_rapide_repetee_jamais_ecrasee(self):
+        # Régression : deux sauvegardes déclenchées dans la même seconde
+        # (possible depuis l'auto-sauvegarde tous les N candidatures)
+        # écrasaient silencieusement le même fichier (horodatage à la
+        # seconde près) avant le passage aux microsecondes.
+        import sauvegarde
+
+        self._candidature()
+        dossier_origine = sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT
+        sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = Path(self.dossier.name) / "sauvegardes"
+        try:
+            chemin1 = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=0)
+            chemin2 = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=0)
+            self.assertNotEqual(chemin1, chemin2)
+            self.assertTrue(Path(chemin1).exists())
+            self.assertTrue(Path(chemin2).exists())
+        finally:
+            sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = dossier_origine
+
+    def test_sauvegarde_auto_tous_les_n_candidatures(self):
+        import sauvegarde
+        from candidatures import INTERVALLE_SAUVEGARDE_AUTO
+
+        dossier_origine = sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT
+        sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = Path(self.dossier.name) / "sauvegardes"
+        try:
+            for i in range(INTERVALLE_SAUVEGARDE_AUTO - 1):
+                self._candidature(entreprise=f"Entreprise{i}")
+            self.assertEqual(
+                len(list(sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT.glob("*.db"))), 0,
+                "pas encore de sauvegarde avant la Nème candidature",
+            )
+            self._candidature(entreprise="EntrepriseDeclencheuse")
+            self.assertEqual(
+                len(list(sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT.glob("*.db"))), 1,
+                "une sauvegarde doit apparaître exactement à la Nème candidature",
+            )
+        finally:
+            sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = dossier_origine
+
+    def test_sauvegarde_auto_rotation_sur_cinq(self):
+        import sauvegarde
+        from candidatures import INTERVALLE_SAUVEGARDE_AUTO
+
+        self.assertEqual(sauvegarde.NOMBRE_CONSERVE, 5)
+        dossier_origine = sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT
+        sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = Path(self.dossier.name) / "sauvegardes"
+        try:
+            for i in range(INTERVALLE_SAUVEGARDE_AUTO * 7):  # 7 déclenchements
+                self._candidature(entreprise=f"Entreprise{i}")
+            self.assertEqual(
+                len(list(sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT.glob("*.db"))), 5
+            )
         finally:
             sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = dossier_origine
 

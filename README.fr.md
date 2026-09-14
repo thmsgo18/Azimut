@@ -107,7 +107,7 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 
 **Données et vie privée**
 - **Export / import Excel** : sauvegarde lisible et restauration, doublons ignorés et jamais écrasés, rapport détaillé après import.
-- **Sauvegarde automatique** de la base à chaque lancement (rotation sur 10).
+- **Sauvegarde automatique** de la base à chaque lancement, et aussi tous les 4 candidatures ajoutées (rotation sur les 5 dernières).
 - **Dossier de données configurable** : choisis où ranger documents et sauvegardes (utile pour les faire suivre par iCloud Drive ou Dropbox) - visible et mis à jour dans le Finder en temps réel, comme n'importe quel autre dossier.
 - **Assistant IA optionnel**, avec la clé de n'importe quel fournisseur - voir plus bas.
 

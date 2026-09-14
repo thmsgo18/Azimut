@@ -363,7 +363,7 @@ window.LANGUES.en = {
     revenir_par_defaut: "Revert to the default location",
     dossier_note: "Files already present at the previous location aren't moved automatically - only new ones are written there.",
     sauvegardes_titre: "Backups",
-    sauvegardes_texte: "A dated copy of the database is created automatically on every launch (the last 10 are kept). The Excel export is the readable, shareable backup; the database copy is the full backup (passwords and settings included).",
+    sauvegardes_texte: "A dated copy of the database is created automatically on every launch, and also every 4 applications added (the last 5 are kept). The Excel export is the readable, shareable backup; the database copy is the full backup (passwords and settings included).",
     sauvegarder_maintenant: "Back up now",
     objectif_texte: "A number of applications to send each week (Monday-Sunday), progress shows up in Statistics. Leave empty to disable.",
     objectif_label: "Applications sent / week",
