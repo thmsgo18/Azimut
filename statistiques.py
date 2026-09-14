@@ -27,7 +27,7 @@ def stats_avancees(chemin_db=None):
     envoyees = [c for c in liste if c["statut"] != "À préparer"]
     reponses = [c for c in envoyees if _a_recu_reponse(c)]
     entretiens = [
-        c for c in liste if c["date_entretien"] or c["statut"] in ("Entretien", "Accepté")
+        c for c in envoyees if c["date_entretien"] or c["statut"] in ("Entretien", "Accepté")
     ]
     acceptees = [c for c in liste if c["statut"] == "Accepté"]
 
@@ -105,13 +105,19 @@ def serie_hebdomadaire(chemin_db=None, nb_semaines=12):
 
 
 def progression_objectif_hebdomadaire(chemin_db=None):
-    """None si aucun objectif n'est réglé ; sinon la progression de la
-    semaine ISO courante (lundi-dimanche) vers l'objectif de candidatures
-    envoyées par semaine réglé dans Réglages."""
+    """None si aucun objectif n'est réglé, ou si la valeur enregistrée n'est
+    pas un entier positif utilisable ; sinon la progression de la semaine ISO
+    courante (lundi-dimanche) vers l'objectif de candidatures envoyées par
+    semaine réglé dans Réglages."""
     brut = reglages.obtenir_reglage("objectif_hebdomadaire", chemin_db=chemin_db)
     if not brut:
         return None
-    objectif = int(brut)
+    try:
+        objectif = int(brut)
+    except ValueError:
+        return None
+    if objectif <= 0:
+        return None
     debut, fin = _bornes_semaine(date.today())
     debut_iso, fin_iso = debut.isoformat(), fin.isoformat()
     nombre = sum(

@@ -155,6 +155,19 @@ class TestModulesNouveautes(unittest.TestCase):
         self.assertEqual(linkedin["envoyees"], 2)
         self.assertEqual(linkedin["taux"], 100)
 
+    def test_stats_avancees_entretiens_jamais_superieur_a_envoyees(self):
+        from statistiques import stats_avancees
+
+        # Une candidature encore "À préparer" (jamais envoyée) avec déjà une
+        # date d'entretien notée ne doit pas compter comme un entretien tant
+        # qu'elle n'est pas comptée comme envoyée - l'entonnoir doit rester
+        # cohérent (Entretiens ⊆ Envoyées).
+        self._candidature(statut="À préparer", date_envoi=None, date_entretien="2026-12-01")
+        stats = stats_avancees(chemin_db=self.chemin_db)
+        entonnoir = {e["etape"]: e for e in stats["entonnoir"]}
+        self.assertEqual(entonnoir["Envoyées"]["nombre"], 0)
+        self.assertEqual(entonnoir["Entretiens"]["nombre"], 0)
+
     # --- agenda ---
 
     def test_agenda_et_ics(self):

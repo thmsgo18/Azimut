@@ -177,6 +177,21 @@ class TestImportCsv(unittest.TestCase):
         )
         self.assertEqual(rapport["candidatures_ajoutees"], 1)
 
+    def test_champ_multi_lignes_entre_guillemets_pas_corrompu(self):
+        # Un retour à la ligne dans un champ entre guillemets (notes,
+        # description) doit être préservé, pas fusionné avec la ligne
+        # suivante en un seul mot sans séparateur.
+        chemin = self._ecrire_csv(
+            "offres.csv",
+            'Company Name,Job Title,Notes\n'
+            'AgentikCo,Stage,"Contacté le 10/09\nRelancer le 20/09"\n',
+        )
+        apercu = apercu_csv(chemin)
+        self.assertEqual(len(apercu["lignes"]), 1)
+        self.assertEqual(
+            apercu["lignes"][0][2], "Contacté le 10/09\nRelancer le 20/09"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

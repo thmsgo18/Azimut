@@ -933,6 +933,7 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 
 .ajout-document {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   margin-top: 10px;

@@ -115,6 +115,20 @@ class TestObjectifHebdomadaire(unittest.TestCase):
         reglages.definir_reglage("objectif_hebdomadaire", "", chemin_db=self.chemin_db)
         self.assertIsNone(progression_objectif_hebdomadaire(chemin_db=self.chemin_db))
 
+    def test_objectif_zero_ne_plante_pas(self):
+        # Réglage écrit hors du formulaire habituel (API directe, ancienne
+        # valeur…) : zéro ne doit jamais donner une division par zéro.
+        reglages.definir_reglage("objectif_hebdomadaire", "0", chemin_db=self.chemin_db)
+        self.assertIsNone(progression_objectif_hebdomadaire(chemin_db=self.chemin_db))
+
+    def test_objectif_negatif_ne_plante_pas(self):
+        reglages.definir_reglage("objectif_hebdomadaire", "-5", chemin_db=self.chemin_db)
+        self.assertIsNone(progression_objectif_hebdomadaire(chemin_db=self.chemin_db))
+
+    def test_objectif_non_numerique_ne_plante_pas(self):
+        reglages.definir_reglage("objectif_hebdomadaire", "abc", chemin_db=self.chemin_db)
+        self.assertIsNone(progression_objectif_hebdomadaire(chemin_db=self.chemin_db))
+
 
 if __name__ == "__main__":
     unittest.main()

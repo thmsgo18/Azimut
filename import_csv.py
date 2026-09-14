@@ -48,7 +48,11 @@ def _lire_lignes(chemin_fichier):
         dialecte = _csv.Sniffer().sniff(premiere_ligne, delimiters=",;\t")
     except _csv.Error:
         dialecte = _csv.excel
-    lignes = list(_csv.reader(contenu.splitlines(), dialecte))
+    # keepends=True : un champ entre guillemets peut contenir un retour à la
+    # ligne (notes multi-lignes) - sans les retours à la ligne, csv.reader
+    # recolle quand même les lignes physiques du champ, mais sans le \n
+    # d'origine entre elles (deux lignes de notes fusionnées en une seule).
+    lignes = list(_csv.reader(contenu.splitlines(keepends=True), dialecte))
     return [ligne for ligne in lignes if any(cellule.strip() for cellule in ligne)]
 
 
