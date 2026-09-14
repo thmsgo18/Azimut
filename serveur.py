@@ -9,6 +9,7 @@ Lancement : ./venv/bin/python serveur.py  puis  http://localhost:8765
 """
 
 import io
+import platform
 import re
 import secrets
 import tempfile
@@ -122,6 +123,11 @@ def api_valeurs():
             "statuts_contact": STATUTS_CONTACT,
             "sources_contact": SOURCES_CONTACT,
             "types_document": TYPES_DOCUMENT,
+            # Widget de barre de menus, notifications et app Rappels : macOS
+            # uniquement (osascript, rumps). L'interface s'appuie là-dessus
+            # pour masquer proprement ces extras sur Windows/Linux plutôt
+            # que d'afficher des boutons qui échoueraient au clic.
+            "plateforme_macos": platform.system() == "Darwin",
         }
     )
 

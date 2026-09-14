@@ -5,12 +5,12 @@
 
   <h1>Azimut</h1>
 
-  <p><b>Track every internship application in a real local database, behind a native macOS app - not another spreadsheet.</b></p>
+  <p><b>Track every internship application in a real local database, behind a native desktop app - not another spreadsheet.</b></p>
 
   <p>
     <a href="https://github.com/thmsgo18/azimut/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/thmsgo18/azimut/tests.yml?style=for-the-badge&label=tests" alt="Tests"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge" alt="License MIT"></a>
-    <img src="https://img.shields.io/badge/platform-macOS-3d8ff0?style=for-the-badge" alt="Platform macOS">
+    <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-3d8ff0?style=for-the-badge" alt="Platform macOS, Windows, Linux">
     <img src="https://img.shields.io/badge/python-3.10%2B-f59e0b?style=for-the-badge" alt="Python 3.10+">
   </p>
 
@@ -28,7 +28,7 @@
 
 ---
 
-Azimut centralizes an entire internship search - applications, companies, contacts, documents, interviews - in a real local database, behind a polished interface that opens like any other Mac app. Built for an AI/ML master's student, it makes no assumption about the field: it fits any internship or apprenticeship search.
+Azimut centralizes an entire internship search - applications, companies, contacts, documents, interviews - in a real local database, behind a polished interface that opens like any other desktop app, on macOS, Windows, or Linux. Built for an AI/ML master's student, it makes no assumption about the field: it fits any internship or apprenticeship search.
 
 **Guiding principle: the database (`suivi_candidatures.db`) is the single source of truth.** Every write - from the interface, the command line, or an AI - goes through Python functions that validate values and catch duplicates. Never hand-written SQL. Excel exports are just projections of that database, regenerable at any time.
 
@@ -36,28 +36,17 @@ Everything runs locally. No data ever leaves the machine, except by explicit act
 
 ## Install
 
-Azimut is built for macOS.
+Azimut runs on macOS, Windows, and Linux - the exact same codebase everywhere. Only the launcher differs, and it installs Python's dependencies by itself the first time you run it (one-time internet connection required); every launch after that is instant. You need [Python 3.10+](https://python.org) installed on the machine (on Windows, tick "Add python.exe to PATH" during install).
 
-**Option A - clone with git** (recommended if you're comfortable with a terminal, makes future updates a `git pull` away):
+[**Download the ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip) and unzip it anywhere, or `git clone https://github.com/thmsgo18/azimut.git` (recommended if you're comfortable with a terminal - makes future updates a `git pull` away). Then, depending on your OS:
 
-```bash
-git clone https://github.com/thmsgo18/azimut.git
-open azimut/Azimut.app
-```
+- **macOS** - double-click **`Azimut.app`**. If macOS blocks it the first time: right-click → *Open* (once only). Fallback if that fails: `Azimut (terminal).command` opens the same window from the Terminal, with the install logs visible.
+- **Windows** - double-click **`Azimut.bat`**.
+- **Linux** - run `./azimut.sh` from a terminal (or double-click it, if your file manager runs executable scripts). The native window needs GTK/WebKit2 (or Qt) - if the first launch fails, the script prints the exact package to install for your distribution.
 
-**Option B - download the ZIP, no terminal needed:**
+Closing the window quits the app. Everything lives in a single local file: `suivi_candidatures.db`, created at the project root on first launch. There's no build step: after any code change, just relaunch the app (or reload the page) to see it.
 
-1. [**Download the ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip) and unzip it anywhere.
-2. Double-click **`Azimut.app`**.
-3. If macOS blocks the app the first time: right-click `Azimut.app` → *Open* (once only).
-
-Either way, the app opens in its own window. On the very first launch, the Python environment and dependencies install themselves (one-time internet connection required) - this first start can take a minute or two, every launch after that is instant. Closing the window quits the app.
-
-If macOS blocks the app at first launch: right-click `Azimut.app` → *Open* (once). As a fallback, `Azimut (terminal).command` opens the same window from the Terminal with the install logs visible.
-
-Everything lives in a single local file: `suivi_candidatures.db`, created at the project root on first launch.
-
-There's no build step: after any code change, just relaunch the app (or reload the page) to see it.
+A handful of extras only exist on macOS - the Reminders app integration, the menu bar widget, and proactive notifications (see [macOS automations](#macos-automations)) - because they lean on macOS-only APIs with no real equivalent elsewhere. The interface hides them automatically outside macOS; everything else (applications, companies, contacts, documents, agenda, AI assistant, Excel import/export, search...) behaves identically on all three OSes, and is covered by the same test suite run in CI on macOS, Windows, and Linux on every change.
 
 ### Sharing a clean copy with a friend
 
@@ -248,6 +237,8 @@ This layer only proposes - never a direct database write, never a made-up value 
 **With no key at all**, Azimut stays fully functional: a Claude-Code-style AI can drive the database directly through the command line or the Python functions documented in [`CLAUDE.md`](CLAUDE.md), on your existing subscription, with no separate API key.
 
 ## macOS automations
+
+Everything below is macOS-only (it leans on AppleScript/`osascript` or macOS-only libraries) and the interface hides the corresponding buttons automatically on Windows/Linux - except dead-link checking and the companion view, which already work identically on every OS and are just documented here alongside the rest.
 
 **Reminders app.** Besides the calendar, the **R** button next to any deadline (Agenda) creates a dated reminder in the Reminders app; a button in "Connect a calendar" sends them all at once. The very first time, macOS asks to authorize Azimut to automate Reminders (System Settings → Privacy & Security → Automation) - grant it once.
 

@@ -5,12 +5,12 @@
 
   <h1>Azimut</h1>
 
-  <p><b>Suivi de candidatures de stage dans une vraie base de données locale, derrière une appli macOS native - pas un énième tableur.</b></p>
+  <p><b>Suivi de candidatures de stage dans une vraie base de données locale, derrière une appli de bureau native - pas un énième tableur.</b></p>
 
   <p>
     <a href="https://github.com/thmsgo18/azimut/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/thmsgo18/azimut/tests.yml?style=for-the-badge&label=tests" alt="Tests"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-22c55e?style=for-the-badge" alt="Licence MIT"></a>
-    <img src="https://img.shields.io/badge/plateforme-macOS-3d8ff0?style=for-the-badge" alt="Plateforme macOS">
+    <img src="https://img.shields.io/badge/plateforme-macOS%20%7C%20Windows%20%7C%20Linux-3d8ff0?style=for-the-badge" alt="Plateforme macOS, Windows, Linux">
     <img src="https://img.shields.io/badge/python-3.10%2B-f59e0b?style=for-the-badge" alt="Python 3.10+">
   </p>
 
@@ -28,7 +28,7 @@
 
 ---
 
-Azimut centralise toute une recherche de stage - candidatures, entreprises, contacts, documents, entretiens - dans une vraie base de données locale, derrière une interface soignée qui s'ouvre comme n'importe quelle application Mac. Pensé au départ pour un M2 en systèmes agentiques, il ne fait aucune hypothèse sur le domaine : il convient à n'importe quelle recherche de stage ou d'alternance.
+Azimut centralise toute une recherche de stage - candidatures, entreprises, contacts, documents, entretiens - dans une vraie base de données locale, derrière une interface soignée qui s'ouvre comme n'importe quelle application de bureau, sur macOS, Windows ou Linux. Pensé au départ pour un M2 en systèmes agentiques, il ne fait aucune hypothèse sur le domaine : il convient à n'importe quelle recherche de stage ou d'alternance.
 
 **Principe directeur : la base de données (`suivi_candidatures.db`) est la seule source de vérité.** Toute écriture - depuis l'interface, la ligne de commande, ou une IA - passe par des fonctions Python qui valident les valeurs et détectent les doublons. Jamais de SQL écrit à la main. Les exports Excel ne sont que des projections de cette base, régénérables à tout moment.
 
@@ -36,28 +36,17 @@ Tout tourne en local. Aucune donnée ne quitte la machine, sauf action explicite
 
 ## Installation
 
-Azimut est fait pour macOS.
+Azimut tourne sur macOS, Windows et Linux - exactement le même code partout. Seul le lanceur change, et il installe lui-même les dépendances Python au premier lancement (connexion Internet nécessaire une seule fois) ; les suivants sont immédiats. Il faut [Python 3.10+](https://python.org) installé sur la machine (sous Windows, cocher « Add python.exe to PATH » pendant l'installation).
 
-**Option A - cloner avec git** (recommandé si tu es à l'aise avec un terminal, les mises à jour suivantes ne seront qu'un `git pull`) :
+[**Télécharger le ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip) et le dézipper n'importe où, ou `git clone https://github.com/thmsgo18/azimut.git` (recommandé si tu es à l'aise avec un terminal - les mises à jour suivantes ne seront qu'un `git pull`). Ensuite, selon ton OS :
 
-```bash
-git clone https://github.com/thmsgo18/azimut.git
-open azimut/Azimut.app
-```
+- **macOS** - double-cliquer sur **`Azimut.app`**. Si macOS la bloque au premier lancement : clic droit → *Ouvrir* (une seule fois). En secours si ça ne marche pas : `Azimut (terminal).command` ouvre la même fenêtre depuis le Terminal, avec les messages d'installation visibles.
+- **Windows** - double-cliquer sur **`Azimut.bat`**.
+- **Linux** - lancer `./azimut.sh` depuis un terminal (ou double-cliquer dessus si ton gestionnaire de fichiers exécute les scripts). La fenêtre native a besoin de GTK/WebKit2 (ou Qt) - si le premier lancement échoue, le script affiche le paquet exact à installer pour ta distribution.
 
-**Option B - télécharger le ZIP, sans terminal :**
+Fermer la fenêtre quitte l'appli. Tout tourne en local dans un seul fichier : `suivi_candidatures.db`, créé à la racine du projet au premier lancement. Le code n'a pas d'étape de compilation : après toute modification, il suffit de relancer l'appli (ou de recharger la page) pour voir les changements.
 
-1. [**Télécharger le ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip) et le dézipper n'importe où.
-2. Double-cliquer sur **`Azimut.app`**.
-3. Si macOS bloque l'appli au premier lancement : clic droit sur `Azimut.app` → *Ouvrir* (une seule fois).
-
-Dans les deux cas, l'appli s'ouvre dans sa propre fenêtre. Au tout premier lancement, l'environnement Python et les dépendances s'installent seuls (connexion Internet nécessaire une seule fois) - ce premier démarrage peut prendre une à deux minutes, les suivants sont immédiats. Fermer la fenêtre quitte l'appli.
-
-En secours, `Azimut (terminal).command` lance la même fenêtre depuis le Terminal avec les messages d'installation visibles.
-
-Tout tourne en local dans un seul fichier : `suivi_candidatures.db`, créé à la racine du projet au premier lancement.
-
-Le code n'a pas d'étape de compilation : après toute modification, il suffit de relancer l'appli (ou de recharger la page) pour voir les changements.
+Une poignée d'extras n'existent que sur macOS - l'intégration à l'app Rappels, le widget de barre de menus et les notifications proactives (voir [Automatisations macOS](#automatisations-macos)) - car ils s'appuient sur des API propres à macOS, sans réel équivalent ailleurs. L'interface les masque automatiquement en dehors de macOS ; tout le reste (candidatures, entreprises, contacts, documents, agenda, assistant IA, import/export Excel, recherche...) se comporte à l'identique sur les 3 OS, et est couvert par la même suite de tests exécutée en CI sur macOS, Windows et Linux à chaque modification.
 
 ### Partager une copie propre à un ami
 
@@ -248,6 +237,8 @@ Cette couche ne fait que proposer - jamais d'écriture directe en base, jamais d
 **Sans clé du tout**, Azimut reste entièrement fonctionnel : une IA de type Claude Code peut piloter la base directement via la ligne de commande ou les fonctions Python documentées dans [`CLAUDE.md`](CLAUDE.md), sur ton abonnement existant, sans clé API séparée.
 
 ## Automatisations macOS
+
+Tout ce qui suit est propre à macOS (ça s'appuie sur AppleScript/`osascript` ou des bibliothèques macOS uniquement) et l'interface masque automatiquement les boutons correspondants sur Windows/Linux - sauf la vérification des liens morts et la vue compagnon, qui fonctionnent déjà à l'identique sur tous les OS et sont juste documentées ici avec le reste.
 
 **App Rappels.** En plus du calendrier, le bouton **R** à côté de chaque échéance (agenda) crée un rappel daté dans l'app Rappels ; un bouton dans « Connecter un calendrier » les envoie toutes d'un coup. La toute première fois, macOS demande d'autoriser Azimut à automatiser Rappels (Réglages Système → Confidentialité et sécurité → Automatisation) - à accorder une fois.
 

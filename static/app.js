@@ -1595,6 +1595,11 @@ function lienGoogleAgenda(echeance) {
 
 function chipEcheance(echeance) {
   const donneesEcheance = echapperAttribut(JSON.stringify(echeance));
+  const boutonRappel = etat.valeurs.plateforme_macos
+    ? `<button type="button" class="chip-echeance-ajout" data-echeance="${donneesEcheance}"
+              title="${t("agenda.envoyer_rappels")}"
+              onclick="event.stopPropagation(); pousserRappelDepuisBouton(this)">R</button>`
+    : "";
   return `
     <span class="chip-echeance-groupe" style="--couleur-statut:${COULEURS_ECHEANCE[echeance.type]}">
       <button class="chip-echeance"
@@ -1604,9 +1609,7 @@ function chipEcheance(echeance) {
       </button>
       <a class="chip-echeance-ajout" href="${lienGoogleAgenda(echeance)}" target="_blank" rel="noopener"
          title="${t("agenda.ajouter_google")}" onclick="event.stopPropagation()">+</a>
-      <button type="button" class="chip-echeance-ajout" data-echeance="${donneesEcheance}"
-              title="${t("agenda.envoyer_rappels")}"
-              onclick="event.stopPropagation(); pousserRappelDepuisBouton(this)">R</button>
+      ${boutonRappel}
     </span>`;
 }
 
@@ -1727,6 +1730,14 @@ function activerAgenda() {
    sur une adresse locale : lien par événement ou import du fichier .ics). */
 function ouvrirConnexionCalendrier() {
   const lienAbonnement = location.origin.replace(/^http/, "webcal") + "/api/agenda/abonnement.ics";
+  const blocRappels = etat.valeurs.plateforme_macos
+    ? `<div class="bloc-calendrier">
+      <h3>${t("agenda.rappels_titre")}</h3>
+      <p class="sous-titre">${t("agenda.rappels_texte")}</p>
+      <button class="btn" id="btn-tout-pousser-rappels">${t("agenda.envoyer_toutes_echeances")}</button>
+      <p class="sous-titre" id="resultat-rappels" style="margin-top:8px;"></p>
+    </div>`
+    : "";
   ouvrirModale(
     t("agenda.connecter_calendrier"),
     `
@@ -1748,30 +1759,28 @@ function ouvrirConnexionCalendrier() {
       <h3>${t("agenda.outlook_titre")}</h3>
       <p class="sous-titre">${t("agenda.outlook_texte")}</p>
     </div>
-    <div class="bloc-calendrier">
-      <h3>${t("agenda.rappels_titre")}</h3>
-      <p class="sous-titre">${t("agenda.rappels_texte")}</p>
-      <button class="btn" id="btn-tout-pousser-rappels">${t("agenda.envoyer_toutes_echeances")}</button>
-      <p class="sous-titre" id="resultat-rappels" style="margin-top:8px;"></p>
-    </div>`,
+    ${blocRappels}`,
     `<button class="btn btn-accent" onclick="fermerModale()">${t("commun.fermer")}</button>`
   );
-  document.getElementById("btn-tout-pousser-rappels").addEventListener("click", async (evenement) => {
-    const bouton = evenement.currentTarget;
-    bouton.disabled = true;
-    bouton.textContent = t("agenda.envoi_en_cours");
-    try {
-      const resultat = await api("/api/rappels/tout_pousser", { methode: "POST" });
-      document.getElementById("resultat-rappels").textContent =
-        t("agenda.rappels_crees", { n: resultat.reussies }) + (resultat.echouees ? ", " + t("agenda.rappels_echecs", { n: resultat.echouees }) : ".");
-      toast(t("agenda.rappels_envoyes", { n: resultat.reussies }));
-    } catch (erreur) {
-      toast(erreur.message, true);
-    } finally {
-      bouton.disabled = false;
-      bouton.textContent = t("agenda.envoyer_toutes_echeances");
-    }
-  });
+  const boutonToutPousser = document.getElementById("btn-tout-pousser-rappels");
+  if (boutonToutPousser) {
+    boutonToutPousser.addEventListener("click", async (evenement) => {
+      const bouton = evenement.currentTarget;
+      bouton.disabled = true;
+      bouton.textContent = t("agenda.envoi_en_cours");
+      try {
+        const resultat = await api("/api/rappels/tout_pousser", { methode: "POST" });
+        document.getElementById("resultat-rappels").textContent =
+          t("agenda.rappels_crees", { n: resultat.reussies }) + (resultat.echouees ? ", " + t("agenda.rappels_echecs", { n: resultat.echouees }) : ".");
+        toast(t("agenda.rappels_envoyes", { n: resultat.reussies }));
+      } catch (erreur) {
+        toast(erreur.message, true);
+      } finally {
+        bouton.disabled = false;
+        bouton.textContent = t("agenda.envoyer_toutes_echeances");
+      }
+    });
+  }
 }
 
 /* ========================================================================
@@ -2260,14 +2269,14 @@ async function vueReglages() {
         </div>
       </div>
 
-      <div class="carte">
+      ${etat.valeurs.plateforme_macos ? `<div class="carte">
         <h2>${t("reglages.notifications_titre")}</h2>
         <p class="sous-titre">${t("reglages.notifications_texte")}</p>
         <label class="case" style="margin-top:10px;">
           <input type="checkbox" id="reg-notifications" ${r.notifications_macos === "Oui" ? "checked" : ""}>
           ${t("reglages.notifications_case")}
         </label>
-      </div>
+      </div>` : ""}
 
       <div class="carte">
         <h2>${t("reglages.compagnon_titre")}</h2>
@@ -2477,17 +2486,20 @@ function activerReglages() {
     });
   }
 
-  document.getElementById("reg-notifications").addEventListener("change", async (evenement) => {
-    try {
-      await api("/api/reglages", {
-        methode: "POST",
-        corps: { notifications_macos: evenement.target.checked ? "Oui" : "Non" },
-      });
-      toast(evenement.target.checked ? t("reglages.notifications_activees") : t("reglages.notifications_desactivees"));
-    } catch (erreur) {
-      toast(erreur.message, true);
-    }
-  });
+  const caseNotifications = document.getElementById("reg-notifications");
+  if (caseNotifications) {
+    caseNotifications.addEventListener("change", async (evenement) => {
+      try {
+        await api("/api/reglages", {
+          methode: "POST",
+          corps: { notifications_macos: evenement.target.checked ? "Oui" : "Non" },
+        });
+        toast(evenement.target.checked ? t("reglages.notifications_activees") : t("reglages.notifications_desactivees"));
+      } catch (erreur) {
+        toast(erreur.message, true);
+      }
+    });
+  }
 
   const selectLangue = document.getElementById("reg-langue");
   if (selectLangue) {

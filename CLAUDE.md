@@ -116,11 +116,13 @@ etat_liens() -> résumé                                # lecture seule, ne rela
 # rapide.py - brouillon depuis un lien/texte externe (Raccourci macOS, etc.)
 creer_brouillon(lien=None, texte=None) -> {id, entreprise, poste}   # statut "À préparer", jamais définitif
 
-# rappels_macos.py - pousse une échéance dans l'app Rappels (osascript, macOS uniquement)
+# rappels_macos.py - pousse une échéance dans l'app Rappels (osascript, macOS uniquement -
+# lève ErreurSuivi proprement sur Windows/Linux, voir section Portabilité)
 creer_rappel(titre, notes, date_echeance_iso, liste="Azimut")
 pousser_echeance(echeance) / pousser_toutes_les_echeances() -> résumé (best effort)
 
-# notifications_macos.py - notifications proactives (widget), désactivées par défaut
+# notifications_macos.py - notifications proactives (widget), désactivées par défaut,
+# no-op silencieux sur Windows/Linux (osascript absent)
 verifier_et_notifier()   # résumé de relances 1x/jour + 1 alerte par lien mort, jamais en boucle
 
 # import_csv.py - import générique (LinkedIn, Indeed, autre), colonnes mappées à la main
@@ -177,11 +179,40 @@ outputs + recherche web) ou `"openai_compatible"` (SDK `openai` avec une
 local...). Ne jamais écrire en base depuis ce module : il ne fait que
 retourner une proposition, à valider et écrire ensuite via l'API métier.
 
+## Portabilité (macOS / Windows / Linux)
+
+Même code partout, un lanceur différent par OS (`Azimut.app` / `Azimut.bat` /
+`azimut.sh`), tous sur le même principe auto-installant (créent le venv et
+installent `requirements.txt` au premier lancement). Trois modules sont
+propres à macOS (`rumps` pour le widget, `osascript` pour les notifications
+et l'app Rappels) : `rumps` a un marqueur `sys_platform == "darwin"` dans
+`requirements.txt` pour ne jamais casser `pip install` ailleurs, et
+`rappels_macos.py` / `notifications_macos.py` dégradent déjà proprement (une
+`ErreurSuivi` claire ou un no-op silencieux) sans qu'aucun garde-fou
+supplémentaire soit nécessaire dans le code Python.
+
+Le reste (toute la logique métier, `serveur.py`, `app_bureau.py`) est déjà
+cross-OS - aucun chemin en dur, tout passe par `pathlib.Path`. La CI
+(`.github/workflows/tests.yml`) fait tourner la suite de tests sur les 3 OS à
+chaque push : c'est la vérification qui compte, pas une hypothèse.
+
+Côté interface, `/api/valeurs` expose `plateforme_macos` (calculé côté
+serveur via `platform.system()`) ; `static/app.js` s'en sert pour masquer
+proprement les 3 extras macOS (bouton **R** des échéances, bloc « App
+Rappels » dans « Connecter un calendrier », carte « Notifications
+proactives » dans Réglages) plutôt que d'afficher un bouton qui échouerait au
+clic sur Windows/Linux. **Toute nouvelle fonctionnalité qui dépend d'une API
+propre à un seul OS doit suivre ce même patron** : dégradation gracieuse côté
+Python (jamais d'exception qui remonte non gérée), masquage côté JS via
+`etat.valeurs.plateforme_macos` (ou un nouveau champ du même genre si un jour
+une fonctionnalité est propre à Windows ou Linux).
+
 ## Vérifier son travail
 
 ```bash
 ./venv/bin/python -m unittest discover -s tests   # la suite complète doit rester verte
 ```
 
-L'appli se lance par `Azimut.app` (fenêtre native) ; le serveur de dev par
-`./venv/bin/python serveur.py` (http://localhost:8765).
+L'appli se lance par `Azimut.app` (macOS), `Azimut.bat` (Windows) ou
+`azimut.sh` (Linux) - fenêtre native ; le serveur de dev par
+`./venv/bin/python serveur.py` (http://localhost:8765), sur les 3 OS.
