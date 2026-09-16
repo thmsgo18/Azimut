@@ -1,0 +1,5 @@
+#!/bin/bash
+# Lanceur du suivi de candidatures : ./suivi <commande>
+# Exécute toujours le code actuel du projet, rien à recompiler après une modification.
+DOSSIER="$(cd "$(dirname "$0")" && pwd)"
+exec "$DOSSIER/venv/bin/python" "$DOSSIER/cli.py" "$@"

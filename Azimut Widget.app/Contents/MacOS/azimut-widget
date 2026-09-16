@@ -1,0 +1,16 @@
+#!/bin/bash
+# Lanceur du widget de barre de menus Azimut (pas d'icône Dock : LSUIElement).
+ICI="$(cd "$(dirname "$0")" && pwd)"          # …/Azimut Widget.app/Contents/MacOS
+PROJET="$(cd "$ICI/../../.." && pwd)"          # racine du projet
+
+cd "$PROJET" || exit 1
+
+if [ ! -x "venv/bin/python" ]; then
+    /usr/bin/osascript -e 'display dialog "Lance d'\''abord Azimut.app une fois : il installe l'\''environnement nécessaire au widget." with title "Azimut Widget" buttons {"OK"} default button 1 with icon caution' >/dev/null 2>&1
+    exit 1
+fi
+if ! ./venv/bin/python -c "import rumps" >/dev/null 2>&1; then
+    ./venv/bin/pip install --quiet rumps >/tmp/azimut-widget-install.log 2>&1
+fi
+
+exec ./venv/bin/python menu_barre.py

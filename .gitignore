@@ -1,0 +1,26 @@
+# Base de données, jamais versionnée (données personnelles)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environnement Python
+venv/
+__pycache__/
+*.pyc
+
+# Dossiers de données personnelles (documents joints, sauvegardes de la base)
+/documents/
+/sauvegardes/
+
+# Exports Excel (données personnelles, régénérables depuis la base)
+*.xlsx
+
+# Fichiers CSV téléversés le temps d'un import (nettoyés automatiquement)
+/import_temp/
+
+# État local des notifications proactives (widget), pas une donnée métier
+/notifications_etat.json
+
+# Fichiers macOS
+.DS_Store

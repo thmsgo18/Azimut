@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Azimut - suivi de candidatures</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='0.6' y='0.6' width='22.8' height='22.8' rx='5.4' fill='%232a78d6'/%3E%3Cg fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3a9 9 0 0 1 6.36 2.64'/%3E%3Ccircle cx='12' cy='12' r='9' opacity='0.35'/%3E%3Cpolygon points='16.5 7.5 13.6 13.6 7.5 16.5 10.4 10.4' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+  <div class="app">
+    <aside class="lateral">
+      <div class="logo">
+        <div class="logo-pastille">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a9 9 0 0 1 6.36 2.64"></path>
+            <circle cx="12" cy="12" r="9" opacity="0.35"></circle>
+            <polygon points="16.5 7.5 13.6 13.6 7.5 16.5 10.4 10.4 16.5 7.5" fill="currentColor" stroke="none"></polygon>
+          </svg>
+        </div>
+        <div>
+          <div class="logo-nom">Azimut</div>
+          <div class="logo-sous">Suivi de candidatures</div>
+        </div>
+      </div>
+
+      <button class="btn btn-accent" id="btn-nouvelle" style="margin: 4px 0 14px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span data-i18n="nav.nouvelle_candidature">Nouvelle candidature</span>
+      </button>
+
+      <nav class="nav">
+        <a href="#/" data-vue="bord">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          <span data-i18n="nav.tableau_de_bord">Tableau de bord</span>
+        </a>
+        <a href="#/candidatures" data-vue="candidatures">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="5" height="13" rx="1.5"/></svg>
+          <span data-i18n="nav.candidatures">Candidatures</span>
+        </a>
+        <a href="#/relances" data-vue="relances">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.5 6.36L3 16"/><path d="M3 21v-5h5"/></svg>
+          <span data-i18n="nav.relances">Relances</span>
+        </a>
+        <a href="#/agenda" data-vue="agenda">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+          <span data-i18n="nav.agenda">Agenda</span>
+        </a>
+        <a href="#/entreprises" data-vue="entreprises">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V5a1.5 1.5 0 0 1 1.5-1.5H13A1.5 1.5 0 0 1 14.5 5v16"/><path d="M14.5 9H18a1.5 1.5 0 0 1 1.5 1.5V21"/><path d="M8 7.5h3M8 11h3M8 14.5h3"/></svg>
+          <span data-i18n="nav.entreprises">Entreprises</span>
+        </a>
+        <a href="#/contacts" data-vue="contacts">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c.6-3.4 2.8-5.2 5.5-5.2s4.9 1.8 5.5 5.2"/><path d="M16.5 5.4a3.4 3.4 0 0 1 0 5.2"/><path d="M17.8 14.9c1.6.8 2.5 2.6 2.7 5.1"/></svg>
+          <span data-i18n="nav.contacts">Contacts</span>
+        </a>
+        <a href="#/documents" data-vue="documents">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>
+          <span data-i18n="nav.documents">Documents</span>
+        </a>
+        <a href="#/statistiques" data-vue="statistiques">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>
+          <span data-i18n="nav.statistiques">Statistiques</span>
+        </a>
+        <a href="#/recherche" data-vue="recherche">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+          <span data-i18n="nav.recherche">Recherche</span>
+        </a>
+      </nav>
+
+      <div class="lateral-bas">
+        <a class="btn" href="#/reglages" id="btn-reglages">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1z"/></svg>
+          <span data-i18n="nav.reglages">Réglages</span>
+        </a>
+        <button class="btn" id="btn-actualiser" title="Recharger les données de la base (utile si une autre appli les a modifiées)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          <span data-i18n="nav.actualiser">Actualiser</span>
+        </button>
+        <button class="btn" id="btn-export">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19h16"/></svg>
+          <span data-i18n="nav.exporter_excel">Exporter en Excel</span>
+        </button>
+        <button class="btn" id="btn-import">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m17 8-5-5-5 5"/><path d="M4 19h16"/></svg>
+          <span data-i18n="nav.importer_excel">Importer un Excel</span>
+        </button>
+        <button class="btn" id="btn-import-csv">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="m17 8-5-5-5 5"/><path d="M4 19h16"/></svg>
+          <span data-i18n="nav.importer_csv">Importer un CSV</span>
+        </button>
+        <input type="file" id="fichier-import" accept=".xlsx" hidden>
+        <input type="file" id="fichier-import-csv" accept=".csv" hidden>
+      </div>
+    </aside>
+
+    <main class="contenu" id="vue"></main>
+  </div>
+
+  <!-- Panneau latéral (formulaires) -->
+  <div class="voile" id="voile"></div>
+  <aside class="panneau" id="panneau" aria-hidden="true">
+    <div class="panneau-entete">
+      <h2 id="panneau-titre"></h2>
+      <button class="btn btn-discret" id="panneau-fermer" data-i18n-aria="commun.fermer" aria-label="Fermer">✕</button>
+    </div>
+    <div class="panneau-corps" id="panneau-corps"></div>
+    <div class="panneau-pied" id="panneau-pied"></div>
+  </aside>
+
+  <!-- Modale centrée (fiche entretien, confirmations) -->
+  <div class="modale" id="modale">
+    <div class="modale-boite" id="modale-boite">
+      <div class="modale-entete">
+        <h2 id="modale-titre"></h2>
+        <button class="btn btn-discret" id="modale-fermer" data-i18n-aria="commun.fermer" aria-label="Fermer">✕</button>
+      </div>
+      <div class="modale-corps" id="modale-corps"></div>
+      <div class="modale-pied" id="modale-pied"></div>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+
+  <script src="langues/fr.js"></script>
+  <script src="langues/en.js"></script>
+  <script src="langues/registre.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

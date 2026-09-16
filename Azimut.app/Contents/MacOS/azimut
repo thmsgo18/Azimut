@@ -1,0 +1,27 @@
+#!/bin/bash
+# Lanceur de Azimut (application de bureau).
+# Le projet est le dossier qui contient Azimut.app.
+ICI="$(cd "$(dirname "$0")" && pwd)"          # …/Azimut.app/Contents/MacOS
+PROJET="$(cd "$ICI/../../.." && pwd)"          # racine du projet
+cd "$PROJET" || exit 1
+
+dialogue() {
+    /usr/bin/osascript -e "display dialog \"$1\" with title \"Azimut\" buttons {\"OK\"} default button 1 with icon caution" >/dev/null 2>&1
+}
+
+# Premier lancement : installation automatique de l'environnement Python.
+if [ ! -x "venv/bin/python" ]; then
+    if ! /usr/bin/python3 -m venv venv >/tmp/azimut-install.log 2>&1 \
+       && ! python3 -m venv venv >>/tmp/azimut-install.log 2>&1; then
+        dialogue "Python 3 est introuvable. Ouvrir le Terminal, taper python3, accepter l'installation des outils de développement proposée par macOS, puis relancer Azimut."
+        exit 1
+    fi
+fi
+if ! ./venv/bin/python -c "import flask, openpyxl, webview" >/dev/null 2>&1; then
+    if ! ./venv/bin/pip install --quiet -r requirements.txt >>/tmp/azimut-install.log 2>&1; then
+        dialogue "Installation des dépendances impossible. Vérifier la connexion Internet (nécessaire une seule fois, au premier lancement), puis relancer Azimut."
+        exit 1
+    fi
+fi
+
+exec ./venv/bin/python app_bureau.py
