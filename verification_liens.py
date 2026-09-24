@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 
 from candidatures import enregistrer_etat_lien, lister_candidatures
 
-STATUTS_A_VERIFIER = ("À préparer", "Envoyée", "Relancée", "Réponse reçue", "Entretien")
+STATUTS_A_VERIFIER = ("À préparer", "Envoyée", "Réponse reçue", "Entretien")
 DELAI_MINIMUM_ENTRE_CONTROLES = timedelta(hours=24)
 AGENT_UTILISATEUR = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "

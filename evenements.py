@@ -1,7 +1,7 @@
 """Journal d'événements (timeline) des candidatures.
 
 Les événements sont enregistrés automatiquement par candidatures.py à chaque
-étape marquante (création, changement de statut, relance, réponse, entretien
+étape marquante (création, changement de statut, réponse, entretien
 planifié). Lecture seule pour l'extérieur : on ne réécrit pas l'histoire.
 """
 

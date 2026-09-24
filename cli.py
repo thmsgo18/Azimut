@@ -82,10 +82,7 @@ CHAMPS_CANDIDATURE = {
     "lien_offre": "lien_offre",
     "texte_offre": "texte_offre",
     "type_candidature": "type_candidature",
-    "priorite": "priorite",
     "statut": "statut",
-    "nb_relances": "nb_relances",
-    "date_relance_prevue": "date_relance_prevue",
     "date_reponse": "date_reponse",
     "date_entretien": "date_entretien",
     "date_debut_souhaitee": "date_debut_souhaitee",
@@ -131,10 +128,7 @@ def _options_candidature(parseur, avec_poste_option):
     parseur.add_argument("--lien-offre", dest="lien_offre", help="URL de l'offre")
     parseur.add_argument("--texte-offre", dest="texte_offre", help="Texte intégral de l'offre (archive)")
     parseur.add_argument("--type", dest="type_candidature", help="Type de candidature")
-    parseur.add_argument("--priorite", help="Priorité : Haute, Moyenne ou Basse")
     parseur.add_argument("--statut", help="Statut de la candidature")
-    parseur.add_argument("--nb-relances", dest="nb_relances", help="Nombre de relances")
-    parseur.add_argument("--date-relance-prevue", dest="date_relance_prevue", help="Date de relance prévue")
     parseur.add_argument("--date-reponse", dest="date_reponse", help="Date de réponse")
     parseur.add_argument("--date-entretien", dest="date_entretien", help="Date de l'entretien")
     parseur.add_argument("--date-debut-souhaitee", dest="date_debut_souhaitee", help="Date de début souhaitée")
@@ -184,7 +178,6 @@ def construire_analyseur():
     lister = actions.add_parser("lister", help="Lister les candidatures")
     lister.add_argument("--statut", help="Filtrer par statut")
     lister.add_argument("--sous-domaine", dest="sous_domaine", help="Filtrer par sous-domaine")
-    lister.add_argument("--priorite", help="Filtrer par priorité")
 
     modifier = actions.add_parser("modifier", help="Modifier une candidature")
     modifier.add_argument("id", type=int, help="Numéro de la candidature")
@@ -192,13 +185,6 @@ def construire_analyseur():
 
     voir = actions.add_parser("voir", help="Afficher le détail d'une candidature")
     voir.add_argument("id", type=int, help="Numéro de la candidature")
-
-    relancer = actions.add_parser(
-        "relancer", help="Marquer une relance faite (incrémente et efface la date prévue)"
-    )
-    relancer.add_argument("id", type=int, help="Numéro de la candidature")
-
-    actions.add_parser("relances", help="Lister les relances à faire aujourd'hui ou en retard")
 
     # --- entreprises ---
     ent = sections.add_parser("entreprises", help="Gérer les entreprises")
@@ -320,16 +306,15 @@ def executer(args):
             liste = candidatures.lister_candidatures(
                 statut=args.statut,
                 sous_domaine=args.sous_domaine,
-                priorite=args.priorite,
                 chemin_db=chemin_db,
             )
             if not liste:
                 print("Aucune candidature trouvée.")
                 return
             _afficher_table(
-                [("N°", 5), ("Entreprise", 22), ("Poste", 32), ("Statut", 14), ("Priorité", 9), ("Envoyée le", 10)],
+                [("N°", 5), ("Entreprise", 22), ("Poste", 32), ("Statut", 14), ("Envoyée le", 10)],
                 [
-                    (c["id"], c["entreprise"], c["poste"], c["statut"], c["priorite"], _date_fr(c["date_envoi"]))
+                    (c["id"], c["entreprise"], c["poste"], c["statut"], _date_fr(c["date_envoi"]))
                     for c in liste
                 ],
             )
@@ -344,12 +329,9 @@ def executer(args):
                 ("Entreprise", cand["entreprise"]),
                 ("Poste", cand["poste"]),
                 ("Statut", cand["statut"]),
-                ("Priorité", cand["priorite"]),
                 ("Sous-domaine", cand["sous_domaine"]),
                 ("Type", cand["type_candidature"]),
                 ("Envoyée le", _date_fr(cand["date_envoi"])),
-                ("Relances", cand["nb_relances"]),
-                ("Relance prévue le", _date_fr(cand["date_relance_prevue"])),
                 ("Réponse le", _date_fr(cand["date_reponse"])),
                 ("Entretien le", _date_fr(cand["date_entretien"])),
                 ("Début souhaité", _date_fr(cand["date_debut_souhaitee"])),
@@ -366,23 +348,6 @@ def executer(args):
             for libelle, valeur in libelles:
                 if valeur not in (None, ""):
                     print(f"  {libelle} : {valeur}")
-        elif args.action == "relancer":
-            cand = candidatures.marquer_relance(args.id, chemin_db=chemin_db)
-            print(f"✓ Relance n°{cand['nb_relances']} enregistrée pour la candidature n°{args.id} "
-                  f"({cand['entreprise']} - {cand['poste']}), statut : {cand['statut']}.")
-        elif args.action == "relances":
-            liste = candidatures.lister_relances_a_faire(chemin_db=chemin_db)
-            if not liste:
-                print("Aucune relance à faire aujourd'hui.")
-                return
-            _afficher_table(
-                [("N°", 5), ("Entreprise", 22), ("Poste", 32), ("Prévue le", 10), ("Priorité", 9)],
-                [
-                    (c["id"], c["entreprise"], c["poste"], _date_fr(c["date_relance_prevue"]), c["priorite"])
-                    for c in liste
-                ],
-            )
-            print(f"\n{len(liste)} relance(s) à faire.")
 
     elif args.section == "entreprises":
         if args.action == "ajouter":

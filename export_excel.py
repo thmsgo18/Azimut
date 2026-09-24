@@ -21,7 +21,6 @@ from entreprises import lister_entreprises
 from valeurs import (
     CONVENTIONS,
     MODES_TRAVAIL,
-    PRIORITES,
     SOURCES_CANDIDATURE,
     SOURCES_CONTACT,
     SOUS_DOMAINES,
@@ -40,13 +39,11 @@ BLEU_LIEN = "FF0563C1"
 COULEURS_STATUT = {
     "À préparer": "FF595959",
     "Envoyée": "FF1F4E78",
-    "Relancée": "FF7F6000",
     "Réponse reçue": "FF1F4E78",
     "Entretien": "FF833C00",
     "Refus": "FF9C0006",
     "Accepté": "FF375623",
 }
-COULEURS_PRIORITE = {"Haute": "FF9C0006", "Moyenne": "FF7F6000", "Basse": "FF595959"}
 
 BORDURE = Border(
     left=Side(style="thin", color=GRIS_BORDURE),
@@ -128,10 +125,7 @@ def _onglet_suivi(wb, liste, ligne_max):
         "Lien de l'offre",
         "Texte de l'offre",
         "Type de candidature",
-        "Priorité",
         "Statut",
-        "Nb relances",
-        "Date de relance prévue",
         "Date de réponse",
         "Date d'entretien",
         "Date de début souhaitée",
@@ -146,7 +140,7 @@ def _onglet_suivi(wb, liste, ligne_max):
         "Fiche entreprise",
         "Contacts",
     ]
-    largeurs = [20, 14, 26, 24, 30, 18, 20, 12, 16, 12, 20, 16, 16, 20, 14, 18, 16, 16, 16, 14, 30, 24, 16, 14]
+    largeurs = [20, 14, 26, 24, 30, 18, 20, 16, 16, 16, 20, 14, 18, 16, 16, 16, 14, 30, 24, 16, 14]
     _preparer_onglet(ws, titres, largeurs, ligne_max, ligne_donnees=3)
 
     # Ligne 2 : exemple (fond jaune, italique), comme dans le fichier existant.
@@ -158,10 +152,7 @@ def _onglet_suivi(wb, liste, ligne_max):
         "https://exemple.com/offre",
         "Texte intégral de l'offre (archive)",
         "Offre publiée",
-        "Haute",
         "Envoyée",
-        0,
-        "15/09/2026",
         None,
         None,
         "02/02/2027",
@@ -171,7 +162,7 @@ def _onglet_suivi(wb, liste, ligne_max):
         "Hybride",
         "Non",
         "LinkedIn",
-        "Relancer si pas de réponse sous 2 semaines",
+        "Contact RH trouvé sur LinkedIn",
         None,
         None,
         None,
@@ -192,10 +183,7 @@ def _onglet_suivi(wb, liste, ligne_max):
             cand["lien_offre"],
             _texte_cellule(cand["texte_offre"]),
             cand["type_candidature"],
-            cand["priorite"],
             cand["statut"],
-            cand["nb_relances"],
-            _date_fr(cand["date_relance_prevue"]),
             _date_fr(cand["date_reponse"]),
             _date_fr(cand["date_entretien"]),
             _date_fr(cand["date_debut_souhaitee"]),
@@ -217,13 +205,13 @@ def _onglet_suivi(wb, liste, ligne_max):
         # Liens HYPERLINK + MATCH vers les onglets Entreprises et Contacts.
         fiche = ws.cell(
             row=ligne,
-            column=23,
+            column=20,
             value=f'=HYPERLINK("#Entreprises!A"&MATCH($A{ligne},Entreprises!$A:$A,0),"→ Entreprise")',
         )
         fiche.font = POLICE_LIEN
         lien_contacts = ws.cell(
             row=ligne,
-            column=24,
+            column=21,
             value=f'=IFERROR(HYPERLINK("#Contacts!A"&MATCH($A{ligne},Contacts!$A:$A,0),"→ Contacts"),"(aucun)")',
         )
         lien_contacts.font = POLICE_LIEN
@@ -232,24 +220,18 @@ def _onglet_suivi(wb, liste, ligne_max):
     for colonne, valeurs in [
         ("D", SOUS_DOMAINES),
         ("G", TYPES_CANDIDATURE),
-        ("H", PRIORITES),
-        ("I", STATUTS),
-        ("R", MODES_TRAVAIL),
-        ("S", CONVENTIONS),
-        ("T", SOURCES_CANDIDATURE),
+        ("H", STATUTS),
+        ("O", MODES_TRAVAIL),
+        ("P", CONVENTIONS),
+        ("Q", SOURCES_CANDIDATURE),
     ]:
         _ajouter_validation(ws, colonne, valeurs, 3, ligne_max)
 
-    # Mise en forme conditionnelle (couleur de police) sur Statut et Priorité.
+    # Mise en forme conditionnelle (couleur de police) sur le statut.
     for statut, couleur in COULEURS_STATUT.items():
         ws.conditional_formatting.add(
-            f"I3:I{ligne_max}",
-            CellIsRule(operator="equal", formula=[f'"{statut}"'], font=Font(color=couleur)),
-        )
-    for priorite, couleur in COULEURS_PRIORITE.items():
-        ws.conditional_formatting.add(
             f"H3:H{ligne_max}",
-            CellIsRule(operator="equal", formula=[f'"{priorite}"'], font=Font(color=couleur)),
+            CellIsRule(operator="equal", formula=[f'"{statut}"'], font=Font(color=couleur)),
         )
     return ws
 
@@ -370,7 +352,7 @@ def _onglet_tableau_de_bord(wb, ligne_max_suivi, ligne_max_contacts):
         cellule_b.alignment = Alignment(horizontal="center")
         return cellule_b
 
-    plage_statut = f"'Suivi candidatures'!$I$3:$I${ligne_max_suivi}"
+    plage_statut = f"'Suivi candidatures'!$H$3:$H${ligne_max_suivi}"
     entete_section(3, "Statut")
     for i, statut in enumerate(STATUTS):
         ligne_compteur(4 + i, statut, f'=COUNTIF({plage_statut},"{statut}")')
@@ -380,7 +362,12 @@ def _onglet_tableau_de_bord(wb, ligne_max_suivi, ligne_max_contacts):
         f"=COUNTA('Suivi candidatures'!$A$3:$A${ligne_max_suivi})",
         gras_libelle=True,
     )
-    taux = ligne_compteur(13, "Taux de réponse", "=IFERROR((B7+B8+B9+B10)/B12,0)", gras_libelle=True)
+    # Taux de réponse = statuts qui supposent une réponse de l'entreprise,
+    # retrouvés par position pour suivre la liste STATUTS si elle évolue.
+    avec_reponse = "+".join(
+        f"B{4 + STATUTS.index(s)}" for s in ("Réponse reçue", "Entretien", "Refus", "Accepté")
+    )
+    taux = ligne_compteur(13, "Taux de réponse", f"=IFERROR(({avec_reponse})/B12,0)", gras_libelle=True)
     taux.number_format = "0%"
 
     plage_domaine = f"'Suivi candidatures'!$D$3:$D${ligne_max_suivi}"

@@ -41,10 +41,8 @@ class TestImportExcel(unittest.TestCase):
             "Stage agents IA",
             date_envoi="2026-08-20",
             statut="Entretien",
-            priorite="Haute",
             sous_domaine="Orchestration multi-agents",
             gratification=1400,
-            nb_relances=2,
             ville="Paris",
             texte_offre="Concevoir des agents multi-étapes.",
             chemin_db=self.source,
@@ -81,7 +79,6 @@ class TestImportExcel(unittest.TestCase):
         self.assertEqual(agentik["date_envoi"], "2026-08-20")  # JJ/MM/AAAA → ISO
         self.assertEqual(agentik["statut"], "Entretien")
         self.assertEqual(agentik["gratification"], 1400)
-        self.assertEqual(agentik["nb_relances"], 2)
         self.assertEqual(agentik["texte_offre"], "Concevoir des agents multi-étapes.")
 
         contacts_cible = lister_contacts(chemin_db=self.cible)

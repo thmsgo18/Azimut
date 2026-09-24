@@ -106,10 +106,6 @@ def generer_fiche_entretien(candidature_id, chemin_db=None):
         if cand["source"]:
             envoi += f" (via {cand['source']})"
         lignes.append(envoi)
-    relances = f"- Relances : {cand['nb_relances'] or 0}"
-    if cand["date_relance_prevue"]:
-        relances += f" (prochaine prévue le {_date_fr(cand['date_relance_prevue'])})"
-    lignes.append(relances)
     if cand["date_reponse"]:
         lignes.append(f"- Réponse reçue le {_date_fr(cand['date_reponse'])}")
     details = []

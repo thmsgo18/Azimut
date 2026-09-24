@@ -198,6 +198,8 @@ class TestServeurRobustesse(unittest.TestCase):
                 date_contact DATE, source TEXT, notes TEXT);
             INSERT INTO entreprises (nom) VALUES ('AgentikCo');
             INSERT INTO candidatures (entreprise_id, poste) VALUES (1, 'Stage');
+            INSERT INTO candidatures (entreprise_id, poste, statut, priorite, nb_relances)
+                VALUES (1, 'Stage relancé', 'Relancée', 'Haute', 2);
             INSERT INTO contacts (entreprise_id, nom, type_contact, valeur_contact)
                 VALUES (1, 'Marie Petit', 'Email', 'marie@agentik.co');
             INSERT INTO contacts (entreprise_id, nom, type_contact, valeur_contact)
@@ -212,15 +214,32 @@ class TestServeurRobustesse(unittest.TestCase):
         from candidatures import lister_candidatures, modifier_candidature
         from contacts import lister_contacts
 
-        liste = lister_candidatures(chemin_db=str(ancienne))
+        liste = sorted(lister_candidatures(chemin_db=str(ancienne)), key=lambda c: c["id"])
         self.assertEqual(liste[0]["poste"], "Stage")
         self.assertIsNone(liste[0]["portail_url"])  # colonne ajoutée par migration
         modifier_candidature(
             liste[0]["id"], chemin_db=str(ancienne), portail_identifiant="thomas"
         )
         self.assertEqual(
-            lister_candidatures(chemin_db=str(ancienne))[0]["portail_identifiant"], "thomas"
+            next(c for c in lister_candidatures(chemin_db=str(ancienne)) if c["poste"] == "Stage")[
+                "portail_identifiant"
+            ],
+            "thomas",
         )
+
+        # Relances et priorité abandonnées : « Relancée » redevient « Envoyée »
+        # et les colonnes disparaissent.
+        self.assertEqual(liste[1]["statut"], "Envoyée")
+        for colonne in ("priorite", "nb_relances", "date_relance_prevue"):
+            self.assertNotIn(colonne, liste[1])
+        # ... après une copie de sécurité intacte, prise juste avant.
+        copie = ancienne.with_name("ancienne-avant-suppression-relances.db")
+        conn = sqlite3.connect(copie)
+        ligne = conn.execute(
+            "SELECT statut, priorite, nb_relances FROM candidatures WHERE poste = 'Stage relancé'"
+        ).fetchone()
+        conn.close()
+        self.assertEqual(ligne, ("Relancée", "Haute", 2))
 
         # L'ancien couple (type_contact, valeur_contact) est réparti dans les
         # nouveaux champs dédiés, sans perte pour un type non reconnu (« Fax »).

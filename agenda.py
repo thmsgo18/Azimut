@@ -1,12 +1,10 @@
-"""Agenda : les échéances des candidatures (relances, entretiens, débuts
-souhaités) et leur export au format iCalendar (.ics) pour Calendrier/Rappels."""
+"""Agenda : les échéances des candidatures (entretiens, débuts souhaités) et leur export au format iCalendar (.ics) pour Calendrier/Rappels."""
 
 from datetime import date, datetime
 
 from candidatures import lister_candidatures
 
 TYPES_ECHEANCE = {
-    "relance": ("date_relance_prevue", "Relancer"),
     "entretien": ("date_entretien", "Entretien"),
     "debut": ("date_debut_souhaitee", "Début souhaité"),
 }

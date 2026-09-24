@@ -23,7 +23,6 @@
   /* Statuts de candidature (toujours accompagnés de leur libellé) */
   --st-a-preparer: #8d8b85;
   --st-envoyee: #2a78d6;
-  --st-relancee: #b07d10;
   --st-reponse: #0f8a66;
   --st-entretien: #d2621d;
   --st-refus: #c43c3c;
@@ -60,7 +59,6 @@
     --sur-accent: #ffffff;
     --st-a-preparer: #9b9993;
     --st-envoyee: #3987e5;
-    --st-relancee: #d9a62e;
     --st-reponse: #27ab85;
     --st-entretien: #e5812f;
     --st-refus: #e26666;
@@ -322,10 +320,40 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 .puce-statut { color: var(--couleur-statut, var(--encre-2)); background: transparent;
   border: 1px solid var(--hairline); }
 
-.puce-priorite-Haute { color: var(--st-entretien); background: transparent;
-  border: 1px solid var(--hairline); }
-.puce-priorite-Moyenne, .puce-priorite-Basse { color: var(--encre-3);
-  background: transparent; border: 1px solid var(--hairline); }
+/* Statut modifiable en un clic (vue liste) : un <select> natif invisible
+   recouvre la puce, qui reste le seul élément visible. */
+.selecteur-statut {
+  position: relative;
+  cursor: pointer;
+}
+.selecteur-statut .chevron { opacity: 0.55; margin-left: -2px; }
+.selecteur-statut:hover { border-color: var(--couleur-statut, var(--encre-3)); }
+.selecteur-statut:hover .chevron { opacity: 1; }
+.selecteur-statut:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.select-statut {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  font-size: 13px;
+}
+
+.btn-lien-offre {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn-lien-offre:hover { background: var(--accent-doux); border-color: var(--accent); }
 
 /* ==========================================================================
    Tableau de bord
@@ -362,6 +390,8 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
   gap: 14px;
   align-items: start;
 }
+
+.grille-bord .carte-large { grid-column: 1 / -1; }
 
 @media (max-width: 980px) { .grille-bord { grid-template-columns: 1fr; } }
 
@@ -1289,26 +1319,8 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 .colonne-notes textarea:focus { outline: none; }
 
 /* ==========================================================================
-   Relances, comparateur, liens morts
+   Comparateur, liens morts
    ========================================================================== */
-
-.liste-relances { padding: 4px; }
-
-.ligne-relance {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 10px;
-  border-bottom: 1px solid var(--hairline);
-}
-
-.ligne-relance:last-child { border-bottom: none; }
-
-.ligne-relance-info { flex: 1; min-width: 0; cursor: pointer; }
-
-.ligne-relance-titre { margin-bottom: 3px; }
-
-.ligne-relance.en-retard .ligne-relance-titre strong { color: var(--danger); }
 
 .barre-comparaison {
   display: flex;

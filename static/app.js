@@ -12,8 +12,8 @@ const etat = {
   valeurs: null,          // listes de valeurs autorisées (chargées au démarrage)
   ia: null,               // état des réglages IA (clé définie ou non)
   langue: "fr",           // langue de l'interface, chargée depuis /api/reglages
-  modeCandidatures: "kanban",
-  filtres: { statut: "", priorite: "", sous_domaine: "", texte: "" },
+  modeCandidatures: "liste",
+  filtres: { statut: "", sous_domaine: "", texte: "" },
   agendaBase: null,       // premier jour du mois affiché dans l'agenda
   agendaMode: "mois",
   rechercheTexte: "",
@@ -31,7 +31,6 @@ const COULEURS_TYPE = {
   contact: "var(--violet)",
 };
 const COULEURS_ECHEANCE = {
-  relance: "var(--st-relancee)",
   entretien: "var(--st-entretien)",
   debut: "var(--st-accepte)",
 };
@@ -51,7 +50,6 @@ const ICONES = {
 const COULEURS_STATUT = {
   "À préparer": "var(--st-a-preparer)",
   "Envoyée": "var(--st-envoyee)",
-  "Relancée": "var(--st-relancee)",
   "Réponse reçue": "var(--st-reponse)",
   "Entretien": "var(--st-entretien)",
   "Refus": "var(--st-refus)",
@@ -89,7 +87,7 @@ function traduireStatique() {
   });
 }
 
-/* Traduit une VALEUR de donnée (statut, priorité, sous-domaine...) pour
+/* Traduit une VALEUR de donnée (statut, sous-domaine...) pour
    l'affichage - jamais pour ce qui part vers l'API ou vit dans
    value="..." d'une <option>, qui restent toujours la valeur canonique en
    français (voir valeurs.py côté serveur). Absente de la table de la
@@ -155,7 +153,6 @@ async function api(chemin, options = {}) {
 const VUES = {
   bord: vueBord,
   candidatures: vueCandidatures,
-  relances: vueRelances,
   agenda: vueAgenda,
   entreprises: vueEntreprises,
   contacts: vueContacts,
@@ -168,7 +165,6 @@ const VUES = {
 
 const ACTIVATIONS = {
   candidatures: activerCandidatures,
-  relances: activerRelances,
   agenda: activerAgenda,
   recherche: activerRecherche,
   comparer: activerComparateur,
@@ -302,18 +298,6 @@ async function vueBord() {
       </div>`
     )
     .join("");
-  const relances = stats.relances_a_faire
-    .map(
-      (cand) => `
-      <div class="echeance" onclick="ouvrirDetailCandidature(${cand.id})">
-        <span class="echeance-date">${dateFr(cand.date_relance_prevue)}</span>
-        <div class="echeance-texte">
-          <div class="principal">${echapper(cand.entreprise)}</div>
-          <div class="secondaire">${echapper(cand.poste)}</div>
-        </div>
-      </div>`
-    )
-    .join("");
 
   return `
     <div class="entete-vue">
@@ -353,11 +337,7 @@ async function vueBord() {
         <h2>${t("bord.carte_par_domaine")}</h2>
         ${Object.keys(stats.par_domaine).length ? barres(stats.par_domaine) : `<div class="sous-titre">${t("bord.par_domaine_vide")}</div>`}
       </div>
-      <div class="carte">
-        <h2>${t("bord.carte_relances")}</h2>
-        ${relances || `<div class="sous-titre">${t("bord.relances_vide")}</div>`}
-      </div>
-      <div class="carte">
+      <div class="carte carte-large">
         <h2>${t("bord.carte_entretiens")}</h2>
         ${entretiens || `<div class="sous-titre">${t("bord.entretiens_vide")}</div>`}
       </div>
@@ -373,7 +353,6 @@ function activerBord() { /* rien à brancher : liens inline */ }
 function candidatureVisible(cand) {
   const f = etat.filtres;
   if (f.statut && cand.statut !== f.statut) return false;
-  if (f.priorite && cand.priorite !== f.priorite) return false;
   if (f.sous_domaine && cand.sous_domaine !== f.sous_domaine) return false;
   if (f.texte) {
     const aiguille = f.texte.toLowerCase();
@@ -385,9 +364,6 @@ function candidatureVisible(cand) {
 
 function carteCandidature(cand) {
   const puces = [];
-  if (cand.priorite === "Haute") {
-    puces.push(`<span class="puce puce-priorite-Haute">${t("candidatures.priorite_haute")}</span>`);
-  }
   if (cand.sous_domaine) {
     puces.push(`<span class="puce">${echapper(tv(cand.sous_domaine))}</span>`);
   }
@@ -400,6 +376,30 @@ function carteCandidature(cand) {
         <span class="date">${dateFr(cand.date_envoi)}</span>
       </div>
     </article>`;
+}
+
+/* Statut modifiable directement depuis la liste : la puce reste visible et
+   un <select> natif transparent posé par-dessus ouvre le menu des statuts
+   au clic (clavier et lecteurs d'écran compris). */
+function selecteurStatut(cand) {
+  return `
+    <span class="selecteur-statut puce puce-statut" style="--couleur-statut:${COULEURS_STATUT[cand.statut]}">
+      <span class="point"></span>${echapper(tv(cand.statut))}
+      <svg class="chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      <select class="select-statut" data-id="${cand.id}" aria-label="${echapperAttribut(t("candidatures.changer_statut"))}">
+        ${optionsSelect(etat.valeurs.statuts, cand.statut, false)}
+      </select>
+    </span>`;
+}
+
+function boutonLienOffre(cand) {
+  if (!cand.lien_offre) return `<span class="cellule-secondaire">-</span>`;
+  return `
+    <a class="btn-lien-offre" href="${echapperAttribut(cand.lien_offre)}" target="_blank" rel="noopener"
+       title="${echapperAttribut(cand.lien_offre)}">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+      ${t("candidatures.voir_offre")}
+    </a>`;
 }
 
 function optionsSelect(liste, selection, avecVide = true) {
@@ -419,10 +419,6 @@ async function vueCandidatures() {
         <option value="">${t("candidatures.tous_statuts")}</option>
         ${v.statuts.map((s) => `<option${etat.filtres.statut === s ? " selected" : ""}>${echapper(tv(s))}</option>`).join("")}
       </select>
-      <select id="filtre-priorite">
-        <option value="">${t("candidatures.toutes_priorites")}</option>
-        ${v.priorites.map((p) => `<option${etat.filtres.priorite === p ? " selected" : ""}>${echapper(tv(p))}</option>`).join("")}
-      </select>
       <select id="filtre-domaine">
         <option value="">${t("candidatures.tous_sous_domaines")}</option>
         ${v.sous_domaines.map((d) => `<option${etat.filtres.sous_domaine === d ? " selected" : ""}>${echapper(tv(d))}</option>`).join("")}
@@ -431,7 +427,7 @@ async function vueCandidatures() {
 
   let corps;
   if (liste.length === 0) {
-    const filtreActif = etat.filtres.statut || etat.filtres.priorite || etat.filtres.sous_domaine || etat.filtres.texte;
+    const filtreActif = etat.filtres.statut || etat.filtres.sous_domaine || etat.filtres.texte;
     corps = `
       <div class="etat-vide">
         <div class="icone">${ICONES.candidatures}</div>
@@ -462,8 +458,8 @@ async function vueCandidatures() {
     corps = `
       <div class="enveloppe-tableau"><table class="tableau">
         <thead><tr>
-          <th></th><th>${t("candidatures.col_entreprise")}</th><th>${t("candidatures.col_poste")}</th><th>${t("candidatures.col_statut")}</th><th>${t("candidatures.col_priorite")}</th>
-          <th>${t("candidatures.col_envoyee_le")}</th><th>${t("candidatures.col_relance_prevue")}</th><th>${t("candidatures.col_ville")}</th>
+          <th></th><th>${t("candidatures.col_entreprise")}</th><th>${t("candidatures.col_poste")}</th><th>${t("candidatures.col_statut")}</th>
+          <th>${t("candidatures.col_envoyee_le")}</th><th>${t("candidatures.col_ville")}</th><th>${t("candidatures.col_offre")}</th>
         </tr></thead>
         <tbody>
           ${liste
@@ -478,11 +474,10 @@ async function vueCandidatures() {
                 ${cand.lien_dernier_etat === "mort" ? `<span class="puce puce-lien-mort" title="${t("candidatures.lien_mort_titre")}">${t("candidatures.lien_mort")}</span>` : ""}
               </td>
               <td>${echapper(cand.poste)}</td>
-              <td><span class="puce puce-statut" style="--couleur-statut:${COULEURS_STATUT[cand.statut]}"><span class="point"></span>${echapper(tv(cand.statut))}</span></td>
-              <td class="cellule-secondaire">${echapper(tv(cand.priorite || ""))}</td>
+              <td onclick="event.stopPropagation()">${selecteurStatut(cand)}</td>
               <td class="cellule-date">${dateFr(cand.date_envoi)}</td>
-              <td class="cellule-date">${dateFr(cand.date_relance_prevue)}</td>
               <td class="cellule-secondaire">${echapper(cand.ville || "")}</td>
+              <td onclick="event.stopPropagation()">${boutonLienOffre(cand)}</td>
             </tr>`
             )
             .join("")}
@@ -526,8 +521,20 @@ function activerCandidatures() {
     });
   };
   brancherFiltre("filtre-statut", "statut");
-  brancherFiltre("filtre-priorite", "priorite");
   brancherFiltre("filtre-domaine", "sous_domaine");
+
+  document.querySelectorAll(".select-statut").forEach((select) => {
+    select.addEventListener("change", async () => {
+      const statut = select.value;
+      try {
+        await api(`/api/candidatures/${select.dataset.id}`, { methode: "PATCH", corps: { statut } });
+        toast(t("candidatures.statut_mis_a_jour", { statut: tv(statut) }));
+      } catch (erreur) {
+        toast(erreur.message, true);
+      }
+      rendre();
+    });
+  });
 
   document.querySelectorAll(".case-comparaison").forEach((case_) => {
     case_.addEventListener("change", () => {
@@ -618,69 +625,14 @@ function activerCandidatures() {
 }
 
 /* ========================================================================
-   Relances : liste priorisée du jour, un clic pour marquer fait
-   ======================================================================== */
-
-async function vueRelances() {
-  const liste = await api("/api/relances");
-  if (!liste.length) {
-    return `
-      <div class="entete-vue"><h1>${t("nav.relances")}</h1></div>
-      <div class="etat-vide">
-        <div class="icone">${ICONES.candidatures}</div>
-        <div class="titre">${t("relances.vide_titre")}</div>
-        <p>${t("relances.vide_texte")}</p>
-      </div>`;
-  }
-  const aujourdHui = dateISOLocale(new Date());
-  const lignes = liste
-    .map((cand) => {
-      const enRetard = cand.date_relance_prevue < aujourdHui;
-      return `
-      <div class="ligne-relance${enRetard ? " en-retard" : ""}">
-        <div class="ligne-relance-info" onclick="ouvrirDetailCandidature(${cand.id})">
-          <div class="ligne-relance-titre">
-            <strong>${echapper(cand.entreprise)}</strong> - ${echapper(cand.poste)}
-            ${cand.priorite === "Haute" ? `<span class="puce puce-priorite-Haute">${t("candidatures.priorite_haute")}</span>` : ""}
-          </div>
-          <div class="cellule-secondaire">
-            ${enRetard ? t("relances.en_retard_depuis", { date: dateFr(cand.date_relance_prevue) }) : t("relances.prevue_aujourdhui")}
-            · ${echapper(tv(cand.statut))} · ${t("relances.relances_deja_faites", { n: cand.nb_relances || 0 })}
-          </div>
-        </div>
-        <button type="button" class="btn btn-accent" onclick="marquerRelance(${cand.id})">${t("relances.relance_bouton")}</button>
-      </div>`;
-    })
-    .join("");
-  return `
-    <div class="entete-vue">
-      <div><h1>${t("nav.relances")}</h1><div class="sous-titre">${t("relances.sous_titre", { n: liste.length })}</div></div>
-    </div>
-    <div class="carte liste-relances">${lignes}</div>`;
-}
-
-function activerRelances() { /* liens inline */ }
-
-async function marquerRelance(id) {
-  try {
-    await api(`/api/candidatures/${id}/relancer`, { methode: "POST" });
-    toast(t("relances.enregistree"));
-    rendre();
-  } catch (erreur) {
-    toast(erreur.message, true);
-  }
-}
-
-/* ========================================================================
    Comparateur : plusieurs candidatures côte à côte
    ======================================================================== */
 
-const CHAMPS_COMPARATEUR_ENUM = new Set(["statut", "priorite", "sous_domaine", "mode_travail", "convention_envoyee", "source"]);
+const CHAMPS_COMPARATEUR_ENUM = new Set(["statut", "sous_domaine", "mode_travail", "convention_envoyee", "source"]);
 
 function criteresComparateur() {
   return [
     ["statut", t("candidatures.col_statut")],
-    ["priorite", t("candidatures.col_priorite")],
     ["sous_domaine", t("comparateur.sous_domaine")],
     ["ville", t("candidatures.col_ville")],
     ["mode_travail", t("comparateur.mode_travail")],
@@ -857,13 +809,10 @@ async function ouvrirFormCandidature(cand = null) {
       ${champEntreprise}
       ${champTexte("poste", t("formulaire.poste_requis"), cand.poste)}
       ${champSelect("statut", t("candidatures.col_statut"), v.statuts, cand.statut || "À préparer", false)}
-      ${champSelect("priorite", t("candidatures.col_priorite"), v.priorites, cand.priorite || "Moyenne", false)}
       ${champSelect("sous_domaine", t("comparateur.sous_domaine"), v.sous_domaines, cand.sous_domaine)}
       ${champSelect("type_candidature", t("formulaire.type_candidature"), v.types_candidature, cand.type_candidature)}
       ${champSelect("source", t("comparateur.source"), v.sources_candidature, cand.source)}
       ${champTexte("date_envoi", t("formulaire.date_envoi"), cand.date_envoi, "date")}
-      ${champTexte("date_relance_prevue", t("formulaire.relance_prevue_le"), cand.date_relance_prevue, "date")}
-      ${champTexte("nb_relances", t("formulaire.nb_relances"), cand.nb_relances ?? (creation ? 0 : ""), "number")}
       ${champTexte("date_reponse", t("formulaire.reponse_recue_le"), cand.date_reponse, "date")}
       ${champTexte("date_entretien", t("comparateur.entretien_le"), cand.date_entretien, "date")}
       ${champTexte("date_debut_souhaitee", t("comparateur.debut_souhaite"), cand.date_debut_souhaitee, "date")}
@@ -969,9 +918,6 @@ async function ouvrirFormCandidature(cand = null) {
 
   document.getElementById("btn-enregistrer").addEventListener("click", async () => {
     const donnees = lireFormulaire(document.getElementById("form-candidature"));
-    if (donnees.nb_relances !== null && donnees.nb_relances !== undefined) {
-      donnees.nb_relances = donnees.nb_relances ?? 0;
-    }
     try {
       if (creation) {
         // Avertissement (non bloquant) : intitulé proche ou même lien d'offre
@@ -1112,13 +1058,10 @@ function contenuFicheCandidature(cand) {
       ${cand.statut ? `<span class="puce puce-statut" style="--couleur-statut:${COULEURS_STATUT[cand.statut]}"><span class="point"></span>${echapper(tv(cand.statut))}</span>` : ""}
     </div>
     <div class="grille-form">
-      ${champAffiche(t("candidatures.col_priorite"), cand.priorite ? echapper(tv(cand.priorite)) : null)}
       ${champAffiche(t("comparateur.sous_domaine"), cand.sous_domaine ? echapper(tv(cand.sous_domaine)) : null)}
       ${champAffiche(t("formulaire.type_candidature"), cand.type_candidature ? echapper(tv(cand.type_candidature)) : null)}
       ${champAffiche(t("comparateur.source"), cand.source ? echapper(tv(cand.source)) : null)}
       ${champAffiche(t("formulaire.date_envoi"), dateFr(cand.date_envoi))}
-      ${champAffiche(t("formulaire.relance_prevue_le"), dateFr(cand.date_relance_prevue))}
-      ${champAffiche(t("formulaire.nb_relances"), cand.nb_relances || null)}
       ${champAffiche(t("formulaire.reponse_recue_le"), dateFr(cand.date_reponse))}
       ${champAffiche(t("comparateur.entretien_le"), dateFr(cand.date_entretien))}
       ${champAffiche(t("comparateur.debut_souhaite"), dateFr(cand.date_debut_souhaitee))}
@@ -1144,11 +1087,8 @@ async function ouvrirDetailCandidature(numero) {
       api(`/api/documents?candidature=${numero}`),
     ]);
     const corps = contenuFicheCandidature(cand) + sectionsCandidature(numero, journal, docs);
-    const peutRelancerIA = etat.ia && etat.ia.cle_api_definie
-      && ["Envoyée", "Relancée"].includes(cand.statut);
     const pied = `
       <button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-      ${peutRelancerIA ? `<button class="btn" id="btn-brouillon-relance">${t("formulaire.brouillon_relance")}</button>` : ""}
       <button class="btn" id="btn-fiche">${t("formulaire.fiche_entretien")}</button>
       <button class="btn" id="btn-mode-entretien">${t("formulaire.mode_entretien")}</button>
       <button class="btn btn-accent" id="btn-modifier">${t("commun.modifier")}</button>`;
@@ -1160,32 +1100,6 @@ async function ouvrirDetailCandidature(numero) {
       fermerPanneau();
       location.hash = `#/entretien/${cand.id}`;
     });
-    const boutonRelance = document.getElementById("btn-brouillon-relance");
-    if (boutonRelance) {
-      boutonRelance.addEventListener("click", async () => {
-        boutonRelance.disabled = true;
-        boutonRelance.textContent = t("formulaire.generation_en_cours");
-        try {
-          const resultat = await api(`/api/agent/relance/${numero}`, { methode: "POST", corps: {} });
-          ouvrirModale(
-            t("formulaire.brouillon_relance"),
-            `<p class="sous-titre">${t("formulaire.brouillon_relance_avertissement")}</p>
-             <textarea id="texte-brouillon-relance" style="min-height:220px;" readonly>${echapper(resultat.texte)}</textarea>`,
-            `<button class="btn" onclick="fermerModale()">${t("commun.fermer")}</button>
-             <button class="btn btn-accent" id="btn-copier-relance">${t("formulaire.copier")}</button>`
-          );
-          document.getElementById("btn-copier-relance").addEventListener("click", async () => {
-            await navigator.clipboard.writeText(document.getElementById("texte-brouillon-relance").value);
-            toast(t("formulaire.message_copie"));
-          });
-        } catch (erreur) {
-          toast(erreur.message, true);
-        } finally {
-          boutonRelance.disabled = false;
-          boutonRelance.textContent = t("formulaire.brouillon_relance");
-        }
-      });
-    }
     document.getElementById("btn-supprimer").addEventListener("click", async () => {
       const accord = await confirmer(
         t("formulaire.supprimer_candidature_titre"),
@@ -1705,7 +1619,6 @@ async function vueAgenda() {
       <button class="btn btn-accent" onclick="ouvrirConnexionCalendrier()">${t("agenda.connecter_calendrier")}</button>
     </div>
     <div class="legende-agenda">
-      <span class="puce puce-statut" style="--couleur-statut:${COULEURS_ECHEANCE.relance}"><span class="point"></span>${t("agenda.legende_relance")}</span>
       <span class="puce puce-statut" style="--couleur-statut:${COULEURS_ECHEANCE.entretien}"><span class="point"></span>${tv("Entretien")}</span>
       <span class="puce puce-statut" style="--couleur-statut:${COULEURS_ECHEANCE.debut}"><span class="point"></span>${t("agenda.legende_debut")}</span>
     </div>`;
@@ -2325,15 +2238,6 @@ async function vueReglages() {
         </div>
       </div>
 
-      ${etat.valeurs.plateforme_macos ? `<div class="carte">
-        <h2>${t("reglages.notifications_titre")}</h2>
-        <p class="sous-titre">${t("reglages.notifications_texte")}</p>
-        <label class="case" style="margin-top:10px;">
-          <input type="checkbox" id="reg-notifications" ${r.notifications_macos === "Oui" ? "checked" : ""}>
-          ${t("reglages.notifications_case")}
-        </label>
-      </div>` : ""}
-
       <div class="carte">
         <h2>${t("reglages.compagnon_titre")}</h2>
         <p class="sous-titre">${t("reglages.compagnon_texte")}</p>
@@ -2536,21 +2440,6 @@ function activerReglages() {
         await api("/api/reglages/compagnon", { methode: "POST", corps: { regenerer_code: true } });
         toast(t("reglages.nouveau_code_genere"));
         rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
-  }
-
-  const caseNotifications = document.getElementById("reg-notifications");
-  if (caseNotifications) {
-    caseNotifications.addEventListener("change", async (evenement) => {
-      try {
-        await api("/api/reglages", {
-          methode: "POST",
-          corps: { notifications_macos: evenement.target.checked ? "Oui" : "Non" },
-        });
-        toast(evenement.target.checked ? t("reglages.notifications_activees") : t("reglages.notifications_desactivees"));
       } catch (erreur) {
         toast(erreur.message, true);
       }

@@ -157,56 +157,6 @@ def analyser_offre(texte, lien=None, chemin_db=None):
     return proposition
 
 
-INSTRUCTIONS_RELANCE = """Tu écris un court message de relance pour une candidature de stage,
-en français, à envoyer par email. Ton professionnel mais chaleureux, direct, sans flagornerie.
-
-Règle d'or : ne RIEN inventer. N'utilise que les faits fournis (entreprise, poste, date d'envoi,
-nombre de relances déjà faites, contact éventuel, notes). Si une information manque, formule la
-phrase pour qu'elle reste vraie sans cette information plutôt que de l'inventer.
-
-Format : objet + corps du message, 5 à 8 phrases maximum, pas de formule de politesse excessive.
-Si un nombre de relances précédentes est supérieur à 0, adapte le ton (rester poli mais montrer
-qu'il s'agit d'une nouvelle relance, sans être insistant). Réponds uniquement avec le texte du
-message (objet sur la première ligne préfixée par "Objet : ", puis le corps), sans commentaire
-ni introduction de ta part."""
-
-
-def _contexte_relance(candidature, contact=None):
-    faits = [
-        f"Entreprise : {candidature.get('entreprise')}",
-        f"Poste : {candidature.get('poste')}",
-    ]
-    if candidature.get("date_envoi"):
-        faits.append(f"Candidature envoyée le : {candidature['date_envoi']}")
-    nb_relances = candidature.get("nb_relances") or 0
-    faits.append(f"Nombre de relances déjà envoyées : {nb_relances}")
-    if candidature.get("sous_domaine"):
-        faits.append(f"Domaine du stage : {candidature['sous_domaine']}")
-    if contact and contact.get("nom"):
-        faits.append(
-            f"Contact chez l'entreprise : {contact['nom']}"
-            + (f" ({contact['poste']})" if contact.get("poste") else "")
-        )
-    if candidature.get("notes"):
-        faits.append(f"Notes : {candidature['notes']}")
-    return "\n".join(faits)
-
-
-def generer_message_relance(candidature, contact=None, chemin_db=None):
-    """Génère un brouillon de message de relance (objet + corps) à partir des
-    faits connus d'une candidature. Jamais d'écriture en base ici - un texte
-    à relire et copier, comme le reste de cette couche."""
-    if not candidature or not candidature.get("entreprise") or not candidature.get("poste"):
-        raise ValeurNonAutorisee("Candidature invalide - entreprise et poste requis.")
-    config = _config(chemin_db)
-    contenu = "Voici les faits connus pour cette relance :\n\n" + _contexte_relance(
-        candidature, contact
-    )
-    if config["fournisseur"] == "openai_compatible":
-        return _generer_texte_openai_compatible(config, INSTRUCTIONS_RELANCE, contenu)
-    return _generer_texte_anthropic(config, INSTRUCTIONS_RELANCE, contenu)
-
-
 def rechercher_contexte(nom_entreprise, chemin_db=None):
     """Cherche sur le web public un court contexte factuel sur l'entreprise.
 
@@ -280,27 +230,6 @@ def _analyser_anthropic(config, contenu):
     if not texte_json:
         raise ErreurSuivi("Réponse vide de l'IA - réessayer.")
     return json.loads(texte_json)
-
-
-def _generer_texte_anthropic(config, instructions, contenu):
-    import anthropic
-
-    client = anthropic.Anthropic(api_key=config["cle"])
-    try:
-        reponse = client.messages.create(
-            model=config["modele"],
-            max_tokens=1000,
-            system=instructions,
-            messages=[{"role": "user", "content": contenu}],
-        )
-    except anthropic.APIError as erreur:
-        raise _traduire_erreur_anthropic(erreur)
-    if reponse.stop_reason == "refusal":
-        raise ErreurSuivi("L'IA a refusé de générer ce message - réessayer.")
-    texte = "\n".join(b.text for b in reponse.content if b.type == "text").strip()
-    if not texte:
-        raise ErreurSuivi("Réponse vide de l'IA - réessayer.")
-    return texte
 
 
 def _rechercher_contexte_anthropic(config, nom_entreprise):
@@ -407,28 +336,6 @@ def _tester_openai_compatible(config):
     except openai.APIError as erreur:
         raise _traduire_erreur_openai(erreur)
     return {"ok": True, "modele": config["modele"], "fournisseur": "Compatible OpenAI"}
-
-
-def _generer_texte_openai_compatible(config, instructions, contenu):
-    _verifier_modele_renseigne(config)
-    import openai
-
-    client = _client_openai_compatible(config)
-    try:
-        reponse = client.chat.completions.create(
-            model=config["modele"],
-            max_tokens=1000,
-            messages=[
-                {"role": "system", "content": instructions},
-                {"role": "user", "content": contenu},
-            ],
-        )
-    except openai.APIError as erreur:
-        raise _traduire_erreur_openai(erreur)
-    texte = (reponse.choices[0].message.content or "").strip()
-    if not texte:
-        raise ErreurSuivi("Réponse vide du fournisseur - réessayer.")
-    return texte
 
 
 def _analyser_openai_compatible(config, contenu):

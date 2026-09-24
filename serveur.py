@@ -42,7 +42,6 @@ from exceptions import EntiteIntrouvable, ErreurSuivi, ValeurNonAutorisee
 from valeurs import (
     CONVENTIONS,
     MODES_TRAVAIL,
-    PRIORITES,
     SOURCES_CANDIDATURE,
     SOURCES_CONTACT,
     SOUS_DOMAINES,
@@ -129,7 +128,6 @@ def api_valeurs():
         {
             "sous_domaines": SOUS_DOMAINES,
             "types_candidature": TYPES_CANDIDATURE,
-            "priorites": PRIORITES,
             "statuts": STATUTS,
             "modes_travail": MODES_TRAVAIL,
             "conventions": CONVENTIONS,
@@ -137,8 +135,7 @@ def api_valeurs():
             "statuts_contact": STATUTS_CONTACT,
             "sources_contact": SOURCES_CONTACT,
             "types_document": TYPES_DOCUMENT,
-            # Widget de barre de menus, notifications et app Rappels : macOS
-            # uniquement (osascript, rumps). L'interface s'appuie là-dessus
+            # App Rappels : macOS uniquement (osascript). L'interface s'appuie là-dessus
             # pour masquer proprement ces extras sur Windows/Linux plutôt
             # que d'afficher des boutons qui échoueraient au clic.
             "plateforme_macos": platform.system() == "Darwin",
@@ -154,7 +151,6 @@ def api_candidatures_lister():
         candidatures.lister_candidatures(
             statut=request.args.get("statut"),
             sous_domaine=request.args.get("sous_domaine"),
-            priorite=request.args.get("priorite"),
         )
     )
 
@@ -185,18 +181,6 @@ def api_candidatures_modifier(numero):
 def api_candidatures_supprimer(numero):
     candidatures.supprimer_candidature(numero)
     return jsonify({"message": f"Candidature n°{numero} supprimée."})
-
-
-@app.route("/api/candidatures/<int:numero>/relancer", methods=["POST"])
-def api_candidatures_relancer(numero):
-    return jsonify(candidatures.marquer_relance(numero))
-
-
-@app.route("/api/relances")
-def api_relances():
-    """Liste complète (non plafonnée) des relances à faire, triée par
-    urgence - utilisée par la vue dédiée « Relances »."""
-    return jsonify(candidatures.lister_relances_a_faire())
 
 
 @app.route("/api/candidatures/similaires")
@@ -333,7 +317,6 @@ def api_stats():
         (c for c in liste if c["date_entretien"] and c["date_entretien"] >= aujourd_hui),
         key=lambda c: c["date_entretien"],
     )
-    relances_a_faire = candidatures.lister_relances_a_faire()
     return jsonify(
         {
             "total": len(liste),
@@ -342,9 +325,8 @@ def api_stats():
             "contacts_par_statut": contacts_par_statut,
             "total_contacts": len(liste_contacts),
             "taux_reponse": round(avec_reponse / len(liste) * 100) if liste else 0,
-            "en_cours": sum(par_statut[s] for s in ("Envoyée", "Relancée", "Réponse reçue")),
+            "en_cours": sum(par_statut[s] for s in ("Envoyée", "Réponse reçue")),
             "entretiens_a_venir": entretiens_a_venir[:5],
-            "relances_a_faire": relances_a_faire[:5],
         }
     )
 
@@ -448,7 +430,7 @@ def api_reglages_modifier():
     donnees = request.get_json(silent=True) or {}
     for cle in (
         "cle_api", "fournisseur_ia", "modele_ia", "ia_base_url", "recherche_web",
-        "objectif_hebdomadaire", "notifications_macos", "langue",
+        "objectif_hebdomadaire", "langue",
     ):
         if cle in donnees:
             reglages.definir_reglage(cle, donnees[cle])
@@ -509,19 +491,6 @@ def api_agent_analyser():
             avertissement = f"Contexte entreprise non récupéré : {erreur}"
     proposition["avertissement"] = avertissement
     return jsonify(proposition)
-
-
-@app.route("/api/agent/relance/<int:numero>", methods=["POST"])
-def api_agent_relance(numero):
-    import agent
-
-    candidature = candidatures.recuperer_candidature(numero)
-    contact = None
-    liste_contacts = contacts.lister_contacts(entreprise_nom=candidature["entreprise"])
-    if liste_contacts:
-        contact = liste_contacts[0]
-    texte = agent.generer_message_relance(candidature, contact=contact)
-    return jsonify({"texte": texte})
 
 
 # --- recherche, statistiques, agenda, sauvegarde ---

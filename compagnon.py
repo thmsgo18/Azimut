@@ -6,8 +6,8 @@ code d'accès généré sur cette machine.
 Surface volontairement minuscule et strictement en lecture :
 - aucune route d'écriture (impossible de modifier quoi que ce soit d'ici) ;
 - aucun champ sensible ne transite jamais (mots de passe de portail, clé
-  API, notes, texte d'offre) - seulement de quoi vérifier les relances du
-  jour, le prochain entretien et la liste des candidatures, sur le même
+  API, notes, texte d'offre) - seulement de quoi voir les entretiens à
+  venir et la liste des candidatures, sur le même
   Wi-Fi que le Mac.
 
 Le serveur principal (serveur.py) n'est pas concerné par ce module : il
@@ -32,11 +32,9 @@ CHAMPS_CANDIDATURE_PUBLICS = (
     "entreprise",
     "poste",
     "statut",
-    "priorite",
     "ville",
     "mode_travail",
     "date_envoi",
-    "date_relance_prevue",
     "date_entretien",
     "lien_offre",
 )
@@ -80,15 +78,13 @@ def verifier_acces():
 @app_compagnon.route("/api/compagnon/tableau")
 def api_tableau():
     aujourd_hui = date.today().isoformat()
-    relances = candidatures.lister_relances_a_faire()
     entretiens_a_venir = sorted(
         (e for e in agenda.lister_echeances() if e["type"] == "entretien" and e["date"] >= aujourd_hui),
         key=lambda e: e["date"],
     )
     return jsonify(
         {
-            "relances": [_public(c) for c in relances],
-            "prochain_entretien": entretiens_a_venir[0] if entretiens_a_venir else None,
+            "entretiens_a_venir": entretiens_a_venir[:5],
         }
     )
 
@@ -157,12 +153,8 @@ PAGE_HTML = """<!doctype html>
     <h1>Azimut</h1>
     <p class="sous-titre">Vue compagnon - lecture seule</p>
     <div class="carte">
-      <h2>Relances à faire</h2>
-      <div id="liste-relances"></div>
-    </div>
-    <div class="carte">
-      <h2>Prochain entretien</h2>
-      <div id="prochain-entretien"></div>
+      <h2>Entretiens à venir</h2>
+      <div id="entretiens-a-venir"></div>
     </div>
     <div class="carte">
       <h2>Toutes les candidatures</h2>
@@ -199,12 +191,9 @@ function ligneCandidature(c) {
 async function charger() {
   try {
     const tableau = await api("/api/compagnon/tableau");
-    document.getElementById("liste-relances").innerHTML = tableau.relances.length
-      ? tableau.relances.map(ligneCandidature).join("")
-      : `<div class="vide">Aucune relance à faire.</div>`;
-    const p = tableau.prochain_entretien;
-    document.getElementById("prochain-entretien").innerHTML = p
-      ? `<div class="ligne"><div><div class="principal">${echapper(p.entreprise)}</div><div class="secondaire">${echapper(p.poste)}</div></div><span class="puce">${dateFr(p.date)}</span></div>`
+    const entretiens = tableau.entretiens_a_venir;
+    document.getElementById("entretiens-a-venir").innerHTML = entretiens.length
+      ? entretiens.map((e) => `<div class="ligne"><div><div class="principal">${echapper(e.entreprise)}</div><div class="secondaire">${echapper(e.poste)}</div></div><span class="puce">${dateFr(e.date)}</span></div>`).join("")
       : `<div class="vide">Aucun entretien planifié.</div>`;
     const liste = await api("/api/compagnon/candidatures");
     document.getElementById("liste-candidatures").innerHTML = liste.length

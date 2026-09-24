@@ -22,7 +22,7 @@ Azimut runs on macOS, Windows, and Linux - the exact same codebase everywhere. O
 
 Closing the window quits the app. Everything lives in a single local file: `suivi_candidatures.db`, created at the project root on first launch. There's no build step: after any code change, just relaunch the app (or reload the page) to see it.
 
-A handful of extras only exist on macOS - the Reminders app integration, the menu bar widget, and proactive notifications (see [macOS automations](#macos-automations)) - because they lean on macOS-only APIs with no real equivalent elsewhere. The interface hides them automatically outside macOS; everything else (applications, companies, contacts, documents, agenda, AI assistant, Excel import/export, search...) behaves identically on all three OSes, and is covered by the same test suite run in CI on macOS, Windows, and Linux on every change.
+A handful of extras only exist on macOS - the Reminders app integration (see [macOS automations](#macos-automations)) - because it leans on macOS-only APIs with no real equivalent elsewhere. The interface hides it automatically outside macOS; everything else (applications, companies, contacts, documents, agenda, AI assistant, Excel import/export, search...) behaves identically on all three OSes, and is covered by the same test suite run in CI on macOS, Windows, and Linux on every change.
 
 ### Sharing a clean copy with a friend
 
@@ -37,8 +37,7 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 | List applications, sort, filter | ✓ | ✓ |
 | Track a company and its contacts | 🟡 | ✓ |
 | Duplicate detection (same company, similar title, same job link) | ✗ | ✓ |
-| Automatic timeline per application (sent, follow-up, reply, interview) | ✗ | ✓ |
-| Reminders view: what to chase today, most urgent first | ✗ | ✓ |
+| Automatic timeline per application (sent, status, reply, interview) | ✗ | ✓ |
 | Dead job-link detection | ✗ | ✓ |
 | Attach files (CV, cover letter, the offer as a PDF) per application | 🟡 | ✓ |
 | Calendar & Reminders.app integration | ✗ | ✓ |
@@ -53,17 +52,15 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 ## Features
 
 **Application tracking**
-- **Kanban** pipeline (drag and drop to change status) or a filterable list, with a side panel to inspect, add, or delete.
-- **Automatic timeline** per application: creation, status change, follow-up, reply, interview scheduled - timestamped without lifting a finger.
+- A **filterable list** by default - change a status by clicking its pill, an "Open posting" button on each row - or a **kanban** pipeline (drag and drop to change status), with a side panel to inspect, add, or delete.
+- **Automatic timeline** per application: creation, status change, reply, interview scheduled - timestamped without lifting a finger.
 - **Attached documents**: CV, cover letter, the offer as a PDF, or any other file - attachable at creation or from the detail view, several at once.
 - **Interview prep sheet** and **interview mode** (the sheet on the left, a notes area on the right, auto-saved into the application).
 - **Recruitment portal access**: URL, username and password per application (masked in the interface, never exported).
-- **Follow-ups**: a dedicated view lists, most urgent first, every application due for a follow-up today or overdue - a single "Followed up" click logs the action (counter, status, timeline).
 - **Comparator**: check several applications in list view to line them up side by side (stipend, duration, work mode, dates…) to decide between multiple ongoing offers.
 - **Dead job-link detection**: a conservative HTTP check (run automatically every 6h while Azimut is open, or on demand) flags withdrawn postings (404/410) - often a sign a role has been filled - with no false positives on a mere network hiccup.
 - **Quick capture from Safari**: a macOS Shortcut sends the page (or selected text) to Azimut, which creates a draft to complete.
 - **CSV import** from a LinkedIn/Indeed export, or any other spreadsheet turned into CSV: pick which column maps to which field (no fixed format to break when a provider changes its export), duplicates skipped and reported like every other import.
-- **AI follow-up drafts**: from a sent or already-followed-up application, generate a short, personalized follow-up email (object + body) from the known facts - never invented, never sent automatically, just a draft to copy.
 
 **Organization**
 - **Companies** with context and news notes; detects probable duplicates ("Mistral" / "Mistral AI") and **merges them in one click**.
@@ -74,12 +71,11 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 - **Bilingual interface** (French / English): switch it in Réglages, applies immediately across the whole interface. Values stored in the database (status, source…) stay French internally - only the display changes.
 
 **Insights**
-- **Dashboard**: counts, breakdown by status and sub-domain, follow-ups due, upcoming interviews.
+- **Dashboard**: counts, breakdown by status and sub-domain, upcoming interviews.
 - **Advanced statistics**: sent → replies → interviews → accepted funnel, average delays, response rate by source, and a **weekly chart** (applications sent per week, last 12 weeks) instead of numbers alone.
 - **Weekly goal**: set a target number of applications per week in Réglages, see the progress bar in Statistiques.
 - **Calendar** (month or 2-week view) connectable to a real calendar: a live `webcal://` subscription for Calendar (Mac), a "Add to Google Calendar" button per deadline, a universal `.ics` file, and every deadline can also become a dated reminder in the **Reminders** app (macOS), one at a time or all at once.
-- **Menu bar widget** (optional, `Azimut Widget.app`): today's follow-ups and the next interview at a glance, no need to open the window - can also fire **proactive macOS notifications** (a daily follow-ups digest, an alert the first time a job link dies), opt-in in Réglages.
-- **Companion view for iPhone/iPad**: an opt-in, read-only mobile page (today's follow-ups, next interview, the full list) reachable from your phone on the same Wi-Fi as the Mac, protected by a locally-generated access code - see [macOS automations](#macos-automations).
+- **Companion view for iPhone/iPad**: an opt-in, read-only mobile page (upcoming interviews, the full list) reachable from your phone on the same Wi-Fi as the Mac, protected by a locally-generated access code - see [macOS automations](#macos-automations).
 
 **Data & privacy**
 - **Excel export / import**: a readable backup and restore, duplicates ignored and never overwritten, a detailed report after import.
@@ -95,7 +91,7 @@ A short walkthrough of the everyday flow:
 2. **Move it through the pipeline** - drag a card between columns in the Kanban view to update its status, or edit it from its sheet.
 3. **Click anything to look, not to edit** - an application, a company, or a contact opens a clean read-only sheet: click the job link or the portal URL freely, nothing changes. Hit **Modifier** only when you actually want to edit.
 4. **Open a company to see who you know there** - its sheet lists its contacts and its applications, each one click away.
-5. **Check Relances every morning** - it's the single most useful daily habit: a prioritized list of what to chase today, one click to mark it done.
+5. **Change a status without opening the sheet** - in the list view, click a row's status pill and pick the new one; the "Open posting" button opens the job ad directly.
 6. **Search anything with ⌘K** - a title, a note, a phrase from a pasted job posting, a contact's name.
 7. **Prep for an interview** - open an application's sheet, click **Fiche entretien** for a printable Markdown summary, or **Mode entretien** for a split view with live notes.
 
@@ -104,7 +100,7 @@ A short walkthrough of the everyday flow:
 Ideas not implemented yet:
 
 - **Secrets in the macOS Keychain** - portal passwords and the AI API key currently sit in cleartext in the local database (by design, documented in `CLAUDE.md`); moving them to Keychain would remove that cleartext exposure entirely.
-- **Two-way sync for the companion view** - it's read-only today; marking a follow-up done from the phone would need a small, carefully-scoped write path (and to stay safe on an open Wi-Fi network).
+- **Two-way sync for the companion view** - it's read-only today; changing a status from the phone would need a small, carefully-scoped write path (and to stay safe on an open Wi-Fi network).
 
 Have another idea, or want one of these built? Open an issue.
 
@@ -114,7 +110,7 @@ Every feature stays scriptable from the command line - handy to automate things,
 
 ```bash
 ./suivi candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée --date-envoi 26/08/2026
-./suivi candidatures lister --statut Entretien --priorite Haute
+./suivi candidatures lister --statut Entretien --sous-domaine "Agents de codage"
 ./suivi candidatures modifier 12 --statut "Réponse reçue" --date-reponse 02/09/2026
 ```
 
@@ -126,14 +122,12 @@ Every feature stays scriptable from the command line - handy to automate things,
 ```bash
 python cli.py candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée --date-envoi 26/08/2026
 python cli.py candidatures lister
-python cli.py candidatures lister --statut Entretien --priorite Haute
+python cli.py candidatures lister --statut Entretien --sous-domaine "Agents de codage"
 python cli.py candidatures modifier 12 --statut "Réponse reçue" --date-reponse 02/09/2026
 python cli.py candidatures voir 12
-python cli.py candidatures relances               # follow-ups due today or overdue
-python cli.py candidatures relancer 12             # +1 follow-up, status → Relancée, date cleared
 ```
 
-Add/update options: `--date-envoi`, `--sous-domaine`, `--lien-offre`, `--texte-offre` (the full posting text, archived in case the listing disappears), `--type`, `--priorite`, `--statut`, `--nb-relances`, `--date-relance-prevue`, `--date-reponse`, `--date-entretien`, `--date-debut-souhaitee`, `--duree`, `--gratification` (€/month), `--ville`, `--mode-travail`, `--convention-envoyee`, `--source`, `--notes`, `--portail-url`, `--portail-identifiant`, `--portail-mdp`.
+Add/update options: `--date-envoi`, `--sous-domaine`, `--lien-offre`, `--texte-offre` (the full posting text, archived in case the listing disappears), `--type`, `--statut`, `--date-reponse`, `--date-entretien`, `--date-debut-souhaitee`, `--duree`, `--gratification` (€/month), `--ville`, `--mode-travail`, `--convention-envoyee`, `--source`, `--notes`, `--portail-url`, `--portail-identifiant`, `--portail-mdp`.
 
 Dates are written `DD/MM/YYYY` or `YYYY-MM-DD` (stored as ISO).
 
@@ -178,7 +172,7 @@ python cli.py export excel --sortie suivi_candidatures.xlsx
 python cli.py import excel --fichier suivi_candidatures.xlsx
 ```
 
-The export regenerates the full file from the database: 4 sheets ("Suivi candidatures", "Entreprises", "Contacts", "Tableau de bord"), dropdowns on columns with allowed values, conditional colors on Status and Priority, `HYPERLINK` + `MATCH` links between sheets, formula-driven counters (`COUNTIF`/`COUNTA`, no hard-coded value). Rerun it anytime with no data loss.
+The export regenerates the full file from the database: 4 sheets ("Suivi candidatures", "Entreprises", "Contacts", "Tableau de bord"), dropdowns on columns with allowed values, conditional colors on Status, `HYPERLINK` + `MATCH` links between sheets, formula-driven counters (`COUNTIF`/`COUNTA`, no hard-coded value). Rerun it anytime with no data loss.
 
 The import re-reads such a file and re-injects the data: duplicates are skipped and reported, invalid rows are reported with their row number without blocking the rest - handy as a readable backup, or to merge two databases.
 
@@ -222,11 +216,7 @@ Everything below is macOS-only (it leans on AppleScript/`osascript` or macOS-onl
 
 **Quick capture (Safari Shortcut).** See the "Quick capture from Safari" card in Réglages to build the 4-step macOS Shortcut that sends the page or selected text to Azimut. The application created is a draft (status "À préparer", an origin note) to review and complete - never a fully-filled application without a pass through the interface. Azimut must be open to receive it (it's a call to its local server).
 
-**Menu bar widget.** Double-click `Azimut Widget.app`: an icon in the menu bar (not the Dock) shows today's follow-up count and the next interview, with a shortcut to open the full app. Reads the database directly, works even if the main window is closed. Can be added to Login Items (System Settings → General → Login Items) to start automatically.
-
-**Proactive notifications.** With the widget running, turn on "Notifications proactives" in Réglages: a macOS notification fires once a day if any follow-up is due, and once per application the first time its job link is detected dead - deliberately not chatty, no repeat alerts for the same thing.
-
-**Companion view (iPhone/iPad).** Turn on "Vue compagnon" in Réglages, then relaunch Azimut: a second, separate mini-server starts, listening on your local network (not just the Mac itself) on its own port, serving a small **read-only** mobile page - today's follow-ups, the next interview, the full application list. It never exposes portal passwords, the AI key, or any write route, and it's protected by an access code shown (and regenerable) in Réglages. Open `http://<the-IP-shown-in-Réglages>:8767` in Safari on your phone, on the **same Wi-Fi** as the Mac - nothing goes through the internet or a cloud service.
+**Companion view (iPhone/iPad).** Turn on "Vue compagnon" in Réglages, then relaunch Azimut: a second, separate mini-server starts, listening on your local network (not just the Mac itself) on its own port, serving a small **read-only** mobile page - upcoming interviews, the full application list. It never exposes portal passwords, the AI key, or any write route, and it's protected by an access code shown (and regenerable) in Réglages. Open `http://<the-IP-shown-in-Réglages>:8767` in Safari on your phone, on the **same Wi-Fi** as the Mac - nothing goes through the internet or a cloud service.
 
 ## Rules enforced by the code (not just documented)
 
@@ -236,8 +226,7 @@ Any out-of-list value is rejected with a clear message listing what's allowed (s
 |---|---|
 | `sous_domaine` | Agents de codage, Orchestration multi-agents, RAG / Agents de recherche, Agents conversationnels, Robotique / Agents physiques, MLOps pour agents, Autre |
 | `type_candidature` | Offre publiée, Candidature spontanée, Cooptation / Réseau |
-| `priorite` | Haute, Moyenne, Basse |
-| `statut` | À préparer, Envoyée, Relancée, Réponse reçue, Entretien, Refus, Accepté |
+| `statut` | À préparer, Envoyée, Réponse reçue, Entretien, Refus, Accepté |
 | `mode_travail` | Présentiel, Hybride, Full remote |
 | `convention_envoyee` | Oui, Non, N/A |
 | `source` (application) | LinkedIn, Indeed, Site entreprise, Welcome to the Jungle, Réseau, Forum / Salon, Autre |
@@ -265,7 +254,7 @@ lister_entreprises() -> list of dicts
 verifier_doublon_candidature(entreprise_nom, poste) -> id or None
 ajouter_candidature(entreprise_nom, poste, **champs) -> id     # DoublonCandidature if duplicate
 modifier_candidature(id, **champs)
-lister_candidatures(statut=None, sous_domaine=None, priorite=None) -> list of dicts
+lister_candidatures(statut=None, sous_domaine=None) -> list of dicts
 recuperer_candidature(id) -> dict
 
 # contacts.py
@@ -298,12 +287,9 @@ Exceptions (see `exceptions.py`): `ValeurNonAutorisee`, `ChampInconnu`, `Doublon
 ```
 azimut/
   Azimut.app                        # double-click: the app (native window)
-  Azimut Widget.app                 # double-click: menu bar widget (optional)
   Azimut (terminal).command         # fallback: same window, from the Terminal
   Créer un zip à partager.command   # double-click: a zip (no personal data) on the Desktop
   app_bureau.py     # native window (pywebview) wrapping the internal server
-  menu_barre.py     # menu bar widget (rumps): follow-ups, next interview, notifications
-  notifications_macos.py  # proactive macOS notifications (dead links, follow-ups due)
   compagnon.py      # read-only companion server for iPhone/iPad (local network, opt-in)
   serveur.py        # internal server (Flask): JSON API + interface
   static/           # interface (index.html, style.css, app.js)
@@ -311,7 +297,7 @@ azimut/
   valeurs.py        # allowed values + field validation
   exceptions.py     # business exceptions (French messages)
   entreprises.py    # company CRUD (anti-duplicate, conflicts, merge)
-  candidatures.py   # application CRUD (anti-duplicate), follow-ups
+  candidatures.py   # application CRUD (anti-duplicate)
   contacts.py       # contact CRUD (anti-duplicate)
   doublons.py       # near-duplicates: close titles, job link, merge
   verification_liens.py  # dead job-link detection (conservative check)
@@ -327,7 +313,7 @@ azimut/
   agenda.py         # deadlines + iCalendar export (.ics)
   reglages.py       # local settings (masked API key, AI provider, data folder, companion code)
   sauvegarde.py      # dated copies of the database, rotation
-  agent.py          # posting analysis + follow-up drafts - Anthropic or any OpenAI-compatible provider
+  agent.py          # posting analysis + company context - Anthropic or any OpenAI-compatible provider
   entretien.py      # interview prep sheet (Markdown)
   cli.py            # command-line interface
   CLAUDE.md         # how the project works, for AIs (Claude Code…)

@@ -22,7 +22,7 @@ Azimut tourne sur macOS, Windows et Linux - exactement le même code partout. Se
 
 Fermer la fenêtre quitte l'appli. Tout tourne en local dans un seul fichier : `suivi_candidatures.db`, créé à la racine du projet au premier lancement. Le code n'a pas d'étape de compilation : après toute modification, il suffit de relancer l'appli (ou de recharger la page) pour voir les changements.
 
-Une poignée d'extras n'existent que sur macOS - l'intégration à l'app Rappels, le widget de barre de menus et les notifications proactives (voir [Automatisations macOS](#automatisations-macos)) - car ils s'appuient sur des API propres à macOS, sans réel équivalent ailleurs. L'interface les masque automatiquement en dehors de macOS ; tout le reste (candidatures, entreprises, contacts, documents, agenda, assistant IA, import/export Excel, recherche...) se comporte à l'identique sur les 3 OS, et est couvert par la même suite de tests exécutée en CI sur macOS, Windows et Linux à chaque modification.
+Une poignée d'extras n'existent que sur macOS - l'intégration à l'app Rappels (voir [Automatisations macOS](#automatisations-macos)) - car elle s'appuie sur des API propres à macOS, sans réel équivalent ailleurs. L'interface la masque automatiquement en dehors de macOS ; tout le reste (candidatures, entreprises, contacts, documents, agenda, assistant IA, import/export Excel, recherche...) se comporte à l'identique sur les 3 OS, et est couvert par la même suite de tests exécutée en CI sur macOS, Windows et Linux à chaque modification.
 
 ### Partager une copie propre à un ami
 
@@ -37,8 +37,7 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 | Lister les candidatures, trier, filtrer | ✓ | ✓ |
 | Suivre une entreprise et ses contacts | 🟡 | ✓ |
 | Détection des doublons (même entreprise, intitulé proche, même lien d'offre) | ✗ | ✓ |
-| Historique automatique par candidature (envoi, relance, réponse, entretien) | ✗ | ✓ |
-| Vue « à relancer » : les plus urgentes en premier | ✗ | ✓ |
+| Historique automatique par candidature (envoi, statut, réponse, entretien) | ✗ | ✓ |
 | Détection des liens d'offres morts | ✗ | ✓ |
 | Fichiers joints (CV, lettre, offre en PDF) par candidature | 🟡 | ✓ |
 | Intégration Calendrier & Rappels (macOS) | ✗ | ✓ |
@@ -53,17 +52,15 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 ## Fonctionnalités
 
 **Suivi des candidatures**
-- Pipeline **kanban** (glisser-déposer pour changer le statut) ou liste filtrable, avec panneau latéral d'ajout/consultation/suppression.
-- **Journal automatique** par candidature : création, changement de statut, relance, réponse, entretien planifié - horodaté sans rien faire.
+- **Liste filtrable** par défaut - statut modifiable d'un clic sur sa puce, bouton « Voir l'offre » par ligne - ou pipeline **kanban** (glisser-déposer pour changer le statut), avec panneau latéral d'ajout/consultation/suppression.
+- **Journal automatique** par candidature : création, changement de statut, réponse, entretien planifié - horodaté sans rien faire.
 - **Documents joints** : CV, lettre de motivation, offre en PDF ou tout autre fichier, attachables dès la création ou depuis la fiche, plusieurs à la fois.
 - **Fiche d'entretien** et **mode entretien** (la fiche à gauche, une zone de notes à droite, sauvegardée automatiquement dans la candidature).
 - **Accès aux portails de recrutement** : URL, identifiant et mot de passe par candidature (masqué dans l'interface, jamais exporté).
-- **Relances** : une vue dédiée liste, des plus urgentes aux plus récentes, toutes les candidatures à relancer aujourd'hui ou en retard - un bouton « Relancé » enregistre le geste en un clic (compteur, statut, journal).
 - **Comparateur** : coche plusieurs candidatures en vue liste pour les mettre côte à côte (gratification, durée, mode de travail, dates…) et arbitrer entre plusieurs propositions en cours.
 - **Détection des liens d'offres morts** : un ping HTTP conservateur (relancé automatiquement toutes les 6h pendant qu'Azimut tourne, ou à la demande) signale les offres retirées (404/410) - souvent le signe qu'un poste est pourvu - sans jamais de faux positif sur une simple panne réseau.
 - **Capture rapide depuis Safari** : un Raccourci macOS envoie la page (ou le texte sélectionné) vers Azimut, qui crée un brouillon à compléter.
 - **Import CSV** depuis un export LinkedIn/Indeed, ou tout autre tableur passé en CSV : associe chaque colonne au bon champ à la main (aucun format figé qui casserait au premier changement côté fournisseur), doublons ignorés et signalés comme le reste des imports.
-- **Brouillons de relance par IA** : depuis une candidature envoyée ou déjà relancée, génère un court message de relance (objet + corps) à partir des faits connus - jamais inventé, jamais envoyé automatiquement, juste un brouillon à copier.
 
 **Organisation**
 - **Entreprises** avec contexte et actualités ; détection des doublons probables (« Mistral » / « Mistral AI ») et **fusion en un clic**.
@@ -74,12 +71,11 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 - **Interface bilingue** (français / anglais) : se change dans Réglages, s'applique immédiatement à toute l'interface. Les valeurs stockées en base (statut, source…) restent en français en interne - seul l'affichage change.
 
 **Pilotage**
-- **Tableau de bord** : compteurs, répartition par statut et sous-domaine, relances à faire, entretiens à venir.
+- **Tableau de bord** : compteurs, répartition par statut et sous-domaine, entretiens à venir.
 - **Statistiques avancées** : entonnoir envoyées → réponses → entretiens → acceptées, délais moyens, taux de réponse par source, et une **courbe hebdomadaire** (candidatures envoyées par semaine, 12 dernières semaines) plutôt que des chiffres seuls.
 - **Objectif hebdomadaire** : règle un nombre de candidatures visé par semaine dans Réglages, suis la progression dans Statistiques.
 - **Agenda** (vue mois ou 2 semaines) connectable à un vrai calendrier : abonnement `webcal://` en direct pour Calendrier (Mac), bouton « Ajouter à Google Agenda » par échéance, fichier `.ics` universel, et chaque échéance peut aussi devenir un rappel daté dans l'app **Rappels** (macOS), une par une ou toutes d'un coup.
-- **Widget de barre de menus** (optionnel, `Azimut Widget.app`) : relances du jour et prochain entretien d'un coup d'œil, sans ouvrir la fenêtre - peut aussi déclencher des **notifications macOS proactives** (résumé quotidien des relances, alerte à la première détection d'un lien mort), à activer dans Réglages.
-- **Vue compagnon iPhone/iPad** : une page mobile en lecture seule (relances du jour, prochain entretien, liste complète), optionnelle, accessible depuis ton téléphone sur le même Wi-Fi que le Mac, protégée par un code d'accès généré localement - voir [Automatisations macOS](#automatisations-macos).
+- **Vue compagnon iPhone/iPad** : une page mobile en lecture seule (entretiens à venir, liste complète), optionnelle, accessible depuis ton téléphone sur le même Wi-Fi que le Mac, protégée par un code d'accès généré localement - voir [Automatisations macOS](#automatisations-macos).
 
 **Données et vie privée**
 - **Export / import Excel** : sauvegarde lisible et restauration, doublons ignorés et jamais écrasés, rapport détaillé après import.
@@ -95,7 +91,7 @@ Le déroulé du quotidien, en bref :
 2. **La faire avancer dans le pipeline** - glisse une carte d'une colonne à l'autre en vue kanban pour changer son statut, ou modifie-la depuis sa fiche.
 3. **Cliquer pour regarder, pas pour modifier** - une candidature, une entreprise ou un contact ouvre une fiche propre en lecture seule : clique librement sur le lien de l'offre ou du portail, rien ne change. N'appuie sur **Modifier** que quand tu veux vraiment éditer.
 4. **Ouvrir une entreprise pour voir qui tu y connais** - sa fiche liste ses contacts et ses candidatures, chacun à un clic de distance.
-5. **Consulter Relances chaque matin** - c'est l'habitude la plus rentable au quotidien : une liste priorisée de ce qu'il faut relancer aujourd'hui, un clic pour marquer fait.
+5. **Changer un statut sans ouvrir la fiche** - en vue liste, clique sur la puce de statut d'une ligne et choisis le nouveau ; le bouton « Voir l'offre » ouvre l'annonce directement.
 6. **Chercher n'importe quoi avec ⌘K** - un intitulé, une note, une phrase d'une offre collée, le nom d'un contact.
 7. **Préparer un entretien** - ouvre la fiche d'une candidature, clique sur **Fiche entretien** pour un résumé Markdown imprimable, ou **Mode entretien** pour une vue partagée avec prise de notes en direct.
 
@@ -104,7 +100,7 @@ Le déroulé du quotidien, en bref :
 Des pistes pas encore implémentées :
 
 - **Secrets dans le Trousseau macOS** - les mots de passe de portails et la clé API IA sont aujourd'hui en clair dans la base locale (un choix assumé, documenté dans `CLAUDE.md`) ; les déplacer vers le Trousseau supprimerait entièrement cette exposition en clair.
-- **Synchronisation à double sens pour la vue compagnon** - elle est en lecture seule aujourd'hui ; marquer une relance faite depuis le téléphone demanderait un chemin d'écriture réduit et pensé avec soin (et sûr sur un Wi-Fi ouvert).
+- **Synchronisation à double sens pour la vue compagnon** - elle est en lecture seule aujourd'hui ; changer un statut depuis le téléphone demanderait un chemin d'écriture réduit et pensé avec soin (et sûr sur un Wi-Fi ouvert).
 
 Une autre idée, ou envie de construire l'une de celles-ci ? Ouvre une issue.
 
@@ -114,7 +110,7 @@ Toutes les fonctions restent pilotables en ligne de commande - pratique pour scr
 
 ```bash
 ./suivi candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée --date-envoi 26/08/2026
-./suivi candidatures lister --statut Entretien --priorite Haute
+./suivi candidatures lister --statut Entretien --sous-domaine "Agents de codage"
 ./suivi candidatures modifier 12 --statut "Réponse reçue" --date-reponse 02/09/2026
 ```
 
@@ -126,14 +122,12 @@ Toutes les fonctions restent pilotables en ligne de commande - pratique pour scr
 ```bash
 python cli.py candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée --date-envoi 26/08/2026
 python cli.py candidatures lister
-python cli.py candidatures lister --statut Entretien --priorite Haute
+python cli.py candidatures lister --statut Entretien --sous-domaine "Agents de codage"
 python cli.py candidatures modifier 12 --statut "Réponse reçue" --date-reponse 02/09/2026
 python cli.py candidatures voir 12
-python cli.py candidatures relances               # relances à faire aujourd'hui ou en retard
-python cli.py candidatures relancer 12             # +1 relance, statut → Relancée, date effacée
 ```
 
-Options d'ajout / modification : `--date-envoi`, `--sous-domaine`, `--lien-offre`, `--texte-offre` (texte intégral de l'offre, archivé si l'annonce disparaît), `--type`, `--priorite`, `--statut`, `--nb-relances`, `--date-relance-prevue`, `--date-reponse`, `--date-entretien`, `--date-debut-souhaitee`, `--duree`, `--gratification` (€/mois), `--ville`, `--mode-travail`, `--convention-envoyee`, `--source`, `--notes`, `--portail-url`, `--portail-identifiant`, `--portail-mdp`.
+Options d'ajout / modification : `--date-envoi`, `--sous-domaine`, `--lien-offre`, `--texte-offre` (texte intégral de l'offre, archivé si l'annonce disparaît), `--type`, `--statut`, `--date-reponse`, `--date-entretien`, `--date-debut-souhaitee`, `--duree`, `--gratification` (€/mois), `--ville`, `--mode-travail`, `--convention-envoyee`, `--source`, `--notes`, `--portail-url`, `--portail-identifiant`, `--portail-mdp`.
 
 Les dates s'écrivent `JJ/MM/AAAA` ou `AAAA-MM-JJ` (stockées en ISO).
 
@@ -178,7 +172,7 @@ python cli.py export excel --sortie suivi_candidatures.xlsx
 python cli.py import excel --fichier suivi_candidatures.xlsx
 ```
 
-L'export régénère le fichier complet depuis la base : 4 onglets (« Suivi candidatures », « Entreprises », « Contacts », « Tableau de bord »), listes déroulantes sur les colonnes à valeurs autorisées, couleurs conditionnelles sur Statut et Priorité, liens `HYPERLINK` + `MATCH` entre onglets, compteurs par formules (`COUNTIF`/`COUNTA`, aucune valeur codée en dur). Relançable à tout moment sans perte.
+L'export régénère le fichier complet depuis la base : 4 onglets (« Suivi candidatures », « Entreprises », « Contacts », « Tableau de bord »), listes déroulantes sur les colonnes à valeurs autorisées, couleurs conditionnelles sur le statut, liens `HYPERLINK` + `MATCH` entre onglets, compteurs par formules (`COUNTIF`/`COUNTA`, aucune valeur codée en dur). Relançable à tout moment sans perte.
 
 L'import relit un tel fichier et réinjecte les données : les doublons sont ignorés et signalés, les lignes invalides sont rapportées avec leur numéro sans bloquer le reste - pratique comme sauvegarde lisible ou pour fusionner deux bases.
 
@@ -222,11 +216,7 @@ Tout ce qui suit est propre à macOS (ça s'appuie sur AppleScript/`osascript` o
 
 **Capture rapide (Raccourci Safari).** Voir la carte « Capture rapide depuis Safari » dans Réglages pour construire le Raccourci macOS (4 blocs) qui envoie la page ou le texte sélectionné vers Azimut. La candidature créée est un brouillon (statut « À préparer », note d'origine) à relire et compléter - jamais une candidature pleinement renseignée sans passage par l'interface. Azimut doit être ouvert pour la recevoir (c'est un appel à son serveur local).
 
-**Widget de barre de menus.** Double-cliquer sur `Azimut Widget.app` : une icône dans la barre de menus (pas dans le Dock) affiche le nombre de relances du jour et le prochain entretien, avec un raccourci pour ouvrir l'appli complète. Lit la base directement, fonctionne même si la fenêtre principale est fermée. Peut être ajouté aux éléments de connexion (Réglages Système → Général → Ouverture) pour démarrer automatiquement.
-
-**Notifications proactives.** Avec le widget lancé, active « Notifications proactives » dans Réglages : une notification macOS s'affiche une fois par jour si une relance est due, et une fois par candidature à la première détection d'un lien d'offre mort - volontairement peu bavard, jamais de répétition pour la même chose.
-
-**Vue compagnon (iPhone/iPad).** Active « Vue compagnon » dans Réglages, puis relance Azimut : un second petit serveur démarre, à l'écoute sur ton réseau local (pas seulement le Mac lui-même) sur son propre port, servant une page mobile **en lecture seule** - relances du jour, prochain entretien, liste complète des candidatures. Aucun mot de passe de portail, aucune clé API, aucune route d'écriture n'y transite jamais ; elle est protégée par un code d'accès affiché (et régénérable) dans Réglages. Ouvre `http://<l'IP affichée dans Réglages>:8767` dans Safari sur ton téléphone, sur le **même Wi-Fi** que le Mac - rien ne passe par Internet ni par un service cloud.
+**Vue compagnon (iPhone/iPad).** Active « Vue compagnon » dans Réglages, puis relance Azimut : un second petit serveur démarre, à l'écoute sur ton réseau local (pas seulement le Mac lui-même) sur son propre port, servant une page mobile **en lecture seule** - entretiens à venir, liste complète des candidatures. Aucun mot de passe de portail, aucune clé API, aucune route d'écriture n'y transite jamais ; elle est protégée par un code d'accès affiché (et régénérable) dans Réglages. Ouvre `http://<l'IP affichée dans Réglages>:8767` dans Safari sur ton téléphone, sur le **même Wi-Fi** que le Mac - rien ne passe par Internet ni par un service cloud.
 
 ## Règles appliquées par le code (pas seulement documentées)
 
@@ -236,8 +226,7 @@ Toute valeur hors liste est refusée avec un message clair listant les valeurs p
 |---|---|
 | `sous_domaine` | Agents de codage, Orchestration multi-agents, RAG / Agents de recherche, Agents conversationnels, Robotique / Agents physiques, MLOps pour agents, Autre |
 | `type_candidature` | Offre publiée, Candidature spontanée, Cooptation / Réseau |
-| `priorite` | Haute, Moyenne, Basse |
-| `statut` | À préparer, Envoyée, Relancée, Réponse reçue, Entretien, Refus, Accepté |
+| `statut` | À préparer, Envoyée, Réponse reçue, Entretien, Refus, Accepté |
 | `mode_travail` | Présentiel, Hybride, Full remote |
 | `convention_envoyee` | Oui, Non, N/A |
 | `source` (candidature) | LinkedIn, Indeed, Site entreprise, Welcome to the Jungle, Réseau, Forum / Salon, Autre |
@@ -265,7 +254,7 @@ lister_entreprises() -> liste de dicts
 verifier_doublon_candidature(entreprise_nom, poste) -> id ou None
 ajouter_candidature(entreprise_nom, poste, **champs) -> id     # DoublonCandidature si doublon
 modifier_candidature(id, **champs)
-lister_candidatures(statut=None, sous_domaine=None, priorite=None) -> liste de dicts
+lister_candidatures(statut=None, sous_domaine=None) -> liste de dicts
 recuperer_candidature(id) -> dict
 
 # contacts.py
@@ -298,12 +287,9 @@ Exceptions (voir `exceptions.py`) : `ValeurNonAutorisee`, `ChampInconnu`, `Doubl
 ```
 azimut/
   Azimut.app                        # double-clic : l'application (fenêtre native)
-  Azimut Widget.app                 # double-clic : widget de barre de menus (optionnel)
   Azimut (terminal).command         # secours : même fenêtre, depuis le Terminal
   Créer un zip à partager.command   # double-clic : zip (sans données) sur le Bureau
   app_bureau.py     # fenêtre native (pywebview) autour du serveur interne
-  menu_barre.py     # widget de barre de menus (rumps) : relances, prochain entretien, notifications
-  notifications_macos.py  # notifications macOS proactives (liens morts, relances dues)
   compagnon.py      # serveur compagnon en lecture seule pour iPhone/iPad (réseau local, opt-in)
   serveur.py        # serveur interne (Flask) : API JSON + interface
   static/           # interface (index.html, style.css, app.js)
@@ -311,7 +297,7 @@ azimut/
   valeurs.py        # valeurs autorisées + validation des champs
   exceptions.py     # exceptions métier (messages en français)
   entreprises.py    # CRUD entreprises (anti-doublon, conflits, fusion)
-  candidatures.py   # CRUD candidatures (anti-doublon), relances
+  candidatures.py   # CRUD candidatures (anti-doublon)
   contacts.py       # CRUD contacts (anti-doublon)
   doublons.py       # quasi-doublons : intitulés proches, lien d'offre, fusion
   verification_liens.py  # détection des liens d'offres morts (ping conservateur)
@@ -327,7 +313,7 @@ azimut/
   agenda.py         # échéances + export iCalendar (.ics)
   reglages.py       # réglages locaux (clé API masquée, fournisseur IA, dossier, code compagnon)
   sauvegarde.py     # copies datées de la base, rotation
-  agent.py          # analyse d'offres + brouillons de relance - Anthropic ou tout fournisseur compatible OpenAI
+  agent.py          # analyse d'offres + contexte entreprise - Anthropic ou tout fournisseur compatible OpenAI
   entretien.py      # fiche de préparation d'entretien (Markdown)
   cli.py            # interface en ligne de commande
   CLAUDE.md         # mode d'emploi du projet pour les IA (Claude Code…)

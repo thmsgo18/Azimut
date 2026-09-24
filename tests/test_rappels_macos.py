@@ -124,7 +124,7 @@ class TestPousserToutesLesEcheances(unittest.TestCase):
 
         ajouter_candidature(
             "AgentikCo", "Stage", statut="Envoyée",
-            date_relance_prevue="2099-01-10", date_entretien="2099-01-15",
+            date_entretien="2099-01-15", date_debut_souhaitee="2099-03-01",
             chemin_db=self.chemin_db,
         )
         with patch("subprocess.run", return_value=FauxResultat(0)) as espion:
@@ -138,7 +138,7 @@ class TestPousserToutesLesEcheances(unittest.TestCase):
 
         ajouter_candidature(
             "AgentikCo", "Stage", statut="Envoyée",
-            date_relance_prevue="2099-01-10", date_entretien="2099-01-15",
+            date_entretien="2099-01-15", date_debut_souhaitee="2099-03-01",
             chemin_db=self.chemin_db,
         )
         with patch(

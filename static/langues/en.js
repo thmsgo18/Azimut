@@ -27,7 +27,6 @@ window.LANGUES.en = {
   nav: {
     tableau_de_bord: "Dashboard",
     candidatures: "Applications",
-    relances: "Follow-ups",
     agenda: "Calendar",
     entreprises: "Companies",
     contacts: "Contacts",
@@ -47,7 +46,7 @@ window.LANGUES.en = {
     titre: "Dashboard",
     sous_titre: "An overview of your internship search",
     bienvenue_titre: "Welcome to Azimut",
-    bienvenue_texte: "Add your first application to see your dashboard appear: statuses, follow-ups due, and upcoming interviews.",
+    bienvenue_texte: "Add your first application to see your dashboard appear: statuses, domains, and upcoming interviews.",
     ajouter_premiere: "Add my first application",
     kpi_candidatures: "Applications",
     kpi_candidatures_detail: "{n} awaiting a reply",
@@ -60,17 +59,13 @@ window.LANGUES.en = {
     carte_par_statut: "Applications by status",
     carte_par_domaine: "By sub-domain",
     par_domaine_vide: "Fill in a sub-domain on your applications to see the breakdown.",
-    carte_relances: "Follow-ups due",
-    relances_vide: "Nothing to follow up on today.",
     carte_entretiens: "Upcoming interviews",
     entretiens_vide: "No interview scheduled yet.",
   },
 
   candidatures: {
-    priorite_haute: "High priority",
     rechercher_placeholder: "Search…",
     tous_statuts: "All statuses",
-    toutes_priorites: "All priorities",
     tous_sous_domaines: "All sub-domains",
     vide_filtre_titre: "No application matches these filters",
     vide_titre: "No applications yet",
@@ -80,10 +75,11 @@ window.LANGUES.en = {
     col_entreprise: "Company",
     col_poste: "Role",
     col_statut: "Status",
-    col_priorite: "Priority",
     col_envoyee_le: "Sent on",
-    col_relance_prevue: "Follow-up due",
     col_ville: "City",
+    col_offre: "Job posting",
+    voir_offre: "Open posting",
+    changer_statut: "Change status",
     lien_mort_titre: "The job link is no longer responding",
     lien_mort: "Dead link",
     selectionnees: "{n} applications selected",
@@ -93,16 +89,6 @@ window.LANGUES.en = {
     statut_mis_a_jour: "Status updated: {statut}",
   },
 
-  relances: {
-    vide_titre: "Nothing to follow up on today",
-    vide_texte: "Applications whose follow-up date is today or overdue will show up here, most urgent first.",
-    en_retard_depuis: "Overdue since {date}",
-    prevue_aujourdhui: "Due today",
-    relances_deja_faites: "{n} follow-up(s) already done",
-    relance_bouton: "Followed up",
-    sous_titre: "{n} due, most urgent first",
-    enregistree: "Follow-up recorded",
-  },
 
   comparateur: {
     titre: "Compare",
@@ -127,8 +113,6 @@ window.LANGUES.en = {
     poste_requis: "Role / title *",
     type_candidature: "Application type",
     date_envoi: "Date sent",
-    relance_prevue_le: "Follow-up due on",
-    nb_relances: "Follow-ups sent",
     reponse_recue_le: "Reply received on",
     lien_offre: "Job link",
     portail_url: "Application portal (login URL)",
@@ -162,11 +146,6 @@ window.LANGUES.en = {
     aucun_document: "No document attached to this application.",
     historique: "History",
     aucun_evenement: "No event recorded.",
-    brouillon_relance: "Follow-up draft",
-    generation_en_cours: "Generating…",
-    brouillon_relance_avertissement: "Review before sending - nothing is sent automatically.",
-    copier: "Copy",
-    message_copie: "Message copied",
   },
 
   entreprises: {
@@ -239,11 +218,10 @@ window.LANGUES.en = {
     exporter_titre: "To import into Calendar, Google Calendar, or Outlook",
     exporter: "Export (.ics)",
     connecter_calendrier: "Connect a calendar",
-    legende_relance: "Follow-up due",
     legende_debut: "Desired start",
     aujourdhui_minuscule: "today",
     vide_titre: "Nothing in the next 14 days",
-    vide_texte: "Follow-ups due, interviews, and desired start dates will show up here.",
+    vide_texte: "Interviews and desired start dates will show up here.",
     aujourdhui: "Today",
     jours_semaine: "Mon,Tue,Wed,Thu,Fri,Sat,Sun",
     calendrier_mac_titre: "Calendar (Mac) and other webcal-compatible apps",
@@ -338,7 +316,7 @@ window.LANGUES.en = {
   reglages: {
     sous_titre: "AI assistant, data folder, backups - all stays on this machine",
     langue_titre: "Interface language",
-    langue_texte: "Choose the app's display language. Stored values (statuses, priorities…) always stay in French in the database; only the display changes.",
+    langue_texte: "Choose the app's display language. Stored values (statuses, sub-domains…) always stay in French in the database; only the display changes.",
     langue_label: "Language",
     langue_changee: "Language changed",
     ia_titre: "AI assistant - posting analysis",
@@ -369,11 +347,8 @@ window.LANGUES.en = {
     sauvegarder_maintenant: "Back up now",
     objectif_texte: "A number of applications to send each week (Monday-Sunday), progress shows up in Statistics. Leave empty to disable.",
     objectif_label: "Applications sent / week",
-    notifications_titre: "Proactive notifications",
-    notifications_texte: "With <code>Azimut Widget.app</code> running (menu bar), a macOS notification fires as soon as a job link dies or a follow-up becomes due, with no need to open the main window. The first time, macOS asks to authorize notifications for the widget.",
-    notifications_case: "Enable proactive notifications",
     compagnon_titre: "Companion view (iPhone / iPad)",
-    compagnon_texte: "A read-only page (today's follow-ups, next interview, application list) reachable from your phone, <strong>on the same Wi-Fi network as this Mac</strong> - no app to install, no account, no cloud. No portal password or API key ever transits through it. Protected by an access code; turn it on once then <strong>relaunch Azimut</strong> for it to take effect.",
+    compagnon_texte: "A read-only page (upcoming interviews, application list) reachable from your phone, <strong>on the same Wi-Fi network as this Mac</strong> - no app to install, no account, no cloud. No portal password or API key ever transits through it. Protected by an access code; turn it on once then <strong>relaunch Azimut</strong> for it to take effect.",
     compagnon_case: "Enable the companion view",
     compagnon_adresse: "Address to open on your phone",
     compagnon_code: "Access code",
@@ -405,8 +380,6 @@ window.LANGUES.en = {
     regenerer_code_titre: "Regenerate the access code?",
     regenerer_code_texte: "The old code will stop working immediately - devices already connected will need to re-enter the new one.",
     nouveau_code_genere: "New code generated",
-    notifications_activees: "Notifications enabled",
-    notifications_desactivees: "Notifications disabled",
   },
 
   entretien: {
@@ -442,20 +415,18 @@ window.LANGUES.en = {
     import_csv_resume: "<strong>{n}</strong> application(s) added.",
   },
 
-  /* Traduction des valeurs de données (statut, priorité...) pour
+  /* Traduction des valeurs de données (statut, sous-domaine...) pour
      l'affichage uniquement - jamais envoyées telles quelles à l'API,
      voir tv() dans app.js. Toujours la valeur française exacte en clé. */
   valeurs: {
     // statut (candidatures)
     "À préparer": "To prepare",
     "Envoyée": "Sent",
-    "Relancée": "Followed up",
     "Réponse reçue": "Reply received",
     "Entretien": "Interview",
     "Refus": "Rejected",
     "Accepté": "Accepted",
     // libellés d'échéance (agenda.py)
-    "Relancer": "Follow up",
     "Début souhaité": "Desired start",
     // libellés d'entonnoir (statistiques.py)
     "Envoyées": "Sent",
@@ -480,10 +451,6 @@ window.LANGUES.en = {
     "Statut": "Status",
     "Source": "Source",
     "Non renseignée": "Not specified",
-    // priorité
-    "Haute": "High",
-    "Moyenne": "Medium",
-    "Basse": "Low",
     // sous_domaine
     "Agents de codage": "Coding agents",
     "Orchestration multi-agents": "Multi-agent orchestration",

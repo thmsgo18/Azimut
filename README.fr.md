@@ -50,9 +50,8 @@ Le premier lancement installe tout seul (connexion Internet nécessaire une fois
 
 ## Fonctionnalités
 
-- **Pipeline kanban** - glisse les candidatures entre les statuts, ou passe en vue liste filtrable.
+- **Liste & pipeline kanban** - vue liste filtrable par défaut (statut modifiable en un clic, lien direct vers l'offre), ou kanban en glisser-déposer.
 - **Entreprises & contacts** - liés à chaque candidature, avec une détection de doublons qui repère « Mistral » vs « Mistral AI ».
-- **Relances** - une liste quotidienne priorisée de ce qu'il faut relancer, un clic pour l'enregistrer.
 - **Tableau de bord & statistiques** - entonnoir, taux de réponse par source, courbe hebdomadaire, objectif hebdo.
 - **Agenda** - vue mois/2 semaines, export vers Calendrier (Mac), Google Agenda, ou `.ics`.
 - **Fiche de préparation d'entretien** et un mode entretien en écran partagé avec prise de notes en direct.
@@ -60,7 +59,7 @@ Le premier lancement installe tout seul (connexion Internet nécessaire une fois
 - **Export/import Excel**, import CSV depuis LinkedIn/Indeed, sauvegardes automatiques.
 - **100 % local** - rien ne quitte ta machine, sauf export explicite ou activation de l'assistant IA.
 
-Quelques extras (app Rappels, widget de barre de menus, vue compagnon iPhone) sont propres à macOS et détaillés dans [la doc complète](#docs).
+Quelques extras (app Rappels, vue compagnon iPhone) sont propres à macOS et détaillés dans [la doc complète](#docs).
 
 ## Ligne de commande & IA
 
@@ -68,7 +67,7 @@ Toutes les fonctions restent pilotables en ligne de commande :
 
 ```bash
 ./suivi candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée
-./suivi candidatures relances
+./suivi candidatures lister --statut Envoyée
 ```
 
 Azimut fournit aussi tout ce dont une IA a besoin pour tenir la base à jour directement et sans risque - champs validés, doublons détectés, jamais de SQL brut. Voir [`CLAUDE.md`](CLAUDE.md) et [`AGENT.md`](AGENT.md).

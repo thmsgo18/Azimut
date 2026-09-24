@@ -37,7 +37,6 @@ class TestFicheEntretien(unittest.TestCase):
             ville="Paris",
             mode_travail="Hybride",
             texte_offre="Concevoir des agents multi-étapes.",
-            nb_relances=1,
             notes="Recruteuse très réactive.",
             chemin_db=self.chemin_db,
         )
@@ -67,7 +66,6 @@ class TestFicheEntretien(unittest.TestCase):
         # 5. Historique
         self.assertIn("## Historique de la candidature", fiche)
         self.assertIn("envoyée le 20/08/2026", fiche)
-        self.assertIn("Relances : 1", fiche)
         self.assertIn("Recruteuse très réactive.", fiche)
 
     def test_fiche_minimale(self):

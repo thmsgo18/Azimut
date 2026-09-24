@@ -53,43 +53,21 @@ class TestCliEncodageUtf8(unittest.TestCase):
         self.assertIn("✓", resultat.stdout)
         self.assertIn("Candidature n°1 ajoutée", resultat.stdout)
 
-    def test_liste_relances_sous_encodage_restreint(self):
+    def test_liste_sous_encodage_restreint(self):
         self._cli(
             "cp1252", "candidatures", "ajouter", "--entreprise", "AgentikCo",
-            "--poste", "Stage", "--statut", "Envoyée",
-            "--date-relance-prevue", "2020-01-01",
+            "--poste", "Stage", "--statut", "Envoyée", "--date-envoi", "2026-08-20",
         )
-        resultat = self._cli("cp1252", "candidatures", "relances")
+        resultat = self._cli("cp1252", "candidatures", "lister")
         self.assertEqual(resultat.returncode, 0, resultat.stderr)
-        self.assertIn("1 relance(s)", resultat.stdout)
-        self.assertIn("Priorité", resultat.stdout)
-
-
-class TestExigencesPlateforme(unittest.TestCase):
-    """Un paquet propre à un seul OS (comme `rumps`, macOS uniquement) doit
-    toujours porter un marqueur d'environnement dans requirements.txt, sinon
-    `pip install` échoue purement et simplement sur les autres OS - déjà
-    arrivé une fois avec rumps, voir l'historique du dépôt."""
-
-    PAQUETS_UN_SEUL_OS = {"rumps": "darwin"}
-
-    def test_paquets_macos_seulement_ont_un_marqueur(self):
-        contenu = (PROJET / "requirements.txt").read_text(encoding="utf-8")
-        lignes = [l.strip() for l in contenu.splitlines() if l.strip()]
-        for paquet, plateforme in self.PAQUETS_UN_SEUL_OS.items():
-            correspondantes = [l for l in lignes if l.split(";")[0].strip() == paquet]
-            self.assertTrue(correspondantes, f"{paquet} absent de requirements.txt")
-            self.assertIn(
-                f'sys_platform == "{plateforme}"', correspondantes[0],
-                f"{paquet} doit porter le marqueur sys_platform == \"{plateforme}\" "
-                "(sinon pip install échoue sur les autres OS)",
-            )
+        self.assertIn("1 candidature(s)", resultat.stdout)
+        self.assertIn("Envoyée le", resultat.stdout)
 
 
 class TestValeursExposePlateforme(unittest.TestCase):
     """/api/valeurs doit toujours exposer plateforme_macos (booléen) :
     c'est sur ce champ que l'interface s'appuie pour masquer les extras
-    macOS (widget, notifications, app Rappels) ailleurs."""
+    macOS (app Rappels) ailleurs."""
 
     def setUp(self):
         import db

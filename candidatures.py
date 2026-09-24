@@ -21,16 +21,11 @@ def _date_fr(iso):
 
 
 def _journaliser_modifications(conn, id_candidature, avant, champs):
-    """Événements automatiques déduits d'une modification (statut, relance, dates)."""
+    """Événements automatiques déduits d'une modification (statut, dates)."""
     if "statut" in champs and champs["statut"] != avant["statut"]:
         evenements.enregistrer(
             conn, id_candidature, "statut",
             f"Statut : {avant['statut']} → {champs['statut']}",
-        )
-    if "nb_relances" in champs and (champs["nb_relances"] or 0) > (avant["nb_relances"] or 0):
-        evenements.enregistrer(
-            conn, id_candidature, "relance",
-            f"Relance effectuée (n°{champs['nb_relances']})",
         )
     if (
         "date_reponse" in champs
@@ -93,7 +88,7 @@ def ajouter_candidature(entreprise_nom, poste, chemin_db=None, **champs):
     champs.pop("poste", None)
     valides = valider_champs("candidatures", champs)
     # Les champs vides sont omis pour laisser jouer les défauts de la base
-    # (statut « À préparer », priorité « Moyenne », etc.).
+    # (statut « À préparer », convention « Non », etc.).
     valides = {c: v for c, v in valides.items() if v is not None}
     entreprise_id = ajouter_ou_recuperer_entreprise(entreprise_nom, chemin_db=chemin_db)
     valides["entreprise_id"] = entreprise_id
@@ -124,7 +119,7 @@ def ajouter_candidature(entreprise_nom, poste, chemin_db=None, **champs):
 
 def modifier_candidature(id_candidature, chemin_db=None, **champs):
     """Modifie une candidature existante. Champs modifiables : ceux du modèle
-    (statut, priorite, date_entretien, notes, ...) - jamais id ni entreprise_id."""
+    (statut, date_entretien, notes, ...) - jamais id ni entreprise_id."""
     valides = valider_champs("candidatures", champs)
     if not valides:
         raise ValeurNonAutorisee("Aucun champ à modifier n'a été fourni.")
@@ -151,47 +146,9 @@ def modifier_candidature(id_candidature, chemin_db=None, **champs):
         conn.close()
 
 
-def marquer_relance(id_candidature, chemin_db=None):
-    """Enregistre qu'une relance vient d'être faite, en un geste :
-    incrémente nb_relances, passe le statut à « Relancée » s'il était
-    « Envoyée », et efface la date de relance prévue (une prochaine se
-    planifie en modifiant la candidature). Journalisé comme toute
-    modification (voir _journaliser_modifications)."""
-    cand = recuperer_candidature(id_candidature, chemin_db=chemin_db)
-    champs = {
-        "nb_relances": (cand["nb_relances"] or 0) + 1,
-        "date_relance_prevue": None,
-    }
-    if cand["statut"] == "Envoyée":
-        champs["statut"] = "Relancée"
-    modifier_candidature(id_candidature, chemin_db=chemin_db, **champs)
-    return recuperer_candidature(id_candidature, chemin_db=chemin_db)
-
-
-STATUTS_RELANCABLES = ("Envoyée", "Relancée")
-
-
-def lister_relances_a_faire(chemin_db=None):
-    """Candidatures dont la relance est prévue aujourd'hui ou avant, triées
-    par urgence : les plus en retard d'abord, puis par priorité."""
-    from datetime import date
-
-    aujourd_hui = date.today().isoformat()
-    poids_priorite = {"Haute": 0, "Moyenne": 1, "Basse": 2}
-    liste = [
-        c
-        for c in lister_candidatures(chemin_db=chemin_db)
-        if c["date_relance_prevue"]
-        and c["date_relance_prevue"] <= aujourd_hui
-        and c["statut"] in STATUTS_RELANCABLES
-    ]
-    liste.sort(key=lambda c: (c["date_relance_prevue"], poids_priorite.get(c["priorite"], 1)))
-    return liste
-
-
-def lister_candidatures(statut=None, sous_domaine=None, priorite=None, chemin_db=None):
+def lister_candidatures(statut=None, sous_domaine=None, chemin_db=None):
     """Retourne les candidatures (liste de dicts, avec le nom d'entreprise),
-    filtrées par statut / sous-domaine / priorité si fournis."""
+    filtrées par statut / sous-domaine si fournis."""
     filtres = valider_champs(
         "candidatures",
         {
@@ -199,7 +156,6 @@ def lister_candidatures(statut=None, sous_domaine=None, priorite=None, chemin_db
             for c, v in (
                 ("statut", statut),
                 ("sous_domaine", sous_domaine),
-                ("priorite", priorite),
             )
             if v is not None
         },

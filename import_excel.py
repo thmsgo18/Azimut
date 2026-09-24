@@ -21,7 +21,9 @@ from entreprises import ajouter_ou_recuperer_entreprise, lister_entreprises, mod
 from exceptions import ConflitMiseAJour, ErreurSuivi, ValeurNonAutorisee
 from valeurs import normaliser
 
-# Correspondance en-tête de colonne -> champ de la base, par onglet.
+# Correspondance en-tête de colonne -> champ de la base, par onglet. Les
+# colonnes absentes de ces tables sont ignorées (ex. « Priorité » ou
+# « Nb relances » des anciens exports).
 COLONNES_SUIVI = {
     "Entreprise": "entreprise",
     "Date d'envoi": "date_envoi",
@@ -30,10 +32,7 @@ COLONNES_SUIVI = {
     "Lien de l'offre": "lien_offre",
     "Texte de l'offre": "texte_offre",
     "Type de candidature": "type_candidature",
-    "Priorité": "priorite",
     "Statut": "statut",
-    "Nb relances": "nb_relances",
-    "Date de relance prévue": "date_relance_prevue",
     "Date de réponse": "date_reponse",
     "Date d'entretien": "date_entretien",
     "Date de début souhaitée": "date_debut_souhaitee",
@@ -181,6 +180,9 @@ def importer_excel(chemin_fichier, chemin_db=None):
         valeurs = _nettoyer(valeurs)
         entreprise = valeurs.pop("entreprise", None)
         poste = valeurs.pop("poste", None)
+        # Statut abandonné des anciens exports : une relance reste une candidature envoyée.
+        if normaliser(valeurs.get("statut")) == "relancee":
+            valeurs["statut"] = "Envoyée"
         if not entreprise or not poste:
             rapport["erreurs"].append(
                 f"Candidatures ligne {numero} : entreprise ou poste manquant - ligne ignorée."

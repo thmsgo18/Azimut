@@ -50,9 +50,8 @@ First launch installs everything by itself (one-time internet connection). Every
 
 ## Features
 
-- **Kanban pipeline** - drag applications between statuses, or use the filterable list view.
+- **List & kanban pipeline** - filterable list view by default (one-click status change, direct link to the posting), or drag-and-drop kanban.
 - **Companies & contacts** - linked to each application, with duplicate detection that catches "Mistral" vs "Mistral AI".
-- **Follow-ups** - a prioritized daily list of what to chase, one click to log it.
 - **Dashboard & stats** - funnel, response rate by source, weekly chart, weekly goal.
 - **Calendar** - month/2-week view, exports to Calendar (Mac), Google Calendar, or `.ics`.
 - **Interview prep sheet** and a split-screen interview mode with live notes.
@@ -60,7 +59,7 @@ First launch installs everything by itself (one-time internet connection). Every
 - **Excel export/import**, CSV import from LinkedIn/Indeed, automatic backups.
 - **100% local** - nothing leaves your machine unless you explicitly export or turn on the AI assistant.
 
-A few extras (Reminders app, menu bar widget, iPhone companion view) are macOS-only and detailed in [the full docs](#docs).
+A few extras (Reminders app, iPhone companion view) are macOS-only and detailed in [the full docs](#docs).
 
 ## The command line & AI
 
@@ -68,7 +67,7 @@ Every feature is scriptable:
 
 ```bash
 ./suivi candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée
-./suivi candidatures relances
+./suivi candidatures lister --statut Envoyée
 ```
 
 Azimut also ships with everything an AI assistant needs to manage the database directly and safely - validated fields, duplicate detection, no raw SQL. See [`CLAUDE.md`](CLAUDE.md) and [`AGENT.md`](AGENT.md).

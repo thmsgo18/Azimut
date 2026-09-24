@@ -21,9 +21,7 @@ SOUS_DOMAINES = [
 
 TYPES_CANDIDATURE = ["Offre publiée", "Candidature spontanée", "Cooptation / Réseau"]
 
-PRIORITES = ["Haute", "Moyenne", "Basse"]
-
-STATUTS = ["À préparer", "Envoyée", "Relancée", "Réponse reçue", "Entretien", "Refus", "Accepté"]
+STATUTS = ["À préparer", "Envoyée", "Réponse reçue", "Entretien", "Refus", "Accepté"]
 
 MODES_TRAVAIL = ["Présentiel", "Hybride", "Full remote"]
 
@@ -56,7 +54,6 @@ LISTES_AUTORISEES = {
     "candidatures": {
         "sous_domaine": SOUS_DOMAINES,
         "type_candidature": TYPES_CANDIDATURE,
-        "priorite": PRIORITES,
         "statut": STATUTS,
         "mode_travail": MODES_TRAVAIL,
         "convention_envoyee": CONVENTIONS,
@@ -80,10 +77,7 @@ CHAMPS_MODIFIABLES = {
         "lien_offre",
         "texte_offre",
         "type_candidature",
-        "priorite",
         "statut",
-        "nb_relances",
-        "date_relance_prevue",
         "date_reponse",
         "date_entretien",
         "date_debut_souhaitee",
@@ -117,7 +111,6 @@ CHAMPS_DATE = {
     "entreprises": ["derniere_recherche"],
     "candidatures": [
         "date_envoi",
-        "date_relance_prevue",
         "date_reponse",
         "date_entretien",
         "date_debut_souhaitee",
@@ -127,7 +120,7 @@ CHAMPS_DATE = {
 
 CHAMPS_ENTIER = {
     "entreprises": [],
-    "candidatures": ["nb_relances", "gratification"],
+    "candidatures": ["gratification"],
     "contacts": [],
 }
 

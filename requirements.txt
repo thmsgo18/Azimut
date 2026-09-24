@@ -3,4 +3,3 @@ flask
 pywebview
 anthropic
 openai
-rumps; sys_platform == "darwin"

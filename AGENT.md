@@ -28,7 +28,7 @@ utilise **la date du jour** (format `AAAA-MM-JJ`), plutôt que de la laisser
 vide.
 
 Les autres champs de type date (`date_reponse`, `date_entretien`,
-`date_debut_souhaitee`, `date_relance_prevue`) suivent la règle générale :
+`date_debut_souhaitee`) suivent la règle générale :
 vide si l'offre ne le précise pas — pas de date du jour par défaut pour eux.
 
 ## Mapping champ ↔ information de l'offre
@@ -49,11 +49,10 @@ vide si l'offre ne le précise pas — pas de date du jour par défaut pour eux.
 | `mode_travail`         | Présentiel / Hybride / Full remote si précisé                    |
 | `convention_envoyee`   | laisser au défaut ("Non") sauf indication contraire              |
 | `source`               | plateforme d'où vient l'offre (LinkedIn, Indeed, ...)             |
-| `priorite`             | ne pas déduire de l'offre — laisser au défaut ("Moyenne") sauf si Thomas la précise |
 | `statut`               | laisser au défaut ("À préparer") sauf si Thomas précise que la candidature est déjà envoyée |
 
 Les valeurs de liste (`sous_domaine`, `type_candidature`, `mode_travail`,
-`source`, `priorite`, `statut`, `convention_envoyee`) doivent correspondre à
+`source`, `statut`, `convention_envoyee`) doivent correspondre à
 une des valeurs autorisées listées dans CLAUDE.md / `valeurs.py` — sinon
 `ajouter_candidature` lève une erreur.
 

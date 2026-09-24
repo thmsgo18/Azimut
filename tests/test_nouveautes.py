@@ -34,14 +34,13 @@ class TestModulesNouveautes(unittest.TestCase):
         from evenements import lister_evenements
 
         numero = self._candidature(statut="Envoyée")
-        modifier_candidature(numero, chemin_db=self.chemin_db, statut="Relancée", nb_relances=1)
+        modifier_candidature(numero, chemin_db=self.chemin_db, statut="Réponse reçue")
         modifier_candidature(numero, chemin_db=self.chemin_db, date_reponse="2026-08-25")
         modifier_candidature(numero, chemin_db=self.chemin_db, date_entretien="05/09/2026")
         types = [e["type_evenement"] for e in lister_evenements(numero, chemin_db=self.chemin_db)]
-        self.assertEqual(len(types), 5)
+        self.assertEqual(len(types), 4)
         self.assertIn("creation", types)
         self.assertIn("statut", types)
-        self.assertIn("relance", types)
         self.assertIn("reponse", types)
         self.assertIn("entretien", types)
 
@@ -173,9 +172,9 @@ class TestModulesNouveautes(unittest.TestCase):
     def test_agenda_et_ics(self):
         from agenda import generer_ics, lister_echeances
 
-        self._candidature(date_relance_prevue="2099-01-10", date_entretien="2099-01-15")
+        self._candidature(date_entretien="2099-01-15", date_debut_souhaitee="2099-03-01")
         echeances = lister_echeances(chemin_db=self.chemin_db)
-        self.assertEqual([e["type"] for e in echeances], ["relance", "entretien"])
+        self.assertEqual([e["type"] for e in echeances], ["entretien", "debut"])
         ics = generer_ics(chemin_db=self.chemin_db)
         self.assertIn("BEGIN:VCALENDAR", ics)
         self.assertEqual(ics.count("BEGIN:VEVENT"), 2)
@@ -301,8 +300,8 @@ class TestModulesNouveautes(unittest.TestCase):
         chemin_xlsx = str(Path(self.dossier.name) / "export.xlsx")
         exporter_excel(chemin_xlsx, chemin_db=self.chemin_db)
         ws = openpyxl.load_workbook(chemin_xlsx)["Suivi candidatures"]
-        self.assertEqual(ws["V1"].value, "Notes entretien")
-        self.assertIn("Question posée", ws["V3"].value)
+        self.assertEqual(ws["S1"].value, "Notes entretien")
+        self.assertIn("Question posée", ws["S3"].value)
 
         cible = str(Path(self.dossier.name) / "cible.db")
         db.initialiser_base(cible)

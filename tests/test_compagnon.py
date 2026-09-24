@@ -80,10 +80,10 @@ class TestCompagnon(unittest.TestCase):
         reponse = self.client.get(f"/api/compagnon/candidatures/999?code={self.code}")
         self.assertEqual(reponse.status_code, 404)
 
-    def test_tableau_expose_relances_et_prochain_entretien(self):
+    def test_tableau_expose_les_entretiens_a_venir(self):
         ajouter_candidature(
-            "AgentikCo", "Stage agents IA", statut="Envoyée",
-            date_relance_prevue="2020-01-01",
+            "AgentikCo", "Stage agents IA", statut="Entretien",
+            date_entretien="2020-01-01",  # passé : ignoré
         )
         ajouter_candidature(
             "Mistral AI", "Stage LLM", statut="Entretien",
@@ -91,8 +91,8 @@ class TestCompagnon(unittest.TestCase):
         )
         reponse = self.client.get(f"/api/compagnon/tableau?code={self.code}")
         donnees = reponse.get_json()
-        self.assertEqual(len(donnees["relances"]), 1)
-        self.assertEqual(donnees["prochain_entretien"]["entreprise"], "Mistral AI")
+        self.assertEqual(len(donnees["entretiens_a_venir"]), 1)
+        self.assertEqual(donnees["entretiens_a_venir"][0]["entreprise"], "Mistral AI")
 
     def test_code_change_apres_regeneration(self):
         nouveau_code = reglages.code_compagnon(regenerer=True)

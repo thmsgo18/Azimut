@@ -23,10 +23,7 @@ CREATE TABLE IF NOT EXISTS candidatures (
     lien_offre TEXT,
     texte_offre TEXT,
     type_candidature TEXT,
-    priorite TEXT DEFAULT 'Moyenne',
     statut TEXT DEFAULT 'À préparer',
-    nb_relances INTEGER DEFAULT 0,
-    date_relance_prevue DATE,
     date_reponse DATE,
     date_entretien DATE,
     date_debut_souhaitee DATE,
@@ -136,6 +133,49 @@ def _migrer_contacts_champs_separes(conn):
     conn.execute("ALTER TABLE contacts DROP COLUMN valeur_contact")
 
 
+# Colonnes abandonnées (relances et priorité retirées de l'application) :
+# supprimées des bases existantes à la première ouverture.
+COLONNES_SUPPRIMEES = {
+    "candidatures": ["priorite", "nb_relances", "date_relance_prevue"],
+}
+
+
+def _copier_avant_migration(conn, suffixe):
+    """Copie de sécurité de la base, à côté d'elle, avant une migration qui
+    supprime des données (la sauvegarde automatique du lancement passe par
+    ouvrir() et arriverait donc trop tard). Rien pour une base en mémoire."""
+    chemin = conn.execute("PRAGMA database_list").fetchone()[2]
+    if not chemin:
+        return
+    source = Path(chemin)
+    destination = source.with_name(f"{source.stem}-{suffixe}.db")
+    if destination.exists():
+        return
+    conn.commit()
+    copie = sqlite3.connect(destination)
+    try:
+        conn.backup(copie)
+    finally:
+        copie.close()
+
+
+def _migrer_suppression_relances(conn):
+    """Retire le suivi des relances et la priorité : le statut « Relancée »
+    redevient « Envoyée » (sa seule signification restante), puis les
+    colonnes abandonnées sont supprimées. Ne s'exécute qu'une fois : une
+    fois les colonnes parties, il n'y a plus rien à faire."""
+    for table, colonnes in COLONNES_SUPPRIMEES.items():
+        existantes = {ligne[1] for ligne in conn.execute(f"PRAGMA table_info({table})")}
+        a_supprimer = [c for c in colonnes if c in existantes]
+        if not a_supprimer:
+            continue
+        _copier_avant_migration(conn, "avant-suppression-relances")
+        if table == "candidatures":
+            conn.execute("UPDATE candidatures SET statut = 'Envoyée' WHERE statut = 'Relancée'")
+        for colonne in a_supprimer:
+            conn.execute(f"ALTER TABLE {table} DROP COLUMN {colonne}")
+
+
 def _migrer(conn):
     for table, colonnes in COLONNES_AJOUTEES.items():
         existantes = {ligne[1] for ligne in conn.execute(f"PRAGMA table_info({table})")}
@@ -143,6 +183,7 @@ def _migrer(conn):
             if colonne not in existantes:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {colonne} {type_sql}")
     _migrer_contacts_champs_separes(conn)
+    _migrer_suppression_relances(conn)
     conn.commit()
 
 

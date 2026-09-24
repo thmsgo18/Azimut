@@ -130,7 +130,6 @@ class TestSuiviCandidatures(unittest.TestCase):
             "AgentikCo",
             "Stage",
             statut="envoyee",
-            priorite="HAUTE",
             date_envoi="26/08/2026",
             gratification="1400",
             chemin_db=self.chemin_db,
@@ -138,7 +137,6 @@ class TestSuiviCandidatures(unittest.TestCase):
         cand = lister_candidatures(chemin_db=self.chemin_db)[0]
         self.assertEqual(cand["id"], numero)
         self.assertEqual(cand["statut"], "Envoyée")
-        self.assertEqual(cand["priorite"], "Haute")
         self.assertEqual(cand["date_envoi"], "2026-08-26")
         self.assertEqual(cand["gratification"], 1400)
 

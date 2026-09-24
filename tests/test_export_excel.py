@@ -34,7 +34,6 @@ class TestExportExcel(unittest.TestCase):
             "Stage agents IA",
             date_envoi="2026-08-20",
             statut="Envoyée",
-            priorite="Haute",
             sous_domaine="Orchestration multi-agents",
             lien_offre="https://agentik.co/jobs/stage",
             texte_offre="Concevoir des agents multi-étapes.",
@@ -71,7 +70,7 @@ class TestExportExcel(unittest.TestCase):
     def test_onglet_suivi_contenu(self):
         ws = self.wb["Suivi candidatures"]
         self.assertEqual(ws["A1"].value, "Entreprise")
-        self.assertEqual(ws["I1"].value, "Statut")
+        self.assertEqual(ws["H1"].value, "Statut")
         # Ligne 2 = exemple jaune italique, données à partir de la ligne 3.
         self.assertTrue(ws["A2"].font.italic)
         self.assertEqual(ws["A2"].fill.start_color.rgb, "FFFFF2CC")
@@ -80,15 +79,15 @@ class TestExportExcel(unittest.TestCase):
         # les candidatures sans date passent en dernier.
         self.assertEqual(ws["A3"].value, "AgentikCo")
         self.assertEqual(ws["B3"].value, "20/08/2026")
-        self.assertEqual(ws["I3"].value, "Envoyée")
-        self.assertEqual(ws["P3"].value, 1400)
+        self.assertEqual(ws["H3"].value, "Envoyée")
+        self.assertEqual(ws["M3"].value, 1400)
         self.assertEqual(ws["A4"].value, "Mistral AI")
 
     def test_liens_hyperlink_match(self):
         ws = self.wb["Suivi candidatures"]
-        self.assertIn("HYPERLINK", ws["W3"].value)
-        self.assertIn("MATCH($A3,Entreprises!$A:$A,0)", ws["W3"].value)
-        self.assertIn("MATCH($A3,Contacts!$A:$A,0)", ws["X3"].value)
+        self.assertIn("HYPERLINK", ws["T3"].value)
+        self.assertIn("MATCH($A3,Entreprises!$A:$A,0)", ws["T3"].value)
+        self.assertIn("MATCH($A3,Contacts!$A:$A,0)", ws["U3"].value)
         ws_ent = self.wb["Entreprises"]
         self.assertIn("MATCH($A2,'Suivi candidatures'!$A:$A,0)", ws_ent["F2"].value)
         ws_contacts = self.wb["Contacts"]
@@ -97,10 +96,9 @@ class TestExportExcel(unittest.TestCase):
     def test_listes_deroulantes(self):
         ws = self.wb["Suivi candidatures"]
         validations = {str(dv.sqref): dv.formula1 for dv in ws.data_validations.dataValidation}
-        self.assertEqual(len(validations), 7)
+        self.assertEqual(len(validations), 6)
         formules = "\n".join(validations.values())
-        self.assertIn("À préparer,Envoyée,Relancée,Réponse reçue,Entretien,Refus,Accepté", formules)
-        self.assertIn("Haute,Moyenne,Basse", formules)
+        self.assertIn("À préparer,Envoyée,Réponse reçue,Entretien,Refus,Accepté", formules)
         self.assertIn("Présentiel,Hybride,Full remote", formules)
         ws_contacts = self.wb["Contacts"]
         self.assertEqual(len(ws_contacts.data_validations.dataValidation), 2)
@@ -112,12 +110,10 @@ class TestExportExcel(unittest.TestCase):
             for regle in plage.rules:
                 regles.append((str(plage.sqref), regle.formula[0]))
         plages = {p for p, _ in regles}
-        self.assertTrue(any(p.startswith("I3:I") for p in plages))  # Statut
-        self.assertTrue(any(p.startswith("H3:H") for p in plages))  # Priorité
+        self.assertEqual(plages, {p for p in plages if p.startswith("H3:H")})  # Statut seul
         formules = {f for _, f in regles}
         self.assertIn('"Accepté"', formules)
-        self.assertIn('"Haute"', formules)
-        self.assertEqual(len(regles), 10)  # 7 statuts + 3 priorités
+        self.assertEqual(len(regles), 6)  # un par statut
 
     def test_onglet_entreprises(self):
         ws = self.wb["Entreprises"]
@@ -138,9 +134,9 @@ class TestExportExcel(unittest.TestCase):
         # Compteurs par statut via COUNTIF (aucune valeur en dur).
         self.assertIn('=COUNTIF(', ws["B4"].value)
         self.assertIn('"À préparer"', ws["B4"].value)
-        self.assertIn('"Accepté"', ws["B10"].value)
+        self.assertIn('"Accepté"', ws["B9"].value)
         self.assertIn("=COUNTA('Suivi candidatures'!$A$3:$A$", ws["B12"].value)
-        self.assertEqual(ws["B13"].value, "=IFERROR((B7+B8+B9+B10)/B12,0)")
+        self.assertEqual(ws["B13"].value, "=IFERROR((B6+B7+B8+B9)/B12,0)")
         self.assertEqual(ws["B13"].number_format, "0%")
         # Sections sous-domaines et contacts.
         self.assertIn('"Orchestration multi-agents"', ws["B17"].value)

@@ -67,12 +67,12 @@ Pour mettre à jour une ligne existante : `modifier_candidature(id, **champs)`.
 
 Définies dans `valeurs.py` (la casse et les accents sont tolérés en entrée) :
 
-- `statut` : À préparer, Envoyée, Relancée, Réponse reçue, Entretien, Refus, Accepté
+- `statut` : À préparer, Envoyée, Réponse reçue, Entretien, Refus, Accepté
 - `sous_domaine` : Agents de codage, Orchestration multi-agents,
   RAG / Agents de recherche, Agents conversationnels, Robotique / Agents physiques,
   MLOps pour agents, Autre
 - `type_candidature` : Offre publiée, Candidature spontanée, Cooptation / Réseau
-- `priorite` : Haute, Moyenne, Basse · `mode_travail` : Présentiel, Hybride, Full remote
+- `mode_travail` : Présentiel, Hybride, Full remote
 - `convention_envoyee` : Oui, Non, N/A
 - `source` (candidature) : LinkedIn, Indeed, Site entreprise, Welcome to the Jungle,
   Réseau, Forum / Salon, Autre
@@ -104,10 +104,8 @@ ajouter_candidature(entreprise_nom, poste, **champs) -> id
 # (4) candidatures - best effort, ne lève jamais si la sauvegarde échoue
 modifier_candidature(id, **champs)         # changement de statut → événement journalisé
 supprimer_candidature(id)                  # supprime aussi journal + documents liés
-lister_candidatures(statut=None, sous_domaine=None, priorite=None)
+lister_candidatures(statut=None, sous_domaine=None)
 recuperer_candidature(id)
-marquer_relance(id) -> dict                # +1 relance, statut→Relancée si besoin, date effacée
-lister_relances_a_faire() -> [dict, ...]   # en retard puis prévues aujourd'hui, triées par urgence
 enregistrer_etat_lien(id, etat)            # "actif"/"mort"/"inconnu" - usage interne (voir ci-dessous)
 
 # verification_liens.py - ping HTTP conservateur des liens d'offres (jamais de faux positif)
@@ -123,10 +121,6 @@ creer_brouillon(lien=None, texte=None) -> {id, entreprise, poste}   # statut "À
 creer_rappel(titre, notes, date_echeance_iso, liste="Azimut")
 pousser_echeance(echeance) / pousser_toutes_les_echeances() -> résumé (best effort)
 
-# notifications_macos.py - notifications proactives (widget), désactivées par défaut,
-# no-op silencieux sur Windows/Linux (osascript absent)
-verifier_et_notifier()   # résumé de relances 1x/jour + 1 alerte par lien mort, jamais en boucle
-
 # import_csv.py - import générique (LinkedIn, Indeed, autre), colonnes mappées à la main
 apercu_csv(chemin_fichier) -> {"entetes", "lignes"}          # sans rien écrire en base
 importer_csv(chemin_fichier, correspondance, valeurs_fixes=None) -> résumé  # correspondance = {champ: en-tête}
@@ -134,9 +128,6 @@ importer_csv(chemin_fichier, correspondance, valeurs_fixes=None) -> résumé  # 
 # statistiques.py - funnel, délais, sources, + activité hebdomadaire
 serie_hebdomadaire(nb_semaines=12) -> [{debut, fin, nombre}, ...]     # candidatures envoyées / semaine ISO
 progression_objectif_hebdomadaire() -> dict | None                    # None si reglages.objectif_hebdomadaire absent
-
-# agent.py - en plus de l'analyse d'offres (voir plus bas)
-generer_message_relance(candidature, contact=None) -> texte   # objet + corps, jamais envoyé automatiquement
 
 # compagnon.py - serveur séparé, lecture seule, réseau local (port 8767), opt-in (reglages.compagnon_actif)
 # Aucune fonction à appeler depuis un autre module : sert sa propre API + page mobile, protégée par
@@ -185,13 +176,12 @@ retourner une proposition, à valider et écrire ensuite via l'API métier.
 
 Même code partout, un lanceur différent par OS (`Azimut.app` / `Azimut.bat` /
 `azimut.sh`), tous sur le même principe auto-installant (créent le venv et
-installent `requirements.txt` au premier lancement). Trois modules sont
-propres à macOS (`rumps` pour le widget, `osascript` pour les notifications
-et l'app Rappels) : `rumps` a un marqueur `sys_platform == "darwin"` dans
-`requirements.txt` pour ne jamais casser `pip install` ailleurs, et
-`rappels_macos.py` / `notifications_macos.py` dégradent déjà proprement (une
-`ErreurSuivi` claire ou un no-op silencieux) sans qu'aucun garde-fou
-supplémentaire soit nécessaire dans le code Python.
+installent `requirements.txt` au premier lancement). Seule l'intégration à
+l'app Rappels est propre à macOS (`osascript`) : `rappels_macos.py` dégrade
+déjà proprement (une `ErreurSuivi` claire) sans qu'aucun garde-fou
+supplémentaire soit nécessaire dans le code Python. Tout paquet propre à un
+seul OS ajouté un jour à `requirements.txt` doit porter un marqueur
+`sys_platform == "..."`, sinon `pip install` échoue ailleurs.
 
 Le reste (toute la logique métier, `serveur.py`, `app_bureau.py`) est déjà
 cross-OS - aucun chemin en dur, tout passe par `pathlib.Path`. La CI
