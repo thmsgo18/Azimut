@@ -10,14 +10,27 @@ dialogue() {
 }
 
 # Premier lancement : installation automatique de l'environnement Python.
+# Un Python récent (python.org, Homebrew) est préféré à celui d'Apple
+# (/usr/bin/python3, souvent 3.9), mais ce dernier fonctionne aussi.
 if [ ! -x "venv/bin/python" ]; then
-    if ! /usr/bin/python3 -m venv venv >/tmp/azimut-install.log 2>&1 \
-       && ! python3 -m venv venv >>/tmp/azimut-install.log 2>&1; then
+    : >/tmp/azimut-install.log
+    cree=""
+    for candidat in /Library/Frameworks/Python.framework/Versions/Current/bin/python3 \
+                    /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
+        if [ -x "$candidat" ] && "$candidat" -m venv venv >>/tmp/azimut-install.log 2>&1; then
+            cree="oui"
+            break
+        fi
+    done
+    if [ -z "$cree" ]; then
         dialogue "Python 3 est introuvable. Ouvrir le Terminal, taper python3, accepter l'installation des outils de développement proposée par macOS, puis relancer Azimut."
         exit 1
     fi
 fi
 if ! ./venv/bin/python -c "import flask, openpyxl, webview" >/dev/null 2>&1; then
+    # pip à jour d'abord : l'ancien pip du Python d'Apple ne sait pas
+    # installer pyobjc (utilisé par la fenêtre native).
+    ./venv/bin/python -m pip install --quiet --upgrade pip >>/tmp/azimut-install.log 2>&1
     if ! ./venv/bin/pip install --quiet -r requirements.txt >>/tmp/azimut-install.log 2>&1; then
         dialogue "Installation des dépendances impossible. Vérifier la connexion Internet (nécessaire une seule fois, au premier lancement), puis relancer Azimut."
         exit 1

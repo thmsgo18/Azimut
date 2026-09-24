@@ -20,6 +20,7 @@ fi
 
 if ! ./venv/bin/python -c "import flask, openpyxl, webview" 2>/dev/null; then
     echo "Installation des dépendances (flask, openpyxl, pywebview)…"
+    ./venv/bin/python -m pip install --quiet --upgrade pip
     if ! ./venv/bin/pip install --quiet -r requirements.txt; then
         echo "✗ Installation impossible (connexion Internet requise au premier lancement)."
         read -r -p "Appuyer sur Entrée pour fermer…"

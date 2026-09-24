@@ -34,6 +34,7 @@ if not exist "venv\Scripts\python.exe" (
 "venv\Scripts\python.exe" -c "import flask, openpyxl, webview" >nul 2>nul
 if errorlevel 1 (
     echo Installation des dependances ^(flask, openpyxl, pywebview^)...
+    "venv\Scripts\python.exe" -m pip install --quiet --upgrade pip
     "venv\Scripts\pip.exe" install --quiet -r requirements.txt
     if errorlevel 1 (
         echo Installation impossible ^(connexion Internet requise au premier

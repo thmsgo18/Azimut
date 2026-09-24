@@ -190,9 +190,8 @@ chaque push : c'est la vérification qui compte, pas une hypothèse.
 
 Côté interface, `/api/valeurs` expose `plateforme_macos` (calculé côté
 serveur via `platform.system()`) ; `static/app.js` s'en sert pour masquer
-proprement les 3 extras macOS (bouton **R** des échéances, bloc « App
-Rappels » dans « Connecter un calendrier », carte « Notifications
-proactives » dans Réglages) plutôt que d'afficher un bouton qui échouerait au
+proprement les extras macOS (bouton **R** des échéances, bloc « App
+Rappels » dans « Connecter un calendrier ») plutôt que d'afficher un bouton qui échouerait au
 clic sur Windows/Linux. **Toute nouvelle fonctionnalité qui dépend d'une API
 propre à un seul OS doit suivre ce même patron** : dégradation gracieuse côté
 Python (jamais d'exception qui remonte non gérée), masquage côté JS via

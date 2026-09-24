@@ -12,7 +12,7 @@ Tout tourne en local. Aucune donnée ne quitte la machine, sauf action explicite
 
 ## Installation
 
-Azimut tourne sur macOS, Windows et Linux - exactement le même code partout. Seul le lanceur change, et il installe lui-même les dépendances Python au premier lancement (connexion Internet nécessaire une seule fois) ; les suivants sont immédiats. Il faut [Python 3.10+](https://python.org) installé sur la machine (sous Windows, cocher « Add python.exe to PATH » pendant l'installation).
+Azimut tourne sur macOS, Windows et Linux - exactement le même code partout. Seul le lanceur change, et il installe lui-même les dépendances Python au premier lancement (connexion Internet nécessaire une seule fois) ; les suivants sont immédiats. Il faut [Python 3.9+](https://python.org) installé sur la machine (sous Windows, cocher « Add python.exe to PATH » pendant l'installation).
 
 [**Télécharger le ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip) et le dézipper n'importe où, ou `git clone https://github.com/thmsgo18/azimut.git` (recommandé si tu es à l'aise avec un terminal - les mises à jour suivantes ne seront qu'un `git pull`). Ensuite, selon ton OS :
 
