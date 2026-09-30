@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import db
 
 PROJET = Path(db.CHEMIN_DB).resolve().parent
-DOSSIERS_DONNEES = ("documents", "sauvegardes", "lettres", "fiches", "profil", "import_temp")
+DOSSIERS_DONNEES = ("documents", "sauvegardes", "lettres", "fiches", "cv", "profil", "import_temp")
 
 
 def _empreinte():

@@ -139,6 +139,85 @@ class TestCliNotes(BaseCli):
         self.assertEqual(self._cli("notes", "ajouter", "--entreprise", "X", "--fichier", "/nulle/part").returncode, 1)
 
 
+class TestCliCv(BaseCli):
+    """Le CV : c'est par « cv voir » qu'une IA locale le lit - et qu'elle apprend
+    où se trouve sa source modifiable."""
+
+    def test_cv_principal_avec_source_latex(self):
+        projet = Path(self.dossier.name) / "cv-fr"
+        projet.mkdir()
+        (projet / "main.tex").write_text("\\section{Formation} M2 IA - agents.", encoding="utf-8")
+        ajout = self._cli("cv", "ajouter", "--nom", "CV français", "--langue", "fr", "--source", str(projet),
+                          "--fichier", self._fichier("cv-fr.pdf", pdf_avec_texte("Camille Martin")))
+        self.assertEqual(ajout.returncode, 0, ajout.stderr)
+        self.assertIn("(principal)", ajout.stdout)
+        voir = self._cli("cv", "voir")
+        self.assertEqual(voir.returncode, 0, voir.stderr)
+        self.assertIn("CV français (principal)", voir.stdout)
+        self.assertIn(str(projet), voir.stdout)  # où lire ET où modifier
+        self.assertIn("éditer cette source", voir.stdout)
+        self.assertIn("M2 IA - agents.", voir.stdout)  # le texte vient de la source LaTeX
+        self.assertIn("1 ", self._cli("cv", "lister").stdout)
+
+    def test_plusieurs_cv_principal_et_suppression(self):
+        self._cli("cv", "ajouter", "--nom", "Français", "--texte", "CV français.")
+        self._cli("cv", "ajouter", "--nom", "English", "--texte", "English resume.")
+        self.assertIn("CV français.", self._cli("cv", "voir").stdout)
+        self.assertIn("English resume.", self._cli("cv", "voir", "2").stdout)
+        self.assertEqual(self._cli("cv", "principal", "2").returncode, 0)
+        self.assertIn("English resume.", self._cli("cv", "voir").stdout)
+        self.assertEqual(self._cli("cv", "modifier", "1", "--nom", "FR 2026", "--langue", "fr").returncode, 0)
+        self.assertIn("FR 2026", self._cli("cv", "lister").stdout)
+        self.assertEqual(self._cli("cv", "supprimer", "2").returncode, 0)
+        self.assertIn("CV français.", self._cli("cv", "voir").stdout)  # l'autre reprend le rôle de principal
+
+    def test_erreurs_claires(self):
+        aucun = self._cli("cv", "voir")
+        self.assertEqual(aucun.returncode, 1)
+        self.assertIn("Aucun CV configuré", aucun.stderr)
+        self.assertIn("Aucun CV enregistré", self._cli("cv", "lister").stdout)
+        self.assertEqual(self._cli("cv", "ajouter").returncode, 1)
+        self.assertEqual(self._cli("cv", "ajouter", "--source", "/nulle/part").returncode, 1)
+        self.assertIn("Fichier introuvable", self._cli("cv", "ajouter", "--fichier", "/nulle/part.pdf").stderr)
+
+
+class TestCliDocuments(BaseCli):
+    def test_importer_lister_supprimer(self):
+        pdf = self._fichier("offre-agentik.pdf", pdf_avec_texte("Mission : agents."))
+        resultat = self._cli("documents", "importer", "--entreprise", "AgentikCo", "--poste", "stage agents ia",
+                             "--fichier", pdf, "--type", "Offre (PDF)")
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+        self.assertIn("Document n°1 enregistré", resultat.stdout)
+        self.assertTrue(list((Path(self.dossier.name) / "documents").glob("*offre-agentik.pdf")))
+        liste = self._cli("documents", "lister", "--recherche", "mission")
+        self.assertIn("offre-agentik.pdf", liste.stdout)
+        self.assertIn("Offre (PDF)", liste.stdout)
+        self.assertIn("1 document(s)", liste.stdout)
+        self.assertIn("Aucun document trouvé", self._cli("documents", "lister", "--entreprise", "Inconnue").stdout)
+        self.assertEqual(self._cli("documents", "supprimer", "1").returncode, 0)
+        self.assertFalse(list((Path(self.dossier.name) / "documents").glob("*.pdf")))
+
+    def test_modifier_rattache_a_plusieurs_offres(self):
+        self._cli("candidatures", "ajouter", "--entreprise", "AgentikCo", "--poste", "Stage RAG")
+        self._cli("documents", "importer", "--entreprise", "AgentikCo", "--fichier", self._fichier("offre.txt", "Mission."))
+        resultat = self._cli("documents", "modifier", "1", "--titre", "Offre AgentikCo", "--type", "Offre (PDF)",
+                             "--candidature-id", "1", "--candidature-id", "2", "--pas-generale")
+        self.assertEqual(resultat.returncode, 0, resultat.stderr)
+        liste = self._cli("documents", "lister")
+        self.assertIn("Offre AgentikCo", liste.stdout)
+        self.assertIn("Offre (PDF)", liste.stdout)
+        refus = self._cli("documents", "modifier", "1", "--candidature-id", "99")
+        self.assertEqual(refus.returncode, 1)
+
+    def test_erreurs(self):
+        mauvais_type = self._cli("documents", "importer", "--entreprise", "X", "--type", "Selfie",
+                                 "--fichier", self._fichier("a.txt", "abc"))
+        self.assertEqual(mauvais_type.returncode, 1)
+        self.assertIn("Type de document", mauvais_type.stderr)
+        self.assertIn("Fichier introuvable", self._cli(
+            "documents", "importer", "--entreprise", "X", "--fichier", "/nulle/part").stderr)
+
+
 class TestCliDiverses(BaseCli):
     def test_candidatures_voir_affiche_le_texte_de_l_offre(self):
         """Claude Code lit l'offre via « candidatures voir » : le texte intégral doit y figurer."""

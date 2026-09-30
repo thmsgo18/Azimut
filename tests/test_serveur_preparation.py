@@ -163,17 +163,26 @@ class TestPiecesApi(BaseApi):
         self.assertIn("erreur", reponse.get_json())
         self.assertEqual(self.client.get("/api/lettres").get_json(), [])
 
-    def test_le_skill_de_lettre_reste_telechargeable(self):
-        reponse = self.client.get("/api/lettres/skill")
-        self.assertEqual(reponse.status_code, 200)
-        self.assertIn("zip", reponse.headers["Content-Type"])
+    def test_les_skills_sont_telechargeables(self):
+        import zipfile
+
+        for nom in ("lettre-motivation", "fiche-entretien"):
+            with self.subTest(nom):
+                reponse = self.client.get(f"/api/skills/{nom}")
+                self.assertEqual(reponse.status_code, 200)
+                self.assertIn("zip", reponse.headers["Content-Type"])
+                self.assertIn(f"{nom}.skill", reponse.headers["Content-Disposition"])
+                with zipfile.ZipFile(io.BytesIO(reponse.data)) as archive:
+                    self.assertIn(f"{nom}/SKILL.md", archive.namelist())
+                reponse.close()  # libère le fichier (verrou sous Windows)
+        self.assertEqual(self.client.get("/api/skills/inconnu").status_code, 404)
 
 
 class TestGenerationApi(BaseApi):
     def _configurer(self, cv=True):
         self.client.post("/api/reglages", json={"cle_api": "sk-ant-test", "modele_ia": "claude-sonnet-5"})
         if cv:
-            self.client.post("/api/profil/cv/texte", json={"texte": "Camille Martin - M2 IA."})
+            self.client.post("/api/cvs", json={"texte": "Camille Martin - M2 IA."})
 
     def test_generer_une_lettre(self):
         self._configurer()
@@ -192,7 +201,7 @@ class TestGenerationApi(BaseApi):
             sans_cv = self.client.post("/api/lettres/generer", json={"entreprise": "AgentikCo"})
             self.assertEqual(sans_cv.status_code, 400)
             self.assertIn("CV", sans_cv.get_json()["erreur"])
-            self.client.post("/api/profil/cv/texte", json={"texte": "CV"})
+            self.client.post("/api/cvs", json={"texte": "CV"})
             melange = self.client.post("/api/lettres/generer", json={"candidature_ids": [self.o1, self.autre]})
             self.assertEqual(melange.status_code, 400)
             self.assertEqual(self.client.post("/api/lettres/generer", json={}).status_code, 400)
@@ -274,7 +283,7 @@ class TestTableauDeBordEtRecherche(BaseApi):
         self.client.post("/api/notes", json={"candidature_id": self.o1, "contenu": "Orchestration confirmée."})
         resultats = self.client.get("/api/recherche?q=orchestration").get_json()
         self.assertEqual((len(resultats["lettres"]), len(resultats["notes"])), (1, 1))
-        self.assertEqual(set(resultats), {"candidatures", "entreprises", "notes", "lettres", "fiches"})
+        self.assertEqual(set(resultats), {"candidatures", "entreprises", "notes", "documents", "lettres", "fiches"})
 
     def test_recapitulatif_de_la_candidature_liste_la_preparation(self):
         self._importer("lettres", entreprise="AgentikCo", candidature_ids=f"[{self.o1}]", titre="Ma lettre")

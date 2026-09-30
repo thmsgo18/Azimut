@@ -23,6 +23,7 @@ Règles (section 8 du cahier des charges), valables pour les deux fournisseurs :
 import json
 import re
 
+import guides_ia
 import reglages
 from exceptions import ErreurSuivi, ValeurNonAutorisee
 from valeurs import MODES_TRAVAIL, SOURCES_CANDIDATURE, SOUS_DOMAINES, TYPES_CANDIDATURE
@@ -252,12 +253,12 @@ def _rechercher_contexte_anthropic(config, nom_entreprise):
 def generer_lettre_motivation(
     entreprise_nom, cv_texte, offres=None, langue=None, generale=False, chemin_db=None
 ):
-    """Rédige une lettre de motivation complète via l'API, en utilisant le
-    skill « azimut-lettre-motivation » (voir lettres_skill.py) comme prompt
-    système, avec recherche web intégrée sur l'entreprise. Seul le
-    fournisseur Anthropic est pris en charge ici (même restriction que
-    rechercher_contexte) - le skill téléchargeable pour Claude Code reste
-    disponible quel que soit le fournisseur configuré.
+    """Rédige une lettre de motivation complète via l'API, avec pour consigne
+    système les règles du guide skills/lettre-motivation/AGENT.md (voir
+    guides_ia.py - les mêmes que suit une IA locale, Claude Code par exemple) et
+    la recherche web intégrée sur l'entreprise. Seul le fournisseur Anthropic
+    est pris en charge ici (même restriction que rechercher_contexte) - une IA
+    installée sur la machine reste possible quel que soit le fournisseur configuré.
 
     `offres` : liste de dicts de candidatures (voir candidatures.recuperer_candidature),
     ou None/vide pour une lettre générale liée seulement à l'entreprise.
@@ -268,13 +269,13 @@ def generer_lettre_motivation(
     if not entreprise_nom or not str(entreprise_nom).strip():
         raise ValeurNonAutorisee("Nom de l'entreprise manquant.")
     if not cv_texte or not str(cv_texte).strip():
-        raise ValeurNonAutorisee("CV manquant - le configurer dans Réglages > Profil.")
+        raise ValeurNonAutorisee("CV manquant - l'ajouter dans la section CV.")
     config = _config(chemin_db)
     if config["fournisseur"] != "anthropic":
         raise ErreurSuivi(
             "La génération de lettre via l'API n'est disponible qu'avec le fournisseur "
-            "Anthropic (recherche web intégrée) - utiliser le skill téléchargeable pour "
-            "Claude Code avec un autre fournisseur."
+            "Anthropic (recherche web intégrée) - avec un autre fournisseur, demander la lettre "
+            "à une IA installée sur la machine (voir skills/lettre-motivation/AGENT.md)."
         )
     bloc_offres = ""
     for offre in offres or []:
@@ -299,17 +300,24 @@ def generer_lettre_motivation(
     return _generer_lettre_anthropic(config, contenu)
 
 
+def instructions_lettre():
+    """Consigne système d'une lettre : une courte mise en situation + les règles du guide."""
+    return (
+        "Tu rédiges une lettre de motivation pour un candidat, à partir de son CV et de l'offre "
+        "(ou de l'entreprise) visée. Réponds uniquement par le texte de la lettre, sans commentaire.\n\n"
+        + guides_ia.regles("lettre-motivation")
+    )
+
+
 def _generer_lettre_anthropic(config, contenu):
     import anthropic
-
-    import lettres_skill
 
     client = anthropic.Anthropic(api_key=config["cle"])
     try:
         reponse = client.messages.create(
             model=config["modele"],
             max_tokens=16000,
-            system=lettres_skill.instructions_systeme(),
+            system=instructions_lettre(),
             messages=[{"role": "user", "content": contenu}],
             tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 5}],
         )
@@ -317,7 +325,7 @@ def _generer_lettre_anthropic(config, contenu):
         raise _traduire_erreur_anthropic(erreur)
     if reponse.stop_reason == "refusal":
         raise ErreurSuivi(
-            "L'IA a refusé de rédiger cette lettre - réessayer, ou utiliser le skill Claude Code."
+            "L'IA a refusé de rédiger cette lettre - réessayer, ou la demander à une IA locale."
         )
     morceaux = [b.text for b in reponse.content if b.type == "text" and b.text.strip()]
     if not morceaux:
@@ -417,28 +425,16 @@ SCHEMA_FICHE = {
     "additionalProperties": False,
 }
 
-INSTRUCTIONS_FICHE = """Tu prépares un candidat à un entretien : tu rédiges le contenu d'une fiche de préparation.
-
-Règle d'or : ne RIEN inventer. Une donnée (chiffre, client, date) absente des informations fournies ou de la
-recherche est omise, jamais estimée. Signale dans source_note les sources utilisées et toute donnée financière
-qui n'est pas la plus récente.
-
-- company_overview : présentation de l'entreprise à partir de la recherche et des notes fournies -
-  stats (0 à 5 chiffres clés vérifiables : effectif, ancienneté, clients, chiffre d'affaires public...),
-  card_left (qui est l'entreprise, son positionnement, 2 à 5 étiquettes), card_right (notoriété, clients notables,
-  partenariats). Si l'on ne sait presque rien, dis-le simplement dans le texte plutôt que de combler.
-- postes : UN élément par offre, dans l'ordre fourni, avec offre_id = son numéro. lead = accroche d'une phrase,
-  stack = technologies ou contexte réellement cités, missions = ce que le poste consiste à faire (reformulé
-  brièvement d'après le texte de l'offre, jamais inventé). Un champ inconnu vaut null.
-- question_blocks : les questions que le candidat pourra poser, groupées par thème (projets et affectation,
-  technique, formation et accompagnement, suite et culture). Chaque question s'appuie sur un élément réel des offres
-  (projet, stack, processus cités), jamais une question générique ; `why` = une phrase sur l'intérêt de la question,
-  ou null. Adapte-les au profil du candidat quand son CV est fourni.
-- footer_tip : 1 à 2 phrases sur l'angle à mettre en avant, d'après le CV et les offres (null sans CV).
-- meta.candidate_line : « Prénom Nom, formation » d'après le CV (null sans CV) ; meta.footer_name : son nom (null
-  sans CV) ; meta.subtitle : une courte ligne de contexte (ex. « Entretien commun à 2 offres de stage »).
-- Dans les champs `html` : uniquement <p>, <b>, <ul>, <li> - jamais d'autre balise, jamais de lien.
-- Langue : le français, sauf demande contraire."""
+def instructions_fiche():
+    """Consigne système d'une fiche : les règles de contenu du guide
+    skills/fiche-entretien/AGENT.md + ce qui est propre à l'appel par API."""
+    return (
+        "Tu prépares un candidat à un entretien : tu rédiges le contenu d'une fiche de préparation.\n\n"
+        + guides_ia.regles("fiche-entretien")
+        + "\n\nSpécifique à cet appel automatisé : dans `postes`, `offre_id` = le numéro de l'offre "
+          "indiqué dans le message (Azimut y ajoute lui-même le lien de l'offre, s'il est encore en "
+          "ligne, et l'entreprise, les dates et le pied de page) ; ne fournis pas `link`."
+    )
 
 
 def rechercher_presentation(nom_entreprise, chemin_db=None):
@@ -548,7 +544,7 @@ def _generer_fiche_anthropic(config, contenu):
         reponse = client.messages.create(
             model=config["modele"],
             max_tokens=16000,
-            system=INSTRUCTIONS_FICHE,
+            system=instructions_fiche(),
             messages=[{"role": "user", "content": contenu}],
             output_config={"format": {"type": "json_schema", "schema": SCHEMA_FICHE}},
         )
@@ -672,7 +668,7 @@ def _generer_fiche_openai_compatible(config, contenu):
 
     client = _client_openai_compatible(config)
     instructions = (
-        INSTRUCTIONS_FICHE
+        instructions_fiche()
         + "\n\nRéponds UNIQUEMENT avec un objet JSON valide respectant exactement ce schéma "
           "(aucun texte avant ou après, aucun bloc de code) :\n"
         + json.dumps(SCHEMA_FICHE, ensure_ascii=False)

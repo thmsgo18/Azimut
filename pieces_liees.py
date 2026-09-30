@@ -1,7 +1,7 @@
-"""Noyau commun aux lettres de motivation (lettres.py) et aux fiches
-d'entretien (fiches.py) : une « pièce » est rattachée à UNE entreprise et, si
-besoin, à une ou plusieurs de ses candidatures ; elle peut aussi porter sur
-l'entreprise en général, même quand des offres sont cochées.
+"""Noyau commun aux lettres de motivation (lettres.py), aux fiches d'entretien
+(fiches.py) et aux documents (documents.py) : une « pièce » est rattachée à UNE
+entreprise et, si besoin, à une ou plusieurs de ses candidatures ; elle peut
+aussi porter sur l'entreprise en général, même quand des offres sont cochées.
 
 Deux façons de la créer, dans le même modèle :
 - ajouter() : un texte déjà rédigé (généré par l'IA, ou par Claude Code via la
@@ -20,17 +20,20 @@ import uuid
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from typing import Optional
 
 import db
 import reglages
 from entreprises import _trouver_par_nom, ajouter_ou_recuperer_entreprise
 from exceptions import EntiteIntrouvable, ValeurNonAutorisee
 from extraction import EXTENSIONS_TEXTE, extraire_texte
-from valeurs import normaliser
+from valeurs import TYPES_DOCUMENT, normaliser
 
 SOURCES = ["manuelle", "api", "claude_code"]
 TAILLE_MAX_FICHIER = 15 * 1024 * 1024  # 15 Mo
+TAILLE_MAX_DOCUMENT = 25 * 1024 * 1024  # 25 Mo : un document peut être un scan ou un portfolio
 TAILLE_MAX_TEXTE = 200_000  # caractères de texte extraits gardés pour la recherche
+EXTENSIONS_IMAGE = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 
 @dataclass(frozen=True)
@@ -43,6 +46,10 @@ class TypePiece:
     sous_dossier: str        # dossier de données où ranger les fichiers
     libelle: str             # « lettre », « fiche » : pour les messages d'erreur
     prefixe_titre: str = ""  # devant le titre par défaut (« Fiche d'entretien - »)
+    colonnes_supplementaires: tuple = ()  # colonnes propres au type (« type_document »)
+    extensions: Optional[frozenset] = None  # formats acceptés à l'import ; None = tous
+    taille_max: Optional[int] = None      # octets ; None = TAILLE_MAX_FICHIER
+    titre_depuis_fichier: bool = False    # titre par défaut = nom du fichier importé
 
 
 TYPE_LETTRE = TypePiece(
@@ -51,6 +58,7 @@ TYPE_LETTRE = TypePiece(
     colonne_lien="lettre_id",
     sous_dossier="lettres",
     libelle="lettre",
+    extensions=frozenset(EXTENSIONS_TEXTE),
 )
 
 TYPE_FICHE = TypePiece(
@@ -60,7 +68,48 @@ TYPE_FICHE = TypePiece(
     sous_dossier="fiches",
     libelle="fiche",
     prefixe_titre="Fiche d'entretien - ",
+    extensions=frozenset(EXTENSIONS_TEXTE),
 )
+
+# Un document est un fichier quelconque (CV envoyé, lettre, offre en PDF, scan,
+# portfolio...) : tout format, 25 Mo, titre = nom du fichier.
+TYPE_DOCUMENT = TypePiece(
+    table="documents",
+    table_liens="documents_candidatures",
+    colonne_lien="document_id",
+    sous_dossier="documents",
+    libelle="document",
+    colonnes_supplementaires=("type_document",),
+    taille_max=TAILLE_MAX_DOCUMENT,
+    titre_depuis_fichier=True,
+)
+
+
+def _valider_type_document(valeur):
+    """Le type d'un document, tolérant à la casse et aux accents (défaut « Autre »)."""
+    if valeur in (None, ""):
+        return "Autre"
+    correspondance = next((t for t in TYPES_DOCUMENT if normaliser(t) == normaliser(valeur)), None)
+    if correspondance is None:
+        raise ValeurNonAutorisee(
+            f"Type de document non autorisé : {valeur!r}. Valeurs possibles : {', '.join(TYPES_DOCUMENT)}."
+        )
+    return correspondance
+
+
+VALIDATEURS_EXTRAS = {"type_document": _valider_type_document}
+
+
+def _extras_valides(type_piece, extras):
+    """Les colonnes supplémentaires du type (par défaut si absentes), validées."""
+    extras = dict(extras or {})
+    inconnus = set(extras) - set(type_piece.colonnes_supplementaires)
+    if inconnus:
+        raise ValeurNonAutorisee(f"Champ non pris en charge : {', '.join(sorted(inconnus))}.")
+    return {
+        colonne: VALIDATEURS_EXTRAS[colonne](extras.get(colonne))
+        for colonne in type_piece.colonnes_supplementaires
+    }
 
 
 def _slugifier(texte, defaut):
@@ -143,16 +192,23 @@ def _preparer(conn, entreprise_nom, candidature_ids, chemin_db):
 
 
 def _inserer(conn, type_piece, entreprise_id, titre, contenu, chemin_fichier, nom_fichier,
-             langue, generale, source, modele_ia, candidature_ids):
+             langue, generale, source, modele_ia, candidature_ids, extras=None):
+    colonnes = [
+        "entreprise_id", "titre", "contenu", "chemin_fichier", "nom_fichier", "langue",
+        "generale", "source", "modele_ia", "date_creation",
+    ]
+    valeurs = [
+        entreprise_id, titre, contenu, chemin_fichier, nom_fichier,
+        (str(langue).strip() if langue else None) or None,
+        1 if generale else 0, source, modele_ia, date.today().isoformat(),
+    ]
+    for colonne, valeur in (extras or {}).items():
+        colonnes.append(colonne)
+        valeurs.append(valeur)
     curseur = conn.execute(
-        f"INSERT INTO {type_piece.table} (entreprise_id, titre, contenu, chemin_fichier, "
-        "nom_fichier, langue, generale, source, modele_ia, date_creation) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (
-            entreprise_id, titre, contenu, chemin_fichier, nom_fichier,
-            (str(langue).strip() if langue else None) or None,
-            1 if generale else 0, source, modele_ia, date.today().isoformat(),
-        ),
+        f"INSERT INTO {type_piece.table} ({', '.join(colonnes)}) "
+        f"VALUES ({', '.join('?' * len(colonnes))})",
+        valeurs,
     )
     piece_id = curseur.lastrowid
     for candidature_id in candidature_ids:
@@ -225,26 +281,35 @@ def _texte_du_fichier(contenu, suffixe):
 
 def importer(
     type_piece, entreprise_nom, nom_fichier, contenu_fichier, candidature_ids=None, titre=None,
-    langue=None, generale=None, chemin_db=None,
+    langue=None, generale=None, extras=None, chemin_db=None,
 ):
-    """Enregistre un fichier déjà fait par l'utilisateur (PDF, Word, texte),
+    """Enregistre un fichier déjà fait par l'utilisateur (PDF, Word, texte...),
     conservé tel quel. Son texte est extrait (best effort) pour la recherche :
     un PDF scanné sans texte est accepté quand même, seul un fichier illisible
-    est refusé. Retourne l'id de la pièce créée."""
+    est refusé (sauf pour un document, qui accepte tout format et se contente
+    de ne pas avoir de texte). Retourne l'id de la pièce créée."""
     if not contenu_fichier:
         raise ValeurNonAutorisee("Le fichier reçu est vide.")
-    if len(contenu_fichier) > TAILLE_MAX_FICHIER:
-        raise ValeurNonAutorisee("Fichier trop volumineux (15 Mo maximum).")
+    limite = type_piece.taille_max or TAILLE_MAX_FICHIER
+    if len(contenu_fichier) > limite:
+        raise ValeurNonAutorisee(f"Fichier trop volumineux ({limite // (1024 * 1024)} Mo maximum).")
     nom_original = Path(str(nom_fichier)).name
     suffixe = Path(nom_original).suffix.lower()
-    if suffixe not in EXTENSIONS_TEXTE:
+    if type_piece.extensions is not None and suffixe not in type_piece.extensions:
         raise ValeurNonAutorisee(
             f"Format non pris en charge : {suffixe or '(aucune extension)'}. "
-            f"Formats acceptés : {', '.join(sorted(EXTENSIONS_TEXTE))}."
+            f"Formats acceptés : {', '.join(sorted(type_piece.extensions))}."
         )
+    extras = _extras_valides(type_piece, extras)
     # Le fichier est lu d'abord : un fichier illisible est refusé sans avoir rien
     # créé nulle part (ni entreprise, ni fichier, ni ligne).
-    texte = _texte_du_fichier(contenu_fichier, suffixe)
+    texte = ""
+    if suffixe in EXTENSIONS_TEXTE:
+        try:
+            texte = _texte_du_fichier(contenu_fichier, suffixe)
+        except ValeurNonAutorisee:
+            if type_piece.extensions is not None:
+                raise
     conn = db.ouvrir(chemin_db)
     destination = None
     try:
@@ -253,10 +318,13 @@ def importer(
         dossier.mkdir(parents=True, exist_ok=True)
         destination = dossier / f"{uuid.uuid4().hex[:8]}-{_nom_securise(nom_original)}"
         destination.write_bytes(contenu_fichier)
-        titre_final = (str(titre).strip() if titre else "") or _titre_par_defaut(type_piece, nom, postes)
+        titre_final = (
+            (str(titre).strip() if titre else "")
+            or (nom_original if type_piece.titre_depuis_fichier else _titre_par_defaut(type_piece, nom, postes))
+        )
         piece_id = _inserer(
             conn, type_piece, entreprise_id, titre_final, texte, str(destination), nom_original,
-            langue, _generale(generale, ids), "manuelle", None, ids,
+            langue, _generale(generale, ids), "manuelle", None, ids, extras,
         )
         conn.commit()
         return piece_id
@@ -283,7 +351,15 @@ def _enrichir(conn, type_piece, ligne):
     ]
     chemin = piece.get("chemin_fichier")
     piece["fichier_disponible"] = bool(chemin) and reglages.chemin_reel(chemin).exists()
-    piece["apercu_pdf"] = piece["fichier_disponible"] and str(chemin).lower().endswith(".pdf")
+    suffixe = Path(str(chemin or "")).suffix.lower()
+    piece["apercu_pdf"] = piece["fichier_disponible"] and suffixe == ".pdf"
+    # Ce que l'interface affiche en fenêtre : le PDF, l'image, ou à défaut le texte.
+    piece["type_apercu"] = (
+        "pdf" if piece["apercu_pdf"]
+        else "image" if piece["fichier_disponible"] and suffixe in EXTENSIONS_IMAGE
+        else "texte" if piece.get("contenu")
+        else None
+    )
     return piece
 
 
@@ -318,8 +394,11 @@ def lister(type_piece, entreprise_id=None, candidature_id=None, recherche=None, 
         pieces = [
             p for p in pieces
             if aiguille in normaliser(
-                " ".join([p["titre"] or "", p["contenu"] or "", p["entreprise"]]
-                         + [c["poste"] for c in p["candidatures"]])
+                " ".join(
+                    [p["titre"] or "", p["contenu"] or "", p["entreprise"]]
+                    + [str(p.get(c) or "") for c in type_piece.colonnes_supplementaires]
+                    + [c["poste"] for c in p["candidatures"]]
+                )
             )
         ]
     return pieces
@@ -344,7 +423,9 @@ def modifier(type_piece, id_piece, chemin_db=None, **champs):
     """Modifie le titre, la langue, la portée « entreprise en général » et/ou
     les offres liées (`candidature_ids`, remplace la liste actuelle - toutes
     doivent appartenir à l'entreprise de la pièce)."""
-    inconnus = set(champs) - {"titre", "langue", "generale", "candidature_ids"}
+    inconnus = set(champs) - {"titre", "langue", "generale", "candidature_ids"} - set(
+        type_piece.colonnes_supplementaires
+    )
     if inconnus:
         raise ValeurNonAutorisee(f"Champ non modifiable : {', '.join(sorted(inconnus))}.")
     if not champs:
@@ -364,6 +445,9 @@ def modifier(type_piece, id_piece, chemin_db=None, **champs):
             maj["titre"] = titre
         if "langue" in champs:
             maj["langue"] = (str(champs["langue"]).strip() if champs["langue"] else None) or None
+        for colonne in type_piece.colonnes_supplementaires:
+            if colonne in champs:
+                maj[colonne] = VALIDATEURS_EXTRAS[colonne](champs[colonne])
         ids = None
         if "candidature_ids" in champs:
             ids = _valider_candidatures(conn, ligne["entreprise_id"], champs["candidature_ids"])

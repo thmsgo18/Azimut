@@ -77,8 +77,54 @@ def _habiller_application_macos():
 
 class ApiBureau:
     """Pont exposé au JavaScript de l'interface (window.pywebview.api.…),
-    tout ce qui a besoin d'une fenêtre native macOS (sélecteur de dossier)
-    passe par ici plutôt que par le serveur Flask, qui n'a pas de fenêtre."""
+    tout ce qui a besoin d'une fenêtre native (sélecteurs de dossier ou de
+    fichier, « Enregistrer sous », ouverture d'un dossier) passe par ici plutôt
+    que par le serveur Flask, qui n'a pas de fenêtre."""
+
+    def __init__(self, url_serveur=None):
+        self.url_serveur = url_serveur
+
+    def enregistrer_fichier(self, chemin_api, nom_suggere=""):
+        """Télécharge un fichier du serveur interne (`chemin_api` : « /api/... »)
+        et demande où l'enregistrer. Retourne le chemin choisi, ou None si
+        l'utilisateur annule. La fenêtre reste sur l'interface : un lien direct
+        vers un PDF ou un texte l'aurait fait naviguer vers le fichier."""
+        import pont_bureau
+
+        nom, contenu = pont_bureau.recuperer_fichier(self.url_serveur, chemin_api)
+        nom = pont_bureau.nom_de_fichier_sur(nom_suggere or nom)
+        dossier = Path.home() / "Downloads"
+        resultat = webview.windows[0].create_file_dialog(
+            webview.FileDialog.SAVE,
+            directory=str(dossier if dossier.is_dir() else Path.home()),
+            save_filename=nom,
+        )
+        if not resultat:
+            return None
+        destination = resultat if isinstance(resultat, str) else resultat[0]
+        Path(destination).write_bytes(contenu)
+        return str(destination)
+
+    def choisir_chemin(self, genre):
+        """Sélecteur natif : « dossier » ou « fichier » (Word, LaTeX). Retourne le
+        chemin choisi, ou None si l'utilisateur annule (rien n'est enregistré ici)."""
+        depart = os.path.expanduser("~/Documents")
+        if genre == "dossier":
+            resultat = webview.windows[0].create_file_dialog(
+                webview.FileDialog.FOLDER, directory=depart
+            )
+        else:
+            resultat = webview.windows[0].create_file_dialog(
+                webview.FileDialog.OPEN, directory=depart,
+                file_types=("Word ou LaTeX (*.docx;*.tex)", "Tous les fichiers (*.*)"),
+            )
+        return str(resultat[0]) if resultat else None
+
+    def ouvrir_chemin(self, chemin):
+        """Ouvre un dossier ou un fichier avec le programme du système."""
+        import pont_bureau
+
+        return pont_bureau.ouvrir_avec_le_systeme(chemin)
 
     def choisir_dossier_donnees(self):
         """Ouvre le sélecteur de dossier natif et enregistre le choix dans les
@@ -175,7 +221,7 @@ def principal():
         width=1280,
         height=840,
         min_size=(980, 640),
-        js_api=ApiBureau(),
+        js_api=ApiBureau(url),
     )
     webview.start(_proposer_dossier_au_premier_lancement, debug=False)
 

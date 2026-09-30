@@ -9,8 +9,8 @@ Tout ce qu'une IA doit savoir pour travailler ici sans rien casser.
    Les fichiers Excel sont des exports régénérables - ne jamais les éditer.
 2. **JAMAIS de SQL direct.** Toute lecture/écriture passe par les fonctions
    Python des modules (`candidatures.py`, `entreprises.py`, `lettres.py`,
-   `fiches.py`, `notes_entretien.py`, `documents.py`, `reglages.py`) ou par la
-   CLI `cli.py`. Elles valident les
+   `fiches.py`, `notes_entretien.py`, `documents.py`, `cvs.py`, `reglages.py`) ou
+   par la CLI `cli.py`. Elles valident les
    valeurs autorisées et détectent les doublons - c'est ce qui protège la base.
 3. **Ne rien inventer.** Un champ absent de l'offre reste vide (None), on ne
    devine pas une gratification, une date ou un chiffre.
@@ -78,7 +78,9 @@ Définies dans `valeurs.py` (la casse et les accents sont tolérés en entrée) 
 - `source` (candidature) : LinkedIn, Indeed, Site entreprise, Welcome to the Jungle,
   Réseau, Forum / Salon, Autre
 - Pièces de préparation : `source` d'une lettre ou d'une fiche = `manuelle` (fichier
-  ajouté par l'utilisateur), `api` (générée par l'IA d'Azimut) ou `claude_code`.
+  ajouté par l'utilisateur), `api` (générée par l'IA d'Azimut) ou `claude_code`
+  (l'interface ne l'affiche plus : seule la CLI le liste).
+- `type_document` (document) : CV, Lettre de motivation, Offre (PDF), Portfolio, Autre.
 
 Dates : `AAAA-MM-JJ` ou `JJ/MM/AAAA` (stockées ISO, la validité réelle est vérifiée).
 
@@ -88,10 +90,10 @@ Dates : `AAAA-MM-JJ` ou `JJ/MM/AAAA` (stockées ISO, la validité réelle est v�
 # entreprises.py - nom unique (casse/accents), champs vides complétés, ConflitMiseAJour sinon
 ajouter_ou_recuperer_entreprise(nom, site_web=None, contexte_actus=None) -> id
 modifier_entreprise(id, **champs)          # écrase explicitement
-supprimer_entreprise(id)                   # refusé si candidatures, lettres, fiches ou notes liées
+supprimer_entreprise(id)                   # refusé si candidatures, documents, lettres, fiches ou notes liées
 lister_entreprises()
 fusionner_entreprises(id_conserver, id_supprimer) -> résumé   # irréversible : déplace candidatures,
-                                           # lettres, fiches et notes ; voir doublons.py
+                                           # documents, lettres, fiches et notes ; voir doublons.py
 
 # doublons.py - quasi-doublons (avertissement, jamais un blocage)
 candidatures_similaires(entreprise, poste, lien_offre=None) -> [{id, score, raisons}, ...]
@@ -103,8 +105,8 @@ ajouter_candidature(entreprise_nom, poste, **champs) -> id
 # déclenche aussi sauvegarde.sauvegarder_base() tous les INTERVALLE_SAUVEGARDE_AUTO
 # (4) candidatures - best effort, ne lève jamais si la sauvegarde échoue
 modifier_candidature(id, **champs)         # changement de statut → événement journalisé
-supprimer_candidature(id)                  # supprime aussi journal + documents liés ; les lettres,
-                                           # fiches et notes qui la visaient sont CONSERVÉES (lien retiré)
+supprimer_candidature(id)                  # supprime son journal ; les documents, lettres, fiches
+                                           # et notes qui la visaient sont CONSERVÉS (lien retiré)
 lister_candidatures(statut=None, sous_domaine=None)
 recuperer_candidature(id)
 enregistrer_etat_lien(id, etat)            # "actif"/"mort"/"inconnu" - usage interne (voir ci-dessous)
@@ -129,10 +131,15 @@ progression_objectif_hebdomadaire() -> dict | None                    # None si 
 # Aucune fonction à appeler depuis un autre module : sert sa propre API + page mobile, protégée par
 # reglages.code_compagnon(). Ne jamais y ajouter de route d'écriture ni de champ sensible.
 
-# documents.py - fichiers copiés dans le dossier configuré (reglages.py > dossier_donnees,
-# sinon documents/ à côté de la base) ; type_document inclut "Offre (PDF)"
-ajouter_document(candidature_id, nom_fichier, contenu_bytes, type_document=None) -> id
-lister_documents(candidature_id=None) / supprimer_document(id)
+# documents.py - même modèle que les lettres et les fiches (noyau pieces_liees.py) : un fichier
+# de n'importe quel format (25 Mo max), rattaché à UNE entreprise et à une ou plusieurs de ses
+# candidatures, ou à l'entreprise en général ; copié dans le dossier documents/ du dossier de
+# données (reglages.py), texte extrait (PDF/Word/texte) pour la recherche.
+importer_document(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None,
+                  generale=None, type_document=None) -> id
+ajouter_document(candidature_id, nom_fichier, contenu_bytes, type_document=None) -> id  # raccourci : 1 offre
+lister_documents(entreprise_id=None, candidature_id=None, recherche=None) / recuperer_document(id)
+modifier_document(id, titre=, type_document=, generale=, candidature_ids=) / supprimer_document(id)
 
 # reglages.py - clé API masquée, fournisseur IA, dossier de données
 definir_reglage(cle, valeur) / obtenir_reglage(cle) / etat_reglages()
@@ -140,11 +147,17 @@ definir_dossier_donnees(chemin) -> chemin résolu, ou None (retour au défaut)
 dossier_donnees_pour("lettres", chemin_db=None) -> Path   # documents / sauvegardes / lettres / fiches / profil :
                                            # le dossier choisi dans Réglages, sinon À CÔTÉ DE LA BASE elle-même
 
-# profil.py - le CV utilisé pour générer une lettre / adapter une fiche (une seule source active à la fois)
-definir_cv_fichier(nom_fichier, contenu_bytes) -> texte extrait (PDF/Word/texte, dossier profil/)
-definir_cv_dossier_latex(chemin) -> texte (relu à chaque appel, jamais mis en cache)
-definir_cv_texte(texte) -> texte  /  supprimer_cv()
-obtenir_cv_texte() -> texte prêt pour l'IA (lève ValeurNonAutorisee si aucun CV configuré) / etat_cv()
+# cvs.py - les CV de l'utilisateur (plusieurs possibles, UN « principal » : celui que l'IA lit pour
+# une lettre ou une fiche). Un CV a un fichier (PDF/Word/texte, copié dans le dossier cv/) et/ou une
+# SOURCE modifiable sur la machine (dossier LaTeX, fichier .tex ou .docx) et/ou un texte collé.
+ajouter_cv(nom=None, langue=None, nom_fichier=None, contenu_fichier=None, chemin_source=None,
+           texte=None, principal=None) -> id
+lister_cvs() / recuperer_cv(id) / modifier_cv(id, nom=, langue=, chemin_source=, texte=, principal=)
+remplacer_fichier_cv(id, nom_fichier, contenu) / definir_cv_principal(id) / supprimer_cv(id)
+obtenir_cv_texte(id=None) -> texte pour l'IA : la SOURCE relue à chaque appel si elle est accessible,
+    sinon le texte gardé (principal par défaut ; lève ValeurNonAutorisee s'il n'y a aucun CV)
+texte_lisible_du_cv(id) -> le texte du fichier (ce qu'on affiche ou copie)
+# supprimer_cv ne touche JAMAIS à la source (dossier LaTeX, fichier Word) : Azimut n'en garde que le chemin.
 
 # lettres.py / fiches.py - même modèle (noyau commun : pieces_liees.py). Une pièce est liée à UNE
 # entreprise et, si besoin, à UNE OU PLUSIEURS de ses candidatures ; `generale=True` = elle porte aussi
@@ -174,12 +187,16 @@ generation.generer_fiche(entreprise_nom, candidature_ids, ...) -> (id, avertisse
 # d'appeler l'IA, et n'enregistre rien si l'appel échoue. Un lien d'offre n'entre dans une fiche que s'il
 # répond encore (verification_liens.verifier_lien == "actif").
 
-# Skill « azimut-lettre-motivation » (skills/azimut-lettre-motivation/SKILL.md) : téléchargeable
-# depuis l'interface (bouton dans Lettres > Nouvelle lettre, ou GET /api/lettres/skill) pour que
-# Claude Code la rédige en local à partir de cli.py profil cv / candidatures voir, puis l'enregistre
-# via cli.py lettres ajouter - jamais de SQL direct ni de dépôt de fichier manuel dans lettres/.
-# Une fiche faite ailleurs (Claude Code, Word...) s'ajoute par cli.py fiches importer, ou par le
-# glisser-déposer de l'interface ; cli.py fiches ajouter --json rend un PDF depuis des données JSON.
+# Rédiger une lettre ou une fiche SANS clé API - guides pour une IA installée sur la machine :
+#   skills/lettre-motivation/AGENT.md  et  skills/fiche-entretien/AGENT.md
+# Lire le guide correspondant AVANT de rédiger : il donne les commandes (cli.py cv voir, candidatures
+# voir, lettres ajouter, fiches ajouter --json...), les règles de rédaction et la vérification. Leur
+# bloc « règles » (entre <!-- regles:debut --> et <!-- regles:fin -->) est AUSSI la consigne envoyée à
+# l'IA par la génération par API (guides_ia.py) : un seul texte, deux chemins. Les fichiers
+# skills/lettre-motivation.skill et skills/fiche-entretien.skill sont les skills d'origine de
+# l'auteur, à installer dans Claude (téléchargeables : GET /api/skills/<nom>).
+# Une fiche ou une lettre faite ailleurs (Word...) s'ajoute par cli.py fiches|lettres importer, ou par
+# le glisser-déposer de l'interface ; cli.py fiches ajouter --json rend un PDF depuis des données JSON.
 
 # export_excel.py / import_excel.py - sauvegarde lisible (sans secrets, sans fichiers) : candidatures,
 # entreprises, notes d'entretien. Les anciens exports (onglet Contacts, colonne « Notes entretien »)
@@ -188,7 +205,7 @@ exporter_excel(chemin_sortie) / importer_excel(chemin_fichier) -> rapport
 
 # entretien.py / recherche.py / statistiques.py / sauvegarde.py
 generer_fiche_entretien(candidature_id) -> Markdown   # « Récapitulatif » de la candidature (préparation liée incluse)
-rechercher(texte) -> {candidatures, entreprises, notes, lettres, fiches}
+rechercher(texte) -> {candidatures, entreprises, notes, documents, lettres, fiches}
 stats_avancees() / sauvegarder_base()                  # copie cohérente (API de sauvegarde SQLite)
 ```
 
@@ -202,9 +219,14 @@ Le schéma vit dans `db.py`. À chaque ouverture, une base plus ancienne (ou res
 ancienne sauvegarde) est mise à jour toute seule ; toute migration qui SUPPRIME des données est
 précédée d'**une** copie de sécurité, à côté de la base :
 `<base>-avant-migration-<horodatage>.db`. Ne jamais la supprimer sans avoir vérifié la base migrée.
-Depuis la refonte « préparation » : la section Contacts (table `contacts`) est retirée, les notes
-d'entretien de la candidature (ancienne colonne `notes_entretien`) sont devenues des notes de la
-section Entretiens, et les lettres ont un fichier principal unique (`chemin_fichier`).
+Toutes les migrations d'une ouverture s'exécutent dans UNE transaction (tout ou rien : si l'une échoue,
+la base reste telle qu'elle était et une connexion n'est jamais laissée ouverte). Elles couvrent : la
+section Contacts retirée (table `contacts`), les notes d'entretien de la candidature (ancienne colonne
+`notes_entretien`) devenues des notes de la section Entretiens, les lettres à fichier principal unique
+(`chemin_fichier`), les **documents** (ancienne table liée à UNE candidature → entreprise + une ou
+plusieurs candidatures, mêmes identifiants et mêmes fichiers) et le **CV** unique des réglages
+(`cv_source`…) devenu le CV principal de la table `cvs`. Toute modification du schéma passe par là,
+avec un test dans `tests/test_migrations.py` sur une base « à l'ancienne ».
 
 **Ne jamais ouvrir la vraie base avec une version du code plus récente que l'appli en cours
 d'exécution** sans prévenir : l'ancienne version, encore ouverte, retape son schéma dessus.
@@ -225,15 +247,25 @@ retourner une proposition, à valider et écrire ensuite via l'API métier.
 ## Portabilité (macOS / Windows / Linux)
 
 Même code partout, un lanceur différent par OS (`Azimut.app` / `Azimut.bat` /
-`azimut.sh`), tous sur le même principe auto-installant (créent le venv et
-installent `requirements.txt` au premier lancement). Tout paquet propre à un
+`azimut.sh`), tous sur le même principe auto-installant : ils créent le venv (Python 3.9 minimum,
+vérifié) et réinstallent `requirements.txt` dès qu'il a changé depuis la dernière installation
+(copie `venv/.requirements-installed`) - sans cela, mettre Azimut à jour sur un ancien venv planterait
+au lancement (module manquant). Tout paquet propre à un
 seul OS ajouté un jour à `requirements.txt` doit porter un marqueur
 `sys_platform == "..."`, sinon `pip install` échoue ailleurs.
 
 Le reste (toute la logique métier, `serveur.py`, `app_bureau.py`) est déjà
 cross-OS - aucun chemin en dur, tout passe par `pathlib.Path`. La CI
 (`.github/workflows/tests.yml`) fait tourner la suite de tests sur les 3 OS à
-chaque push : c'est la vérification qui compte, pas une hypothèse.
+chaque push, avec Python 3.9 (celui que macOS fournit) et 3.13 : c'est la vérification qui compte, pas
+une hypothèse. Le code ne doit donc utiliser aucune syntaxe plus récente que 3.9 (pas de `X | None`
+dans une annotation évaluée, pas de `match`) - `tests/test_lanceurs.py` le vérifie.
+
+Dans la fenêtre native, un lien vers un PDF ou un texte fait NAVIGUER la fenêtre vers le fichier
+(impossible d'en revenir sans quitter l'appli) : les aperçus se font en fenêtre (iframe) et les
+téléchargements passent par `telechargerFichier()` (app.js) → « Enregistrer sous » natif
+(`ApiBureau.enregistrer_fichier`, `pont_bureau.py`). Ne jamais mettre un simple `<a href>` vers un
+fichier dans l'interface : utiliser `data-telechargement`.
 
 Aucune fonctionnalité actuelle n'est propre à un seul OS. **Si une fonctionnalité dépend un jour
 d'une API propre à un seul OS**,
@@ -247,6 +279,9 @@ clic sur les autres systèmes.
 ```bash
 ./venv/bin/python -m unittest discover -s tests   # la suite complète doit rester verte
 ```
+
+Le rendu Markdown des notes (`static/markdown.js`) est testé avec Node (`tests/test_markdown_js.py`) : tout
+ce qui est tapé est échappé avant d'être mis en forme.
 
 Les tests sont **hermétiques** : chacun travaille sur une base temporaire (`tempfile` +
 `db.initialiser_base(chemin)`), jamais sur la vraie base ni sur ses dossiers de fichiers.

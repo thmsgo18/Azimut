@@ -118,6 +118,7 @@ def modifier_entreprise(id_entreprise, chemin_db=None, **champs):
 # (table, libellé pour le message d'erreur).
 RATTACHEMENTS = (
     ("candidatures", "candidature(s)"),
+    ("documents", "document(s)"),
     ("lettres_motivation", "lettre(s) de motivation"),
     ("fiches_entretien", "fiche(s) d'entretien"),
     ("notes_entretien", "note(s) d'entretien"),
@@ -126,7 +127,7 @@ RATTACHEMENTS = (
 
 def supprimer_entreprise(id_entreprise, chemin_db=None):
     """Supprime une entreprise, refusé tant qu'il lui reste des candidatures,
-    lettres, fiches ou notes d'entretien."""
+    documents, lettres, fiches ou notes d'entretien."""
     conn = db.ouvrir(chemin_db)
     try:
         actuelle = conn.execute(
@@ -163,15 +164,15 @@ def lister_entreprises(chemin_db=None):
 
 
 def fusionner_entreprises(id_conserver, id_supprimer, chemin_db=None):
-    """Fusionne id_supprimer dans id_conserver : candidatures, lettres, fiches
-    et notes d'entretien sont ré-attribuées à id_conserver, ses champs vides
+    """Fusionne id_supprimer dans id_conserver : candidatures, documents, lettres,
+    fiches et notes d'entretien sont ré-attribuées à id_conserver, ses champs vides
     (site_web, contexte_actus, derniere_recherche) sont complétés depuis
     id_supprimer, puis id_supprimer est supprimé. Irréversible - pensé pour
     les doublons repérés par doublons.entreprises_similaires (ex. « Mistral » /
     « Mistral AI »).
 
-    Retourne un résumé : {id, nom, candidatures_deplacees, lettres_deplacees,
-    fiches_deplacees, notes_deplacees, champs_completes}.
+    Retourne un résumé : {id, nom, candidatures_deplacees, documents_deplaces,
+    lettres_deplacees, fiches_deplacees, notes_deplacees, champs_completes}.
     """
     if id_conserver == id_supprimer:
         raise ValeurNonAutorisee("Impossible de fusionner une entreprise avec elle-même.")
@@ -191,6 +192,7 @@ def fusionner_entreprises(id_conserver, id_supprimer, chemin_db=None):
         deplaces = {}
         for table, cle in (
             ("candidatures", "candidatures_deplacees"),
+            ("documents", "documents_deplaces"),
             ("lettres_motivation", "lettres_deplacees"),
             ("fiches_entretien", "fiches_deplacees"),
             ("notes_entretien", "notes_deplacees"),

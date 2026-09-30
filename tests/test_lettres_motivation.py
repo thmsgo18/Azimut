@@ -1,6 +1,6 @@
-"""Tests des lettres de motivation : profil.py (CV), lettres.py (stockage,
-liens aux candidatures), agent.py > generer_lettre_motivation (dispatch,
-sans aucun appel réseau réel), et lettres_skill.py."""
+"""Tests des lettres de motivation : lettres.py (stockage, liens aux
+candidatures) et agent.py > generer_lettre_motivation (dispatch, sans aucun
+appel réseau réel). Le CV : voir test_cvs.py ; les guides IA : test_guides_ia.py."""
 
 import sys
 import tempfile
@@ -14,91 +14,8 @@ import candidatures
 import db
 import entreprises
 import lettres
-import lettres_skill
-import profil
 import reglages
 from exceptions import EntiteIntrouvable, ErreurSuivi, ValeurNonAutorisee
-
-
-class TestProfilCv(unittest.TestCase):
-    def setUp(self):
-        self.dossier = tempfile.TemporaryDirectory()
-        self.chemin_db = str(Path(self.dossier.name) / "test.db")
-        db.initialiser_base(self.chemin_db)
-        reglages.definir_reglage(
-            "dossier_donnees", self.dossier.name, chemin_db=self.chemin_db
-        )
-
-    def tearDown(self):
-        self.dossier.cleanup()
-
-    def test_aucun_cv_par_defaut(self):
-        etat = profil.etat_cv(chemin_db=self.chemin_db)
-        self.assertFalse(etat["defini"])
-        with self.assertRaises(ValeurNonAutorisee):
-            profil.obtenir_cv_texte(chemin_db=self.chemin_db)
-
-    def test_cv_texte_colle(self):
-        profil.definir_cv_texte("Formation : M2 IA. Expérience : stage agents IA.", chemin_db=self.chemin_db)
-        etat = profil.etat_cv(chemin_db=self.chemin_db)
-        self.assertTrue(etat["defini"])
-        self.assertEqual(etat["source"], "texte")
-        self.assertIn("M2 IA", profil.obtenir_cv_texte(chemin_db=self.chemin_db))
-
-    def test_cv_texte_vide_refuse(self):
-        with self.assertRaises(ValeurNonAutorisee):
-            profil.definir_cv_texte("   ", chemin_db=self.chemin_db)
-
-    def test_cv_fichier_txt_extrait_et_remplace_ancien(self):
-        premier = profil.definir_cv_fichier("cv.txt", b"Mon premier CV", chemin_db=self.chemin_db)
-        self.assertEqual(premier, "Mon premier CV")
-        chemin_premier = Path(reglages.obtenir_reglage("cv_chemin", chemin_db=self.chemin_db))
-        self.assertTrue(chemin_premier.exists())
-
-        second = profil.definir_cv_fichier("cv-v2.txt", b"CV mis a jour", chemin_db=self.chemin_db)
-        self.assertEqual(second, "CV mis a jour")
-        # L'ancien fichier a été nettoyé (un seul CV actif à la fois).
-        self.assertFalse(chemin_premier.exists())
-        self.assertEqual(profil.obtenir_cv_texte(chemin_db=self.chemin_db), "CV mis a jour")
-
-    def test_cv_fichier_format_non_supporte(self):
-        with self.assertRaises(ValeurNonAutorisee):
-            profil.definir_cv_fichier("cv.exe", b"binaire", chemin_db=self.chemin_db)
-
-    def test_cv_fichier_vide_refuse(self):
-        with self.assertRaises(ValeurNonAutorisee):
-            profil.definir_cv_fichier("cv.txt", b"", chemin_db=self.chemin_db)
-
-    def test_cv_dossier_latex(self):
-        with tempfile.TemporaryDirectory() as projet:
-            (Path(projet) / "cv.tex").write_text(
-                "\\section{Formation} M2 IA - systèmes agentiques.", encoding="utf-8"
-            )
-            texte = profil.definir_cv_dossier_latex(projet, chemin_db=self.chemin_db)
-            self.assertIn("M2 IA", texte)
-            etat = profil.etat_cv(chemin_db=self.chemin_db)
-            self.assertEqual(etat["source"], "dossier_latex")
-            # Relu à chaque appel (pas mis en cache) : une modification du
-            # fichier .tex après coup doit être reflétée sans reconfigurer.
-            (Path(projet) / "cv.tex").write_text("\\section{Formation} Mise a jour.", encoding="utf-8")
-            self.assertIn("Mise a jour", profil.obtenir_cv_texte(chemin_db=self.chemin_db))
-
-    def test_cv_dossier_latex_sans_tex_refuse(self):
-        with tempfile.TemporaryDirectory() as projet:
-            with self.assertRaises(ValeurNonAutorisee):
-                profil.definir_cv_dossier_latex(projet, chemin_db=self.chemin_db)
-
-    def test_cv_dossier_latex_introuvable(self):
-        with self.assertRaises(ValeurNonAutorisee):
-            profil.definir_cv_dossier_latex("/chemin/qui/nexiste/pas", chemin_db=self.chemin_db)
-
-    def test_supprimer_cv(self):
-        profil.definir_cv_texte("Un CV", chemin_db=self.chemin_db)
-        profil.supprimer_cv(chemin_db=self.chemin_db)
-        etat = profil.etat_cv(chemin_db=self.chemin_db)
-        self.assertFalse(etat["defini"])
-        with self.assertRaises(ValeurNonAutorisee):
-            profil.obtenir_cv_texte(chemin_db=self.chemin_db)
 
 
 class TestLettresMotivation(unittest.TestCase):
@@ -274,23 +191,6 @@ class TestGenererLettreMotivationAgent(unittest.TestCase):
         self.assertIn("AgentikCo", appels[0])
         self.assertIn("Stage agents IA", appels[0])
         self.assertIn("Langue demandée : fr", appels[0])
-
-
-class TestLettresSkill(unittest.TestCase):
-    def test_contenu_et_instructions_systeme(self):
-        contenu = lettres_skill.contenu_skill()
-        self.assertTrue(contenu.startswith("---"))
-        self.assertIn("azimut-lettre-motivation", contenu)
-        instructions = lettres_skill.instructions_systeme()
-        self.assertNotIn("name:", instructions)
-        self.assertIn("Lettre de motivation", instructions)
-
-    def test_zip_contient_le_bon_fichier(self):
-        import zipfile
-
-        tampon = lettres_skill.zip_skill()
-        with zipfile.ZipFile(tampon) as archive:
-            self.assertIn("azimut-lettre-motivation/SKILL.md", archive.namelist())
 
 
 if __name__ == "__main__":

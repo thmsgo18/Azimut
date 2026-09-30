@@ -5,6 +5,8 @@ Exemples :
     python cli.py candidatures lister --statut Entretien
     python cli.py candidatures modifier 12 --statut "Réponse reçue"
     python cli.py lettres importer --entreprise "AgentikCo" --fichier ma-lettre.pdf
+    python cli.py documents importer --entreprise "AgentikCo" --fichier offre.pdf --type "Offre (PDF)"
+    python cli.py cv voir
     python cli.py notes ajouter --entreprise "AgentikCo" --titre "Entretien RH" --contenu "..."
     python cli.py export excel --sortie suivi_candidatures.xlsx
     python cli.py entretien preparer 12
@@ -16,7 +18,9 @@ import sys
 from pathlib import Path
 
 import candidatures
+import cvs
 import db
+import documents
 import doublons
 import entreprises
 import entretien
@@ -26,7 +30,6 @@ import import_csv
 import import_excel
 import lettres
 import notes_entretien
-import profil
 from exceptions import ErreurSuivi
 
 
@@ -229,12 +232,70 @@ def construire_analyseur():
     preparer.add_argument("id", type=int, help="Numéro de la candidature")
     preparer.add_argument("--sortie", help="Enregistrer le récapitulatif dans un fichier .md")
 
-    # --- profil (CV) ---
-    profil_p = sections.add_parser(
-        "profil", help="Gérer le profil (CV) utilisé pour les lettres de motivation"
+    # --- CV ---
+    cv_p = sections.add_parser(
+        "cv", help="Gérer les CV (le CV principal sert à rédiger lettres et fiches)"
     )
-    actions = profil_p.add_subparsers(dest="action", required=True, metavar="action")
-    actions.add_parser("cv", help="Afficher le texte du CV configuré (voir Réglages > Profil)")
+    actions = cv_p.add_subparsers(dest="action", required=True, metavar="action")
+    actions.add_parser("lister", help="Lister les CV")
+    voir = actions.add_parser(
+        "voir", help="Afficher un CV : texte, fichier et chemin de sa source (défaut : le CV principal)"
+    )
+    voir.add_argument("id", type=int, nargs="?", help="Numéro du CV (défaut : le principal)")
+    ajouter = actions.add_parser("ajouter", help="Ajouter un CV")
+    ajouter.add_argument("--nom", help="Nom du CV (défaut : nom du fichier)")
+    ajouter.add_argument("--langue", help="Langue (ex. fr, en)")
+    ajouter.add_argument("--fichier", help="Fichier du CV (PDF, Word ou texte), copié dans Azimut")
+    ajouter.add_argument(
+        "--source", help="Où le CV se modifie : dossier LaTeX, fichier .tex ou fichier Word (.docx)"
+    )
+    ajouter.add_argument("--texte", help="Texte du CV, s'il n'y a ni fichier ni source")
+    ajouter.add_argument("--principal", action="store_true", help="En faire le CV principal")
+    modifier = actions.add_parser("modifier", help="Modifier un CV")
+    modifier.add_argument("id", type=int, help="Numéro du CV")
+    modifier.add_argument("--nom", help="Nouveau nom")
+    modifier.add_argument("--langue", help="Langue")
+    modifier.add_argument("--source", help="Nouveau chemin de la source (vide pour la retirer)")
+    modifier.add_argument("--principal", action="store_true", help="En faire le CV principal")
+    remplacer = actions.add_parser("remplacer-fichier", help="Remplacer le fichier d'un CV")
+    remplacer.add_argument("id", type=int, help="Numéro du CV")
+    remplacer.add_argument("--fichier", required=True, help="Nouveau fichier (PDF, Word ou texte)")
+    principal = actions.add_parser("principal", help="Choisir le CV principal")
+    principal.add_argument("id", type=int, help="Numéro du CV")
+    supprimer = actions.add_parser("supprimer", help="Supprimer un CV (sa source n'est jamais touchée)")
+    supprimer.add_argument("id", type=int, help="Numéro du CV")
+
+    # --- documents ---
+    docs_p = sections.add_parser("documents", help="Gérer les documents (CV envoyé, offre en PDF...)")
+    actions = docs_p.add_subparsers(dest="action", required=True, metavar="action")
+    importer = actions.add_parser("importer", help="Ajouter un fichier, conservé tel quel")
+    importer.add_argument("--fichier", required=True, help="Chemin du fichier à ajouter")
+    importer.add_argument("--entreprise", required=True, help="Nom de l'entreprise")
+    importer.add_argument(
+        "--poste", help="Intitulé du poste - lie automatiquement l'offre suivie chez cette entreprise"
+    )
+    importer.add_argument(
+        "--candidature-id", dest="candidature_id", type=int, action="append",
+        help="Numéro de candidature à lier (répétable) - prioritaire sur --poste",
+    )
+    importer.add_argument("--generale", action="store_true", help="Porte aussi sur l'entreprise en général")
+    importer.add_argument("--titre", help="Titre affiché (défaut : nom du fichier)")
+    importer.add_argument("--type", dest="type_document", help="CV, Lettre de motivation, Offre (PDF), Portfolio, Autre")
+    modifier = actions.add_parser("modifier", help="Modifier un document (titre, type, offres liées)")
+    modifier.add_argument("id", type=int, help="Numéro du document")
+    modifier.add_argument("--titre", help="Nouveau titre")
+    modifier.add_argument("--type", dest="type_document", help="CV, Lettre de motivation, Offre (PDF), Portfolio, Autre")
+    modifier.add_argument(
+        "--candidature-id", dest="candidature_id", type=int, action="append",
+        help="Numéros des candidatures liées (répétable) - REMPLACE les offres actuelles",
+    )
+    modifier.add_argument("--generale", action="store_true", help="Porte aussi sur l'entreprise en général")
+    modifier.add_argument("--pas-generale", action="store_true", help="Ne porte plus sur l'entreprise en général")
+    lister = actions.add_parser("lister", help="Lister les documents")
+    lister.add_argument("--entreprise", help="Filtrer par nom d'entreprise")
+    lister.add_argument("--recherche", help="Recherche texte (titre, contenu, entreprise)")
+    supprimer = actions.add_parser("supprimer", help="Supprimer un document")
+    supprimer.add_argument("id", type=int, help="Numéro")
 
     # --- lettres de motivation et fiches d'entretien ---
     for section, libelle, article in (
@@ -436,6 +497,7 @@ def executer(args):
             print(
                 f"✓ Fusion effectuée dans « {resultat['nom']} » (n°{resultat['id']}) : "
                 f"{resultat['candidatures_deplacees']} candidature(s), "
+                f"{resultat['documents_deplaces']} document(s), "
                 f"{resultat['lettres_deplacees']} lettre(s), "
                 f"{resultat['fiches_deplacees']} fiche(s), "
                 f"{resultat['notes_deplacees']} note(s) d'entretien déplacé(s)"
@@ -493,9 +555,11 @@ def executer(args):
         for ligne in rapport["erreurs"]:
             print(f"  ✗ {ligne}")
 
-    elif args.section == "profil":
-        if args.action == "cv":
-            print(profil.obtenir_cv_texte(chemin_db=chemin_db))
+    elif args.section == "cv":
+        _executer_cv(args, chemin_db)
+
+    elif args.section == "documents":
+        _executer_documents(args, chemin_db)
 
     elif args.section in ("lettres", "fiches"):
         _executer_pieces(args, chemin_db)
@@ -512,6 +576,126 @@ def executer(args):
             print(f"✓ Fiche d'entretien enregistrée : {chemin}")
         else:
             print(fiche)
+
+
+def _lire_fichier_local(chemin):
+    chemin = Path(chemin).expanduser()
+    if not chemin.is_file():
+        raise ErreurSuivi(f"Fichier introuvable : {chemin}.")
+    return chemin
+
+
+def _executer_cv(args, chemin_db):
+    if args.action == "lister":
+        liste = cvs.lister_cvs(chemin_db=chemin_db)
+        if not liste:
+            print("Aucun CV enregistré - en ajouter un avec « cv ajouter » ou dans la section CV.")
+            return
+        _afficher_table(
+            [("N°", 4), ("Nom", 26), ("Langue", 6), ("Principal", 9), ("Fichier", 26), ("Source", 40)],
+            [
+                (
+                    c["id"], c["nom"], c["langue"], "★" if c["principal"] else "",
+                    c["nom_fichier"], (f"{c['type_source']} : {c['chemin_source']}" if c["chemin_source"] else ""),
+                )
+                for c in liste
+            ],
+        )
+    elif args.action == "voir":
+        if args.id is None:
+            principal = next((c for c in cvs.lister_cvs(chemin_db=chemin_db) if c["principal"]), None)
+            if principal is None:
+                raise ErreurSuivi(
+                    "Aucun CV configuré - en ajouter un avec « cv ajouter » ou dans la section CV."
+                )
+            args.id = principal["id"]
+        cv = cvs.recuperer_cv(args.id, chemin_db=chemin_db)
+        print(f"CV n°{cv['id']} - {cv['nom']}" + (" (principal)" if cv["principal"] else ""))
+        if cv["langue"]:
+            print(f"  Langue : {cv['langue']}")
+        if cv["chemin_fichier"]:
+            print(f"  Fichier : {cv['chemin_fichier']}")
+        if cv["chemin_source"]:
+            etiquette = "dossier/fichier LaTeX" if cv["type_source"] == "latex" else "fichier Word"
+            etat = "" if cv["source_disponible"] else "  (introuvable sur cette machine)"
+            print(f"  Source modifiable ({etiquette}) : {cv['chemin_source']}{etat}")
+            print("  → pour modifier le CV, éditer cette source, pas le texte ci-dessous.")
+        print()
+        print(cvs.texte_du_cv(cv["id"], chemin_db=chemin_db))
+    elif args.action == "ajouter":
+        fichier = _lire_fichier_local(args.fichier) if args.fichier else None
+        numero = cvs.ajouter_cv(
+            nom=args.nom, langue=args.langue,
+            nom_fichier=fichier.name if fichier else None,
+            contenu_fichier=fichier.read_bytes() if fichier else None,
+            chemin_source=args.source, texte=args.texte, principal=args.principal,
+            chemin_db=chemin_db,
+        )
+        cv = cvs.recuperer_cv(numero, chemin_db=chemin_db)
+        print(f"✓ CV n°{numero} ajouté : {cv['nom']}" + (" (principal)" if cv["principal"] else "") + ".")
+    elif args.action == "modifier":
+        champs = {
+            champ: valeur for champ, valeur in (
+                ("nom", args.nom), ("langue", args.langue), ("chemin_source", args.source),
+            ) if valeur is not None
+        }
+        if args.principal:
+            champs["principal"] = True
+        cvs.modifier_cv(args.id, chemin_db=chemin_db, **champs)
+        print(f"✓ CV n°{args.id} modifié ({', '.join(champs)}).")
+    elif args.action == "remplacer-fichier":
+        fichier = _lire_fichier_local(args.fichier)
+        cvs.remplacer_fichier_cv(args.id, fichier.name, fichier.read_bytes(), chemin_db=chemin_db)
+        print(f"✓ Fichier du CV n°{args.id} remplacé par {fichier.name}.")
+    elif args.action == "principal":
+        cv = cvs.definir_cv_principal(args.id, chemin_db=chemin_db)
+        print(f"✓ « {cv['nom']} » est maintenant le CV principal.")
+    elif args.action == "supprimer":
+        cvs.supprimer_cv(args.id, chemin_db=chemin_db)
+        print(f"✓ CV n°{args.id} supprimé.")
+
+
+def _executer_documents(args, chemin_db):
+    if args.action == "importer":
+        fichier = _lire_fichier_local(args.fichier)
+        ids = _candidatures_a_lier(args, chemin_db)
+        numero = documents.importer_document(
+            args.entreprise, fichier.name, fichier.read_bytes(), candidature_ids=ids or None,
+            titre=args.titre, generale=args.generale, type_document=args.type_document,
+            chemin_db=chemin_db,
+        )
+        document = documents.recuperer_document(numero, chemin_db=chemin_db)
+        print(f"✓ Document n°{numero} enregistré pour {args.entreprise} : {document['chemin_fichier']}")
+    elif args.action == "modifier":
+        champs = {
+            champ: valeur for champ, valeur in (
+                ("titre", args.titre), ("type_document", args.type_document),
+                ("candidature_ids", args.candidature_id),
+            ) if valeur is not None
+        }
+        if args.generale or args.pas_generale:
+            champs["generale"] = bool(args.generale)
+        documents.modifier_document(args.id, chemin_db=chemin_db, **champs)
+        print(f"✓ Document n°{args.id} modifié ({', '.join(champs)}).")
+    elif args.action == "lister":
+        liste = documents.lister_documents(recherche=args.recherche, chemin_db=chemin_db)
+        if args.entreprise:
+            cible = args.entreprise.strip().casefold()
+            liste = [d for d in liste if d["entreprise"].strip().casefold() == cible]
+        if not liste:
+            print("Aucun document trouvé.")
+            return
+        _afficher_table(
+            [("N°", 5), ("Entreprise", 22), ("Titre", 44), ("Type", 20), ("Ajouté le", 10)],
+            [
+                (d["id"], d["entreprise"], d["titre"], d["type_document"], _date_fr(d["date_creation"]))
+                for d in liste
+            ],
+        )
+        print(f"\n{len(liste)} document(s).")
+    elif args.action == "supprimer":
+        documents.supprimer_document(args.id, chemin_db=chemin_db)
+        print(f"✓ Document n°{args.id} supprimé.")
 
 
 def _candidatures_a_lier(args, chemin_db):

@@ -1,125 +1,79 @@
-"""Documents liés aux candidatures (CV, lettre de motivation, offre en PDF…).
+"""Documents : tous les fichiers qu'on veut garder avec ses candidatures - CV
+envoyé, lettre, offre en PDF, portfolio, scan...
 
-Les fichiers sont copiés dans le dossier « documents » choisi par
-l'utilisateur (réglage dossier_donnees - voir reglages.py), ou à défaut dans
-documents/ à côté de la base. La base ne stocke que les métadonnées et le
-chemin absolu. Ce dossier est exclu du zip de partage (fichiers personnels).
+Un document suit le même modèle que les lettres et les fiches (voir
+pieces_liees.py) : il est rattaché à UNE entreprise et, si besoin, à une ou
+plusieurs de ses candidatures, ou à l'entreprise en général. Le fichier est
+conservé tel quel dans le dossier « documents » du dossier de données (voir
+reglages.py) ; son texte, quand il est lisible (PDF, Word, texte), est extrait
+pour la recherche. Tous les formats sont acceptés, 25 Mo au plus.
+
+Toute écriture passe par ces fonctions - jamais de SQL direct depuis l'extérieur.
 """
 
-import uuid
-from datetime import date
-from pathlib import Path
+import pieces_liees
+from exceptions import EntiteIntrouvable
+from pieces_liees import TAILLE_MAX_DOCUMENT, TYPE_DOCUMENT
+from reglages import chemin_reel
 
-import db
-import reglages
-from exceptions import EntiteIntrouvable, ValeurNonAutorisee
-from valeurs import TYPES_DOCUMENT, normaliser
-
-TAILLE_MAX = 25 * 1024 * 1024  # 25 Mo par fichier
+TAILLE_MAX = TAILLE_MAX_DOCUMENT
 
 
 def dossier_documents(chemin_db=None):
     """Dossier où stocker les fichiers : celui choisi dans Réglages, sinon
     documents/ à côté de la base."""
-    return reglages.dossier_donnees_pour("documents", chemin_db=chemin_db)
+    return pieces_liees.dossier_pieces(TYPE_DOCUMENT, chemin_db)
 
 
-def _nom_securise(nom_fichier):
-    nom = Path(str(nom_fichier)).name.strip() or "document"
-    return "".join(c if c.isalnum() or c in "._- " else "-" for c in nom)
+def importer_document(
+    entreprise_nom, nom_fichier, contenu, candidature_ids=None, titre=None, generale=None,
+    type_document=None, chemin_db=None,
+):
+    """Enregistre un fichier (bytes) rattaché à une entreprise et, si besoin, à
+    une ou plusieurs de ses candidatures. `type_document` : voir
+    valeurs.TYPES_DOCUMENT (défaut « Autre »). Retourne l'id du document."""
+    return pieces_liees.importer(
+        TYPE_DOCUMENT, entreprise_nom, nom_fichier, contenu, candidature_ids=candidature_ids,
+        titre=titre, generale=generale, extras={"type_document": type_document},
+        chemin_db=chemin_db,
+    )
 
 
 def ajouter_document(candidature_id, nom_fichier, contenu, type_document=None, chemin_db=None):
-    """Enregistre un fichier (bytes) lié à une candidature et retourne son id."""
-    if not contenu:
-        raise ValeurNonAutorisee("Le fichier reçu est vide.")
-    if len(contenu) > TAILLE_MAX:
-        raise ValeurNonAutorisee("Fichier trop volumineux (25 Mo maximum).")
-    if type_document:
-        correspondance = next(
-            (t for t in TYPES_DOCUMENT if normaliser(t) == normaliser(type_document)), None
-        )
-        if correspondance is None:
-            raise ValeurNonAutorisee(
-                f"Type de document non autorisé : {type_document!r}. "
-                f"Valeurs possibles : {', '.join(TYPES_DOCUMENT)}."
-            )
-        type_document = correspondance
-    else:
-        type_document = "Autre"
+    """Raccourci : enregistre un fichier lié à UNE candidature (l'entreprise s'en
+    déduit). Retourne l'id du document."""
+    import candidatures
 
-    conn = db.ouvrir(chemin_db)
-    try:
-        if conn.execute(
-            "SELECT id FROM candidatures WHERE id = ?", (candidature_id,)
-        ).fetchone() is None:
-            raise EntiteIntrouvable(f"Aucune candidature avec l'id {candidature_id}.")
-        nom = _nom_securise(nom_fichier)
-        dossier = dossier_documents(chemin_db)
-        dossier.mkdir(parents=True, exist_ok=True)
-        chemin_absolu = dossier / f"{uuid.uuid4().hex[:10]}-{nom}"
-        chemin_absolu.write_bytes(contenu)
-        curseur = conn.execute(
-            "INSERT INTO documents (candidature_id, nom_fichier, chemin, type_document, date_ajout) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (candidature_id, nom, str(chemin_absolu), type_document, date.today().isoformat()),
-        )
-        conn.commit()
-        return curseur.lastrowid
-    finally:
-        conn.close()
+    candidature = candidatures.recuperer_candidature(candidature_id, chemin_db=chemin_db)
+    return importer_document(
+        candidature["entreprise"], nom_fichier, contenu, candidature_ids=[candidature_id],
+        type_document=type_document, chemin_db=chemin_db,
+    )
 
 
-def lister_documents(candidature_id=None, chemin_db=None):
-    """Retourne les documents (avec entreprise et poste), tous ou pour une candidature."""
-    conn = db.ouvrir(chemin_db)
-    try:
-        requete = (
-            "SELECT d.*, c.poste, e.nom AS entreprise FROM documents d "
-            "JOIN candidatures c ON c.id = d.candidature_id "
-            "JOIN entreprises e ON e.id = c.entreprise_id"
-        )
-        parametres = []
-        if candidature_id is not None:
-            requete += " WHERE d.candidature_id = ?"
-            parametres.append(candidature_id)
-        requete += " ORDER BY d.date_ajout DESC, d.id DESC"
-        return [dict(l) for l in conn.execute(requete, parametres)]
-    finally:
-        conn.close()
+def lister_documents(entreprise_id=None, candidature_id=None, recherche=None, chemin_db=None):
+    """Les documents (avec l'entreprise et les offres liées), les plus récents d'abord."""
+    return pieces_liees.lister(
+        TYPE_DOCUMENT, entreprise_id=entreprise_id, candidature_id=candidature_id,
+        recherche=recherche, chemin_db=chemin_db,
+    )
 
 
 def recuperer_document(id_document, chemin_db=None):
-    """Retourne les métadonnées d'un document et son chemin absolu."""
-    conn = db.ouvrir(chemin_db)
-    try:
-        ligne = conn.execute("SELECT * FROM documents WHERE id = ?", (id_document,)).fetchone()
-        if ligne is None:
-            raise EntiteIntrouvable(f"Aucun document avec l'id {id_document}.")
-        document = dict(ligne)
-        document["chemin_absolu"] = str(reglages.chemin_reel(document["chemin"]))
-        return document
-    finally:
-        conn.close()
+    """Un document, avec le chemin absolu de son fichier (`chemin_absolu`)."""
+    document = pieces_liees.recuperer(TYPE_DOCUMENT, id_document, chemin_db=chemin_db)
+    if document["chemin_fichier"]:
+        document["chemin_absolu"] = str(chemin_reel(document["chemin_fichier"]))
+    else:  # ne devrait pas arriver : un document est toujours un fichier
+        raise EntiteIntrouvable(f"Le document n°{id_document} n'a pas de fichier.")
+    return document
+
+
+def modifier_document(id_document, chemin_db=None, **champs):
+    """Champs modifiables : titre, type_document, generale, candidature_ids."""
+    return pieces_liees.modifier(TYPE_DOCUMENT, id_document, chemin_db=chemin_db, **champs)
 
 
 def supprimer_document(id_document, chemin_db=None):
-    """Supprime un document (fichier + métadonnées)."""
-    document = recuperer_document(id_document, chemin_db=chemin_db)
-    conn = db.ouvrir(chemin_db)
-    try:
-        conn.execute("DELETE FROM documents WHERE id = ?", (id_document,))
-        conn.commit()
-    finally:
-        conn.close()
-    Path(document["chemin_absolu"]).unlink(missing_ok=True)
-
-
-def supprimer_pour_candidature(conn, candidature_id):
-    """Nettoie les documents d'une candidature (usage interne, même connexion)."""
-    lignes = conn.execute(
-        "SELECT chemin FROM documents WHERE candidature_id = ?", (candidature_id,)
-    ).fetchall()
-    conn.execute("DELETE FROM documents WHERE candidature_id = ?", (candidature_id,))
-    for ligne in lignes:
-        reglages.chemin_reel(ligne["chemin"]).unlink(missing_ok=True)
+    """Supprime un document (fichier, métadonnées et liens vers les candidatures)."""
+    pieces_liees.supprimer(TYPE_DOCUMENT, id_document, chemin_db=chemin_db)

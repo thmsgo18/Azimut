@@ -14,6 +14,7 @@ import re
 import secrets
 import tempfile
 import time
+import mimetypes
 import unicodedata
 from datetime import date
 from pathlib import Path
@@ -21,6 +22,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, request, send_file
 
 import candidatures
+import cvs
 import db
 import documents
 import doublons
@@ -34,7 +36,6 @@ import import_csv
 import import_excel
 import lettres
 import notes_entretien
-import profil
 import rapide
 import recherche
 import reglages
@@ -201,6 +202,7 @@ def api_entreprises_lister():
     liste = entreprises.lister_entreprises()
     sources = {
         "nb_candidatures": candidatures.lister_candidatures(),
+        "nb_documents": documents.lister_documents(),
         "nb_lettres": lettres.lister_lettres(),
         "nb_fiches": fiches.lister_fiches(),
         "nb_notes": notes_entretien.lister_notes(),
@@ -336,10 +338,11 @@ def api_evenements(numero):
     return jsonify(evenements.lister_evenements(numero))
 
 
-# --- documents ---
+# --- documents (voir plus bas : mêmes routes que les lettres et les fiches) ---
 
 @app.route("/api/candidatures/<int:numero>/documents", methods=["POST"])
 def api_document_ajouter(numero):
+    """Raccourci : joint un fichier à UNE candidature (l'entreprise s'en déduit)."""
     fichier = request.files.get("fichier")
     if fichier is None or not fichier.filename:
         raise ValeurNonAutorisee("Aucun fichier reçu.")
@@ -347,31 +350,6 @@ def api_document_ajouter(numero):
         numero, fichier.filename, fichier.read(), type_document=request.form.get("type")
     )
     return jsonify({"id": numero_document}), 201
-
-
-@app.route("/api/documents")
-def api_documents_lister():
-    return jsonify(
-        documents.lister_documents(candidature_id=request.args.get("candidature", type=int))
-    )
-
-
-@app.route("/api/documents/<int:numero>/telecharger")
-def api_document_telecharger(numero):
-    document = documents.recuperer_document(numero)
-    if not Path(document["chemin_absolu"]).exists():
-        raise EntiteIntrouvable(
-            f"Le fichier « {document['nom_fichier']} » est introuvable sur le disque."
-        )
-    return send_file(
-        document["chemin_absolu"], as_attachment=True, download_name=document["nom_fichier"]
-    )
-
-
-@app.route("/api/documents/<int:numero>", methods=["DELETE"])
-def api_document_supprimer(numero):
-    documents.supprimer_document(numero)
-    return jsonify({"message": f"Document n°{numero} supprimé."})
 
 
 # --- réglages et IA ---
@@ -433,40 +411,86 @@ def api_dossier_donnees():
     return jsonify({"dossier_donnees": dossier})
 
 
-# --- profil (CV utilisé pour les lettres de motivation) ---
+# --- CV (le CV principal est lu par l'IA pour les lettres et les fiches) ---
 
-@app.route("/api/profil/cv")
-def api_profil_cv():
-    return jsonify(profil.etat_cv())
+def _champs_cv():
+    """Champs d'un CV envoyés en JSON ou en formulaire multipart."""
+    source = request.form if request.form else (request.get_json(silent=True) or {})
+    return {c: source[c] for c in ("nom", "langue", "chemin_source", "texte") if c in source}
 
 
-@app.route("/api/profil/cv/fichier", methods=["POST"])
-def api_profil_cv_fichier():
+@app.route("/api/cvs")
+def api_cvs_lister():
+    return jsonify(cvs.lister_cvs())
+
+
+@app.route("/api/cvs", methods=["POST"])
+def api_cvs_ajouter():
+    champs = _champs_cv()
+    fichier = request.files.get("fichier")
+    source = request.form if request.form else (request.get_json(silent=True) or {})
+    numero = cvs.ajouter_cv(
+        nom=champs.get("nom"), langue=champs.get("langue"),
+        nom_fichier=fichier.filename if fichier and fichier.filename else None,
+        contenu_fichier=fichier.read() if fichier and fichier.filename else None,
+        chemin_source=champs.get("chemin_source"), texte=champs.get("texte"),
+        principal=_booleen(source.get("principal")),
+    )
+    return jsonify(cvs.recuperer_cv(numero)), 201
+
+
+@app.route("/api/cvs/<int:numero>")
+def api_cvs_voir(numero):
+    return jsonify(cvs.recuperer_cv(numero))
+
+
+@app.route("/api/cvs/<int:numero>", methods=["PATCH"])
+def api_cvs_modifier(numero):
+    champs = _champs_cv()
+    donnees = request.get_json(silent=True) or {}
+    if "principal" in donnees:
+        champs["principal"] = _booleen(donnees["principal"])
+    return jsonify(cvs.modifier_cv(numero, **champs))
+
+
+@app.route("/api/cvs/<int:numero>/fichier", methods=["POST"])
+def api_cvs_fichier(numero):
     fichier = request.files.get("fichier")
     if fichier is None or not fichier.filename:
         raise ValeurNonAutorisee("Aucun fichier reçu.")
-    profil.definir_cv_fichier(fichier.filename, fichier.read())
-    return jsonify(profil.etat_cv()), 201
+    return jsonify(cvs.remplacer_fichier_cv(numero, fichier.filename, fichier.read()))
 
 
-@app.route("/api/profil/cv/dossier_latex", methods=["POST"])
-def api_profil_cv_dossier_latex():
-    donnees = request.get_json(silent=True) or {}
-    profil.definir_cv_dossier_latex(donnees.get("chemin"))
-    return jsonify(profil.etat_cv())
+@app.route("/api/cvs/<int:numero>", methods=["DELETE"])
+def api_cvs_supprimer(numero):
+    cvs.supprimer_cv(numero)
+    return jsonify({"message": f"CV n°{numero} supprimé."})
 
 
-@app.route("/api/profil/cv/texte", methods=["POST"])
-def api_profil_cv_texte():
-    donnees = request.get_json(silent=True) or {}
-    profil.definir_cv_texte(donnees.get("texte"))
-    return jsonify(profil.etat_cv())
+@app.route("/api/cvs/<int:numero>/texte")
+def api_cvs_texte(numero):
+    """Le texte lisible du CV (celui de son fichier), pour l'afficher ou le copier."""
+    return jsonify({"texte": cvs.texte_lisible_du_cv(numero)})
 
 
-@app.route("/api/profil/cv", methods=["DELETE"])
-def api_profil_cv_supprimer():
-    profil.supprimer_cv()
-    return jsonify({"message": "CV supprimé."})
+@app.route("/api/cvs/<int:numero>/telecharger")
+def api_cvs_telecharger(numero):
+    cv = cvs.recuperer_cv(numero)
+    if not cv["fichier_disponible"]:
+        raise EntiteIntrouvable("Ce CV n'a pas de fichier (ou il est introuvable sur le disque).")
+    return send_file(
+        reglages.chemin_reel(cv["chemin_fichier"]), as_attachment=True,
+        download_name=_nom_fichier_ascii(cv["nom_fichier"] or "cv"),
+    )
+
+
+@app.route("/api/cvs/<int:numero>/apercu")
+def api_cvs_apercu(numero):
+    """Le PDF affiché dans la page (pas téléchargé), ou à défaut le texte."""
+    cv = cvs.recuperer_cv(numero)
+    if cv["apercu_pdf"]:
+        return send_file(reglages.chemin_reel(cv["chemin_fichier"]), mimetype="application/pdf")
+    return Response(cvs.texte_lisible_du_cv(numero), mimetype="text/plain; charset=utf-8")
 
 
 # --- lettres de motivation et fiches d'entretien ---
@@ -506,8 +530,10 @@ def _nom_entreprise_pour(candidature_ids, entreprise_nom):
     return candidatures.recuperer_candidature(candidature_ids[0])["entreprise"]
 
 
-def _routes_pieces(prefixe, module, type_libelle):
-    """Déclare les routes d'un type de pièce (« lettres » ou « fiches »)."""
+def _routes_pieces(prefixe, module, type_libelle, extras=(), avec_langue=True):
+    """Déclare les routes d'un type de pièce (« lettres », « fiches » ou
+    « documents »). `extras` : champs propres au type (« type_document »),
+    acceptés à l'import et à la modification ; `avec_langue` : le type a une langue."""
 
     @app.route(f"/api/{prefixe}", endpoint=f"{prefixe}_lister")
     def lister():
@@ -524,7 +550,10 @@ def _routes_pieces(prefixe, module, type_libelle):
     @app.route(f"/api/{prefixe}/<int:numero>", methods=["PATCH"], endpoint=f"{prefixe}_modifier")
     def modifier(numero):
         donnees = request.get_json(silent=True) or {}
-        champs = {c: v for c, v in donnees.items() if c in ("titre", "langue", "generale", "candidature_ids")}
+        champs = {
+            c: v for c, v in donnees.items()
+            if c in ("titre", "langue", "generale", "candidature_ids") + extras
+        }
         if "candidature_ids" in champs:
             champs["candidature_ids"] = _liste_entiers(champs["candidature_ids"])
         if "generale" in champs:
@@ -542,11 +571,14 @@ def _routes_pieces(prefixe, module, type_libelle):
         if fichier is None or not fichier.filename:
             raise ValeurNonAutorisee("Aucun fichier reçu.")
         ids = _liste_entiers(request.form.get("candidature_ids"))
+        supplements = {c: request.form.get(c) for c in extras if request.form.get(c)}
+        if avec_langue:
+            supplements["langue"] = request.form.get("langue")
         numero = module["importer"](
             _nom_entreprise_pour(ids, request.form.get("entreprise")),
             fichier.filename, fichier.read(),
             candidature_ids=ids or None, titre=request.form.get("titre"),
-            langue=request.form.get("langue"), generale=_booleen(request.form.get("generale")),
+            generale=_booleen(request.form.get("generale")), **supplements,
         )
         return jsonify(module["recuperer"](numero)), 201
 
@@ -572,6 +604,9 @@ def _routes_pieces(prefixe, module, type_libelle):
         piece = module["recuperer"](numero)
         if piece["apercu_pdf"]:
             return send_file(reglages.chemin_reel(piece["chemin_fichier"]), mimetype="application/pdf")
+        if piece["type_apercu"] == "image":
+            chemin = reglages.chemin_reel(piece["chemin_fichier"])
+            return send_file(chemin, mimetype=mimetypes.guess_type(chemin.name)[0] or "image/png")
         return Response(piece["contenu"] or "", mimetype="text/plain; charset=utf-8")
 
 
@@ -587,16 +622,26 @@ _routes_pieces("fiches", {
     "importer": fiches.importer_fiche,
 }, "Fiche")
 
+_routes_pieces("documents", {
+    "lister": documents.lister_documents, "recuperer": documents.recuperer_document,
+    "modifier": documents.modifier_document, "supprimer": documents.supprimer_document,
+    "importer": documents.importer_document,
+}, "Document", extras=("type_document",), avec_langue=False)
 
-@app.route("/api/lettres/skill")
-def api_lettres_skill():
-    import lettres_skill
+SKILLS_TELECHARGEABLES = ("lettre-motivation", "fiche-entretien")
 
+
+@app.route("/api/skills/<nom>")
+def api_skill_telecharger(nom):
+    """Télécharge un skill (fichier .skill) du dossier skills/ : ils décrivent
+    à une IA comment rédiger une lettre ou préparer une fiche."""
+    if nom not in SKILLS_TELECHARGEABLES:
+        raise EntiteIntrouvable(f"Skill inconnu : {nom}.")
+    chemin = Path(__file__).parent / "skills" / f"{nom}.skill"
+    if not chemin.is_file():
+        raise EntiteIntrouvable(f"Le fichier du skill « {nom} » est introuvable.")
     return send_file(
-        lettres_skill.zip_skill(),
-        mimetype="application/zip",
-        as_attachment=True,
-        download_name="azimut-lettre-motivation.skill",
+        chemin, mimetype="application/zip", as_attachment=True, download_name=f"{nom}.skill"
     )
 
 
@@ -606,6 +651,7 @@ def api_lettres_generer():
     numero = generation.generer_lettre(
         donnees.get("entreprise"), _liste_entiers(donnees.get("candidature_ids")),
         langue=donnees.get("langue"), generale=_booleen(donnees.get("generale")),
+        cv_id=donnees.get("cv_id") or None,
     )
     return jsonify(lettres.recuperer_lettre(numero)), 201
 
@@ -617,7 +663,7 @@ def api_fiches_generer():
         donnees.get("entreprise"), _liste_entiers(donnees.get("candidature_ids")),
         langue=donnees.get("langue"), date_entretien=donnees.get("date_entretien"),
         lieu=donnees.get("lieu"), mode=donnees.get("mode"),
-        generale=_booleen(donnees.get("generale")),
+        generale=_booleen(donnees.get("generale")), cv_id=donnees.get("cv_id") or None,
     )
     return jsonify({**fiches.recuperer_fiche(numero), "avertissements": avertissements}), 201
 

@@ -2,7 +2,6 @@
 listing - chaque étape marquante alimente automatiquement le journal (evenements)."""
 
 import db
-import documents
 import evenements
 import pieces_liees
 import sauvegarde
@@ -180,9 +179,9 @@ def lister_candidatures(statut=None, sous_domaine=None, chemin_db=None):
 
 
 def supprimer_candidature(id_candidature, chemin_db=None):
-    """Supprime une candidature, son journal et ses documents. L'entreprise est
-    conservée, ainsi que les lettres, fiches et notes d'entretien qui la
-    visaient : seul leur lien avec cette offre est retiré."""
+    """Supprime une candidature et son journal. L'entreprise est conservée, ainsi
+    que les documents, lettres, fiches et notes d'entretien qui la visaient :
+    seul leur lien avec cette offre est retiré."""
     conn = db.ouvrir(chemin_db)
     try:
         actuelle = conn.execute(
@@ -191,10 +190,10 @@ def supprimer_candidature(id_candidature, chemin_db=None):
         if actuelle is None:
             raise EntiteIntrouvable(f"Aucune candidature avec l'id {id_candidature}.")
         conn.execute("DELETE FROM evenements WHERE candidature_id = ?", (id_candidature,))
-        documents.supprimer_pour_candidature(conn, id_candidature)
-        # Ce que l'utilisateur a écrit ou rassemblé (lettres, fiches, notes) n'est
-        # jamais supprimé avec l'offre : elles peuvent viser d'autres offres, ou
-        # rester générales pour l'entreprise - seul le lien est retiré.
+        # Ce que l'utilisateur a écrit ou rassemblé (documents, lettres, fiches, notes)
+        # n'est jamais supprimé avec l'offre : cela peut viser d'autres offres, ou
+        # rester général pour l'entreprise - seul le lien est retiré.
+        pieces_liees.detacher_candidature(conn, pieces_liees.TYPE_DOCUMENT, id_candidature)
         pieces_liees.detacher_candidature(conn, pieces_liees.TYPE_LETTRE, id_candidature)
         pieces_liees.detacher_candidature(conn, pieces_liees.TYPE_FICHE, id_candidature)
         conn.execute(

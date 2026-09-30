@@ -1,7 +1,28 @@
-# Azimut — remplir une candidature à partir d'une offre
+# Azimut — guides pour une IA
 
-Ce fichier complète [CLAUDE.md](CLAUDE.md) (règles générales du projet, à lire
-en premier). Il détaille uniquement la procédure à suivre quand on te donne
+[CLAUDE.md](CLAUDE.md) donne les règles générales du projet (à lire en premier). Ce
+fichier dit **quel guide suivre selon ce qu'on te demande** — une IA installée sur
+cette machine (Claude Code ou autre) sait ainsi tout faire comme le fait l'appli avec
+sa clé API, sans clé :
+
+| On te demande… | Guide à suivre |
+|---|---|
+| d'ajouter une offre / une candidature | ce fichier, section ci-dessous |
+| une **lettre de motivation** | [`skills/lettre-motivation/AGENT.md`](skills/lettre-motivation/AGENT.md) |
+| une **fiche d'entretien** (préparation, PDF) | [`skills/fiche-entretien/AGENT.md`](skills/fiche-entretien/AGENT.md) |
+| de lire ou modifier le **CV** | `./venv/bin/python cli.py cv voir` — la commande indique aussi où se trouve la *source modifiable* (dossier LaTeX, fichier Word) : c'est là qu'il faut éditer, pas dans le texte affiché |
+| de prendre des **notes d'entretien** | `./venv/bin/python cli.py notes ajouter …` (texte en Markdown) |
+| d'ajouter un fichier (offre en PDF, CV envoyé…) | `./venv/bin/python cli.py documents importer --entreprise … --fichier …` |
+
+Dans tous les cas : jamais de SQL direct, uniquement les fonctions Python des modules ou
+la CLI `cli.py` (voir CLAUDE.md), et rien d'inventé.
+
+Les deux guides ci-dessus sont aussi disponibles sous forme de skills (`skills/*.skill`)
+à installer dans Claude — voir [`skills/README.md`](skills/README.md).
+
+# Remplir une candidature à partir d'une offre
+
+Cette section détaille la procédure à suivre quand on te donne
 une offre (texte collé, lien, PDF...) et qu'il faut créer la candidature
 correspondante dans la base.
 

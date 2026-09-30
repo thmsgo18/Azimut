@@ -1,5 +1,5 @@
 """Tests du dossier de données configurable (documents/, sauvegardes/, lettres/,
-fiches/ et profil/ dans un dossier choisi par l'utilisateur, avec repli sur un
+fiches/ et cv/ dans un dossier choisi par l'utilisateur, avec repli sur un
 emplacement par défaut à côté de la base)."""
 
 import sys
@@ -32,14 +32,14 @@ class TestDossierDonnees(unittest.TestCase):
         dossier temporaire - jamais le vrai dossier du projet)."""
         from fiches import dossier_fiches
         from lettres import dossier_lettres
-        from profil import dossier_profil
+        from cvs import dossier_cv
 
         racine = Path(self.chemin_db).parent
         self.assertEqual(dossier_documents(chemin_db=self.chemin_db), racine / "documents")
         self.assertEqual(dossier_sauvegardes(chemin_db=self.chemin_db), racine / "sauvegardes")
         self.assertEqual(dossier_lettres(chemin_db=self.chemin_db), racine / "lettres")
         self.assertEqual(dossier_fiches(chemin_db=self.chemin_db), racine / "fiches")
-        self.assertEqual(dossier_profil(chemin_db=self.chemin_db), racine / "profil")
+        self.assertEqual(dossier_cv(chemin_db=self.chemin_db), racine / "cv")
 
     def test_la_base_par_defaut_vit_a_cote_du_code(self):
         """La vraie base est à côté du code : c'est donc là que vont, par défaut, les

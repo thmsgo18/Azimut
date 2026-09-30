@@ -16,8 +16,8 @@ import candidatures
 import db
 import fiches
 import generation
+import cvs
 import lettres
-import profil
 import reglages
 from exceptions import ErreurSuivi, ValeurNonAutorisee
 from fichiers_exemple import fiche_ia
@@ -43,7 +43,7 @@ class BaseGeneration(unittest.TestCase):
         return candidatures.ajouter_candidature(entreprise, poste, chemin_db=self.chemin_db, **champs)
 
     def _cv(self, texte="Camille Martin - M2 IA - stage agents multi-étapes."):
-        profil.definir_cv_texte(texte, chemin_db=self.chemin_db)
+        cvs.ajouter_cv(texte=texte, chemin_db=self.chemin_db)
 
 
 class TestGenererLettre(BaseGeneration):

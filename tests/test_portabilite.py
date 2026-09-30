@@ -127,6 +127,13 @@ class TestCoherenceLangues(unittest.TestCase):
             f"de frappe/oubli lors d'un renommage) : {sorted(orphelines)}",
         )
 
+    # Textes composés avec la section (t(`${section}.x`)) qui n'existent que pour les lettres et les
+    # fiches : la création par IA (génération, skill) n'a pas de sens pour un simple document.
+    SUFFIXES_SANS_DOCUMENTS = {
+        "ajouter_la_mienne", "generee", "generation_en_cours", "methode_skill_titre",
+        "methode_skill_texte", "telecharger_skill",
+    }
+
     def test_toute_cle_utilisee_par_le_code_existe_en_francais(self):
         """Une clé t("...") absente de fr.js s'afficherait brute (« lettres.nouvelle ») dans
         l'interface : on relit le code JS et on vérifie que chaque clé existe."""
@@ -135,7 +142,7 @@ class TestCoherenceLangues(unittest.TestCase):
         codes = {
             # Sans les commentaires : ils citent des exemples (t("section.cle")), pas des clés réelles.
             nom: re.sub(r"/\*.*?\*/", "", (PROJET / "static" / nom).read_text(encoding="utf-8"), flags=re.S)
-            for nom in ("app.js", "preparation.js")
+            for nom in ("app.js", "preparation.js", "cv.js")
         }
         absentes = []
         for nom, code in codes.items():
@@ -148,7 +155,9 @@ class TestCoherenceLangues(unittest.TestCase):
                         absentes.append(f"{nom} : {cle}_{forme}")
             # Clés composées avec la section (lettres / fiches) : t(`${section}.ajoutee`)
             for suffixe in re.findall(r"\bt\(`\$\{section\}\.([\w]+)`", code):
-                for section in ("lettres", "fiches"):
+                for section in ("lettres", "fiches", "documents"):
+                    if section == "documents" and suffixe in self.SUFFIXES_SANS_DOCUMENTS:
+                        continue
                     if f"{section}.{suffixe}" not in self.cles_fr:
                         absentes.append(f"{nom} : {section}.{suffixe}")
         self.assertEqual(absentes, [], f"Clés utilisées par le code mais absentes de fr.js : {absentes}")
@@ -160,11 +169,10 @@ class TestCoherenceLangues(unittest.TestCase):
 
         sources = "\n".join(
             (PROJET / "static" / nom).read_text(encoding="utf-8")
-            for nom in ("app.js", "preparation.js", "index.html")
+            for nom in ("app.js", "preparation.js", "cv.js", "index.html")
         )
         # Clés construites dynamiquement : leur préfixe suffit à les considérer comme utilisées.
-        dynamiques = ("profil.source_", "lettres.origine_", "fiches.origine_", "preparation.type_",
-                      "entretiens.cible_", "valeurs.")
+        dynamiques = ("preparation.type_", "entretiens.cible_", "valeurs.")
         inutilisees = []
         for cle in sorted(self.cles_fr):
             if cle.startswith(dynamiques):
@@ -173,7 +181,7 @@ class TestCoherenceLangues(unittest.TestCase):
             if cle not in sources and base not in sources:
                 # clé composée : section + suffixe (t(`${section}.suffixe`))
                 section, _, suffixe = cle.partition(".")
-                if not (section in ("lettres", "fiches") and f"${{section}}.{suffixe}" in sources):
+                if not (section in ("lettres", "fiches", "documents") and f"${{section}}.{suffixe}" in sources):
                     inutilisees.append(cle)
         self.assertEqual(inutilisees, [], f"Clés de fr.js jamais utilisées : {inutilisees}")
 

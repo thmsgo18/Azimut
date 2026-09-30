@@ -82,7 +82,9 @@ class TestModulesNouveautes(unittest.TestCase):
         with self.assertRaises(ValeurNonAutorisee):
             documents.ajouter_document(numero, "x.pdf", b"", chemin_db=self.chemin_db)
 
-    def test_suppression_candidature_nettoie_documents_et_journal(self):
+    def test_suppression_candidature_nettoie_le_journal_et_garde_les_documents(self):
+        """Un fichier que l'utilisateur a rangé n'est jamais supprimé avec l'offre :
+        seul son lien est retiré, il reste attaché à l'entreprise."""
         import documents
         from candidatures import supprimer_candidature
         from evenements import lister_evenements
@@ -91,9 +93,11 @@ class TestModulesNouveautes(unittest.TestCase):
         id_doc = documents.ajouter_document(numero, "cv.pdf", b"abc", chemin_db=self.chemin_db)
         chemin = Path(documents.recuperer_document(id_doc, chemin_db=self.chemin_db)["chemin_absolu"])
         supprimer_candidature(numero, chemin_db=self.chemin_db)
-        self.assertEqual(documents.lister_documents(chemin_db=self.chemin_db), [])
         self.assertEqual(lister_evenements(numero, chemin_db=self.chemin_db), [])
-        self.assertFalse(chemin.exists())
+        restant = documents.recuperer_document(id_doc, chemin_db=self.chemin_db)
+        self.assertEqual(restant["candidatures"], [])
+        self.assertTrue(restant["generale"])  # plus d'offre : il porte sur l'entreprise
+        self.assertTrue(chemin.exists())
 
     # --- réglages ---
 
@@ -135,7 +139,7 @@ class TestModulesNouveautes(unittest.TestCase):
         self.assertEqual(len(resultats["entreprises"]), 1)
         self.assertEqual(
             rechercher("", chemin_db=self.chemin_db),
-            {"candidatures": [], "entreprises": [], "notes": [], "lettres": [], "fiches": []},
+            {"candidatures": [], "entreprises": [], "notes": [], "documents": [], "lettres": [], "fiches": []},
         )
 
     def test_recherche_lettres_et_fiches(self):
@@ -153,6 +157,21 @@ class TestModulesNouveautes(unittest.TestCase):
         self.assertEqual(resultats["lettres"][0]["champs_trouves"], ["Contenu"])
         resultats = rechercher("EVALUATION d'agents", chemin_db=self.chemin_db)
         self.assertEqual(len(resultats["fiches"]), 1)
+
+    def test_recherche_documents(self):
+        """Le texte des documents (PDF, Word, texte) est indexé : on retrouve une offre archivée
+        par une phrase qu'elle contient, ou par le type du document."""
+        import documents
+        from recherche import rechercher
+
+        documents.importer_document(
+            "AgentikCo", "offre.txt", "Mission : orchestrer des agents Kubernetes.".encode("utf-8"),
+            type_document="Offre (PDF)", chemin_db=self.chemin_db,
+        )
+        resultats = rechercher("kubernetes", chemin_db=self.chemin_db)
+        self.assertEqual(len(resultats["documents"]), 1)
+        self.assertEqual(resultats["documents"][0]["champs_trouves"], ["Contenu"])
+        self.assertEqual(len(rechercher("offre (pdf)", chemin_db=self.chemin_db)["documents"]), 1)
 
     # --- statistiques avancées ---
 

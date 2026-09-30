@@ -1,5 +1,5 @@
 """Extraction du texte d'un fichier (PDF, Word, texte brut) : sert à lire le
-CV (profil.py) et à indexer les lettres et fiches importées (pieces_liees.py)
+CV (cvs.py) et à indexer les lettres et fiches importées (pieces_liees.py)
 pour que la recherche les retrouve.
 
 L'extraction est best effort : un PDF scanné (une image sans texte) ou une

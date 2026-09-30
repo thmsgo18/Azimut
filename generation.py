@@ -14,7 +14,7 @@ import candidatures
 import entreprises
 import fiches
 import lettres
-import profil
+import cvs
 import reglages
 import verification_liens
 from exceptions import ErreurSuivi, ValeurNonAutorisee
@@ -51,10 +51,13 @@ def _cible(entreprise_nom, candidature_ids, chemin_db):
     return nom, offres, ids
 
 
-def generer_lettre(entreprise_nom=None, candidature_ids=None, langue=None, generale=None, chemin_db=None):
-    """Rédige puis enregistre une lettre de motivation. Retourne l'id de la lettre."""
+def generer_lettre(
+    entreprise_nom=None, candidature_ids=None, langue=None, generale=None, cv_id=None, chemin_db=None,
+):
+    """Rédige puis enregistre une lettre de motivation. Retourne l'id de la lettre.
+    `cv_id` : le CV à lire (défaut : le CV principal)."""
     nom, offres, ids = _cible(entreprise_nom, candidature_ids, chemin_db)
-    cv_texte = profil.obtenir_cv_texte(chemin_db=chemin_db)
+    cv_texte = cvs.obtenir_cv_texte(cv_id, chemin_db=chemin_db)
     contenu = agent.generer_lettre_motivation(
         nom, cv_texte, offres=offres, langue=langue, generale=bool(generale), chemin_db=chemin_db
     )
@@ -83,7 +86,7 @@ def _valeur_commune(valeurs):
 
 def generer_fiche(
     entreprise_nom=None, candidature_ids=None, langue=None, date_entretien=None, lieu=None,
-    mode=None, generale=None, chemin_db=None,
+    mode=None, generale=None, cv_id=None, chemin_db=None,
 ):
     """Rédige puis enregistre une fiche de préparation d'entretien pour une ou
     plusieurs offres d'une même entreprise. Le CV (s'il est configuré) sert à
@@ -98,11 +101,11 @@ def generer_fiche(
         )
     avertissements = []
     try:
-        cv_texte = profil.obtenir_cv_texte(chemin_db=chemin_db)
+        cv_texte = cvs.obtenir_cv_texte(cv_id, chemin_db=chemin_db)
     except ValeurNonAutorisee:
         cv_texte = None
         avertissements.append(
-            "Aucun CV configuré : les questions ne sont pas adaptées à ton profil (Réglages > Profil)."
+            "Aucun CV configuré : les questions ne sont pas adaptées à ton profil (section CV)."
         )
     try:
         recherche = agent.rechercher_presentation(nom, chemin_db=chemin_db)

@@ -18,16 +18,12 @@ REGLAGES_CONNUS = {
     "modele_ia": "claude-opus-5",       # modèle utilisé par l'analyse d'offres
     "ia_base_url": None,                # URL de base, uniquement pour "openai_compatible"
     "recherche_web": "Oui",             # enrichir le contexte entreprise via recherche web
-    "dossier_donnees": None,            # dossier choisi pour documents/, sauvegardes/, lettres/, fiches/, profil/
+    "dossier_donnees": None,            # dossier choisi pour documents/, sauvegardes/, lettres/, fiches/, cv/
     "dossier_donnees_choisi": "Non",    # évite de redemander à chaque lancement
     "objectif_hebdomadaire": None,      # nb de candidatures envoyées visé par semaine (None = désactivé)
     "compagnon_actif": "Non",           # vue compagnon iPhone/iPad (lecture seule, réseau local)
     "compagnon_code": None,             # code d'accès à la vue compagnon (régénérable)
     "langue": "fr",                     # langue de l'interface : "fr" ou "en"
-    "cv_source": None,                  # "fichier", "dossier_latex" ou "texte" (voir profil.py)
-    "cv_chemin": None,                  # chemin du fichier CV copié, ou du dossier latex-forge
-    "cv_nom_fichier": None,             # nom original du fichier CV (affichage uniquement)
-    "cv_texte": None,                   # texte du CV (collé, ou extrait et mis en cache pour un fichier)
 }
 
 FOURNISSEURS_IA = ["anthropic", "openai_compatible"]
@@ -77,7 +73,7 @@ def masquer_cle(cle_api):
 
 def dossier_donnees_pour(sous_dossier, chemin_db=None):
     """Dossier où ranger les fichiers d'un type donné (« documents »,
-    « sauvegardes », « lettres », « fiches », « profil »).
+    « sauvegardes », « lettres », « fiches », « cv »).
 
     C'est le dossier de données choisi dans Réglages, sinon un dossier à côté
     de la base elle-même. Pour la vraie base, qui vit à côté du code, ça donne

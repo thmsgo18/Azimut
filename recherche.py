@@ -1,11 +1,12 @@
-"""Recherche globale : candidatures, entreprises, notes d'entretien, lettres de
-motivation et fiches d'entretien, en une requête.
+"""Recherche globale : candidatures, entreprises, notes d'entretien, documents,
+lettres de motivation et fiches d'entretien, en une requête.
 
 Correspondance insensible à la casse et aux accents ; chaque résultat indique
 les champs où le texte a été trouvé et un court extrait.
 """
 
 from candidatures import lister_candidatures
+from documents import lister_documents
 from entreprises import lister_entreprises
 from fiches import lister_fiches
 from lettres import lister_lettres
@@ -35,6 +36,12 @@ CHAMPS_RECHERCHE = {
         ("contenu", "Contenu"),
         ("entreprise", "Entreprise"),
         ("poste", "Poste"),
+    ],
+    "document": [
+        ("titre", "Titre"),
+        ("contenu", "Contenu"),
+        ("entreprise", "Entreprise"),
+        ("type_document", "Type"),
     ],
     "lettre": [
         ("titre", "Titre"),
@@ -83,12 +90,15 @@ def _chercher_dans(objets, champs, requete_normalisee, requete):
 
 
 def rechercher(texte, chemin_db=None):
-    """Retourne {"candidatures", "entreprises", "notes", "lettres", "fiches"} :
-    pour chacun, la liste des éléments qui contiennent le texte."""
+    """Retourne {"candidatures", "entreprises", "notes", "documents", "lettres",
+    "fiches"} : pour chacun, la liste des éléments qui contiennent le texte."""
     requete = str(texte or "").strip()
     requete_normalisee = normaliser(requete)
     if not requete_normalisee:
-        return {"candidatures": [], "entreprises": [], "notes": [], "lettres": [], "fiches": []}
+        return {
+            "candidatures": [], "entreprises": [], "notes": [], "documents": [],
+            "lettres": [], "fiches": [],
+        }
     return {
         "candidatures": _chercher_dans(
             lister_candidatures(chemin_db=chemin_db),
@@ -101,6 +111,10 @@ def rechercher(texte, chemin_db=None):
         "notes": _chercher_dans(
             lister_notes(chemin_db=chemin_db),
             CHAMPS_RECHERCHE["note"], requete_normalisee, requete,
+        ),
+        "documents": _chercher_dans(
+            lister_documents(chemin_db=chemin_db),
+            CHAMPS_RECHERCHE["document"], requete_normalisee, requete,
         ),
         "lettres": _chercher_dans(
             lister_lettres(chemin_db=chemin_db),
