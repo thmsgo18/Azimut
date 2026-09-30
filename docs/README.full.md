@@ -66,7 +66,7 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 - **Companies** with context and news notes; detects probable duplicates ("Mistral" / "Mistral AI") and **merges them in one click**.
 - **Global search** (shortcut <kbd>⌘K</kbd>) across everything - titles, notes, job text, interview notes, documents, letters and sheets - color-coded by result type.
 - **Near-duplicate detection** when creating an application (a similar title, or the same job link once tracking params are stripped): a simple warning, never a block.
-- **Read-only company sheets**: clicking a company opens a clean sheet in a side panel - links (the website) are just clickable, nothing gets edited by accident. An explicit **Modify** button switches to the edit form. (An application, on the other hand, opens in a window where everything is edited in place.)
+- **Company sheets edited in place**: clicking a company opens a window (like an application) where the name, website, context and last-research date are edited directly - each change is saved on the spot, no button to press first. The applications, documents, letters, sheets and notes tied to the company are listed below, and one click opens any of them. Deleting is refused while something is still attached to it.
 - **Bilingual interface** (French / English): switch it in Réglages, applies immediately across the whole interface. Values stored in the database (status, source…) stay French internally - only the display changes.
 
 **Insights**

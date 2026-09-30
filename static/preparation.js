@@ -917,7 +917,7 @@ function sectionPreparation(lettres, fiches, notes, documents = [], creerNote = 
     ...documents.map((d) => ligne("document", d.titre, `ouvrirApercuPiece('documents', ${d.id})`)),
     ...lettres.map((l) => ligne("lettre", l.titre, `ouvrirApercuPiece('lettres', ${l.id})`)),
     ...fiches.map((f) => ligne("fiche", f.titre, `ouvrirApercuPiece('fiches', ${f.id})`)),
-    ...notes.map((n) => ligne("note", n.titre, `fermerToutesLesFenetres(); fermerPanneau(); location.hash='#/entretiens/${n.id}'`)),
+    ...notes.map((n) => ligne("note", n.titre, `fermerToutesLesFenetres(); location.hash='#/entretiens/${n.id}'`)),
   ];
   return `
     <h3 class="section-panneau">${t("preparation.titre")}</h3>
@@ -937,7 +937,22 @@ async function nouvelleNotePourOffre(candidatureId) {
       corps: { candidature_id: candidatureId, date_entretien: aujourdHuiISO() },
     });
     fermerToutesLesFenetres();
-    fermerPanneau();
+    location.hash = `#/entretiens/${note.id}`;
+  } catch (erreur) {
+    toast(erreur.message, true);
+  }
+}
+
+/* Une nouvelle note liée à cette entreprise en général, ouverte tout de suite dans l'éditeur. */
+async function nouvelleNotePourEntreprise(entrepriseId) {
+  try {
+    const ent = (await api("/api/entreprises")).find((e) => e.id === entrepriseId);
+    if (!ent) throw new Error(t("entreprises.introuvable"));
+    const note = await api("/api/notes", {
+      methode: "POST",
+      corps: { entreprise: ent.nom, date_entretien: aujourdHuiISO() },
+    });
+    fermerToutesLesFenetres();
     location.hash = `#/entretiens/${note.id}`;
   } catch (erreur) {
     toast(erreur.message, true);

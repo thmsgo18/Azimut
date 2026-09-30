@@ -742,57 +742,8 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 }
 
 /* ==========================================================================
-   Panneau latéral (formulaires) et modales
+   Fenêtres centrées (modales) et formulaires
    ========================================================================== */
-
-.voile {
-  position: fixed;
-  inset: 0;
-  background: rgba(12, 12, 14, 0.38);
-  display: none;
-  z-index: 50;
-}
-
-.voile.visible { display: block; }
-
-.panneau {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: min(520px, 94vw);
-  background: var(--surface);
-  border-left: 1px solid var(--hairline);
-  z-index: 60;
-  transform: translateX(102%);
-  transition: transform 220ms ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.panneau.ouvert { transform: translateX(0); }
-
-.panneau-entete {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 22px 14px;
-  border-bottom: 1px solid var(--hairline);
-}
-
-.panneau-entete h2 { margin: 0; font-size: 16.5px; font-weight: 650; flex: 1; }
-
-.panneau-corps { flex: 1; overflow-y: auto; padding: 18px 22px; }
-
-.panneau-pied {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 14px 22px;
-  border-top: 1px solid var(--hairline);
-}
-
-.panneau-pied .btn-accent { margin-left: auto; }
 
 .grille-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
 

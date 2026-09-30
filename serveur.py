@@ -233,7 +233,8 @@ def api_entreprises_modifier(numero):
     entreprises.modifier_entreprise(
         numero, **{c: v for c, v in donnees.items() if c != "id"}
     )
-    return jsonify({"id": numero})
+    # L'entreprise mise à jour : la fenêtre de détail (édition directe) s'en sert pour se rafraîchir.
+    return jsonify(next(e for e in entreprises.lister_entreprises() if e["id"] == numero))
 
 
 @app.route("/api/entreprises/<int:numero>", methods=["DELETE"])

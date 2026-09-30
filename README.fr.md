@@ -231,7 +231,7 @@ Une candidature, c'est **une offre chez une entreprise**. Elle avance dans un cy
 
 ### Entreprises et documents
 
-- **Entreprises** - créées automatiquement avec les candidatures, avec un contexte (actus, missions, équipe) et une détection de doublons qui repère « Mistral » vs « Mistral AI ». Ouvre une entreprise : ses candidatures, documents, lettres, fiches et notes sont réunis.
+- **Entreprises** - créées automatiquement avec les candidatures, avec un contexte (actus, missions, équipe) et une détection de doublons qui repère « Mistral » vs « Mistral AI ». Ouvre une entreprise : ses candidatures, documents, lettres, fiches et notes sont réunis, et son nom, son site ou son contexte se modifient directement, sans bouton « Modifier ».
 - **Documents** - n'importe quel fichier (offre en PDF, CV et lettre envoyés, portfolio, scan…), conservé tel quel. Comme pour les lettres, on choisit **une entreprise** et **une ou plusieurs de ses offres** (ou l'entreprise en général) avec la même barre de recherche, et on peut en déposer **plusieurs d'un coup**. Un clic ouvre l'**aperçu dans une fenêtre** (PDF, image, texte) - jamais en plein écran - et leur texte est retrouvé par la recherche globale.
 
 <p align="center"><img src="docs/screenshot-documents.png" width="760" alt="Documents rattachés à une entreprise et à ses offres"></p>

@@ -101,6 +101,25 @@ class TestServeur(unittest.TestCase):
         refus = self.client.delete(f"/api/entreprises/{entreprises_liste[0]['id']}")
         self.assertEqual(refus.status_code, 400)
 
+    def test_modifier_une_entreprise_retourne_la_fiche_a_jour(self):
+        """La fenêtre de détail (édition directe) se rafraîchit avec cette réponse."""
+        self._ajouter()
+        numero = self.client.get("/api/entreprises").get_json()[0]["id"]
+        reponse = self.client.patch(
+            f"/api/entreprises/{numero}",
+            json={"site_web": "https://agentik.example", "derniere_recherche": "2026-09-01"},
+        )
+        self.assertEqual(reponse.status_code, 200)
+        fiche = reponse.get_json()
+        self.assertEqual(fiche["id"], numero)
+        self.assertEqual(fiche["nom"], "AgentikCo")
+        self.assertEqual(fiche["site_web"], "https://agentik.example")
+        self.assertEqual(fiche["derniere_recherche"], "2026-09-01")
+        # Un nom déjà pris est refusé.
+        self.client.post("/api/entreprises", json={"nom": "Autre"})
+        autre = [e for e in self.client.get("/api/entreprises").get_json() if e["nom"] == "Autre"][0]["id"]
+        self.assertEqual(self.client.patch(f"/api/entreprises/{autre}", json={"nom": "AgentikCo"}).status_code, 400)
+
     def test_fiche_entretien(self):
         numero = self._ajouter().get_json()["id"]
         fiche = self.client.get(f"/api/entretien/{numero}")

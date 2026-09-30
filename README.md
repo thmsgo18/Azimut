@@ -231,7 +231,7 @@ An application is **one job at one company**. It moves through a simple cycle, a
 
 ### Companies and documents
 
-- **Companies** - created automatically with applications, with a context (news, missions, team) and duplicate detection that catches "Mistral" vs "Mistral AI". Open a company: its applications, documents, letters, sheets and notes are gathered.
+- **Companies** - created automatically with applications, with a context (news, missions, team) and duplicate detection that catches "Mistral" vs "Mistral AI". Open a company: its applications, documents, letters, sheets and notes are gathered, and its name, website or context are edited right there, with no "Edit" button.
 - **Documents** - any file (job posting as a PDF, résumé and letter you sent, portfolio, scan…), kept as is. As for letters, you pick **one company** and **one or more of its jobs** (or the company in general) with the same search bar, and you can drop **several files at once**. A click opens the **preview in a window** (PDF, image, text) - never full screen - and their text is found by the global search.
 
 <p align="center"><img src="docs/screenshot-documents.png" width="760" alt="Documents attached to a company and its jobs"></p>

@@ -233,14 +233,12 @@ window.addEventListener("hashchange", rendre);
    Détecte les écritures faites hors de l'appli en cours (script, IA,
    import lancé ailleurs...) pour que l'affichage suive sans avoir à
    fermer/rouvrir Azimut. On compare le mtime de suivi_candidatures.db :
-   si une saisie est en cours (panneau, modale ou champ actif), on se
+   si une saisie est en cours (fenêtre ouverte ou champ actif), on se
    contente d'allumer le bouton "Actualiser" plutôt que de recharger
    sous les pieds de l'utilisateur.
    ======================================================================== */
 
 function saisieEnCours() {
-  const panneau = document.getElementById("panneau");
-  if (panneau && panneau.classList.contains("ouvert")) return true;
   if (pileModales.length) return true;
   const actif = document.activeElement;
   return !!actif && ["INPUT", "TEXTAREA", "SELECT"].includes(actif.tagName);
@@ -726,25 +724,8 @@ function viderComparateur() {
 }
 
 /* ========================================================================
-   Panneau latéral : formulaire candidature (création et édition)
+   Champs de formulaire
    ======================================================================== */
-
-function ouvrirPanneau(titre, corpsHTML, piedHTML) {
-  document.getElementById("panneau-titre").textContent = titre;
-  document.getElementById("panneau-corps").innerHTML = corpsHTML;
-  document.getElementById("panneau-pied").innerHTML = piedHTML;
-  document.getElementById("voile").classList.add("visible");
-  const panneau = document.getElementById("panneau");
-  panneau.classList.add("ouvert");
-  panneau.setAttribute("aria-hidden", "false");
-}
-
-function fermerPanneau() {
-  document.getElementById("voile").classList.remove("visible");
-  const panneau = document.getElementById("panneau");
-  panneau.classList.remove("ouvert");
-  panneau.setAttribute("aria-hidden", "true");
-}
 
 function champTexte(nom, libelle, valeur = "", type = "text", pleineLargeur = false) {
   return `
@@ -974,7 +955,92 @@ function remplirDepuisProposition(proposition) {
    dernière frappe).
    ------------------------------------------------------------------------ */
 
-/* Champs de la fenêtre de détail. `sauv` = enregistrés à la volée. */
+/* Édition directe d'une fenêtre de détail (candidature, entreprise) : chaque champ portant
+   `data-champ` est enregistré tout de suite (listes et dates au changement, textes un instant
+   après la dernière frappe) ; rien à valider. `options` :
+     donnees()             l'objet affiché (relu à chaque enregistrement) ;
+     envoyer(nom, valeur)  écrit un champ et retourne l'objet mis à jour ;
+     fusionner(misAJour)   met à jour l'objet affiché ;
+     verifier(nom, valeur) message d'erreur à afficher (et valeur refusée), sinon rien ;
+     apres(nom)            réaction à un champ enregistré (rafraîchir un bloc lié...).
+   Retourne { signaler, envoyerEnAttente, annulerEnAttente, aModifie, marquerModifie }. */
+function editionDirecte(zone, options) {
+  let modifie = false;
+  const enAttente = new Map(); // champ -> minuteur d'un texte en cours de frappe
+  const indicateur = zone.racine.querySelector(".modale-etat");
+  let minuteurIndicateur = null;
+  const signaler = (texte) => {
+    indicateur.textContent = texte;
+    indicateur.classList.toggle("visible", !!texte);
+    clearTimeout(minuteurIndicateur);
+    if (texte) minuteurIndicateur = setTimeout(() => { indicateur.classList.remove("visible"); }, 2400);
+  };
+
+  async function enregistrerChamp(nom, brut) {
+    const champ = zone.racine.querySelector(`[data-champ="${nom}"]`);
+    const donnees = options.donnees();
+    const valeur = brut === "" ? null : brut;
+    const actuelle = donnees[nom] === undefined ? null : donnees[nom];
+    if (String(valeur ?? "") === String(actuelle ?? "")) return;
+    const refus = options.verifier ? options.verifier(nom, valeur) : null;
+    if (refus) {
+      champ.value = actuelle ?? "";
+      toast(refus, true);
+      return;
+    }
+    signaler(t("formulaire.enregistrement_en_cours"));
+    try {
+      options.fusionner(await options.envoyer(nom, valeur));
+      modifie = true;
+      signaler(t("formulaire.enregistre"));
+      if (options.apres) await options.apres(nom);
+    } catch (erreur) {
+      signaler("");
+      champ.value = actuelle ?? "";
+      toast(erreur.message, true);
+    }
+  }
+
+  function annulerEnAttente() {
+    enAttente.forEach((minuteur) => clearTimeout(minuteur));
+    enAttente.clear();
+  }
+
+  async function envoyerEnAttente() {
+    const noms = [...enAttente.keys()];
+    annulerEnAttente();
+    for (const nom of noms) {
+      const champ = zone.racine.querySelector(`[data-champ="${nom}"]`);
+      if (champ) await enregistrerChamp(nom, champ.value);
+    }
+  }
+
+  zone.corps.addEventListener("change", (evenement) => {
+    const nom = evenement.target.dataset && evenement.target.dataset.champ;
+    if (!nom) return;
+    clearTimeout(enAttente.get(nom));
+    enAttente.delete(nom);
+    enregistrerChamp(nom, evenement.target.value);
+  });
+  zone.corps.addEventListener("input", (evenement) => {
+    const cible = evenement.target;
+    const nom = cible.dataset && cible.dataset.champ;
+    if (!nom || !(cible.tagName === "TEXTAREA" || cible.type === "text" || cible.type === "url")) return;
+    clearTimeout(enAttente.get(nom));
+    enAttente.set(nom, setTimeout(() => { enAttente.delete(nom); enregistrerChamp(nom, cible.value); }, 900));
+  });
+  zone.corps.addEventListener("keydown", (evenement) => {
+    if (evenement.key === "Enter" && evenement.target.tagName === "INPUT") evenement.target.blur();
+  });
+
+  return {
+    signaler, envoyerEnAttente, annulerEnAttente,
+    aModifie: () => modifie,
+    marquerModifie: () => { modifie = true; },
+  };
+}
+
+/* Champs de la fenêtre de détail. */
 function champDetail(nom, libelle, valeur, type = "text", pleineLargeur = false) {
   return `
     <div class="champ${pleineLargeur ? " pleine-largeur" : ""}">
@@ -1111,8 +1177,7 @@ async function ouvrirDetailCandidature(numero) {
       <div id="detail-annexes">${annexesCandidature(numero, ...annexes)}</div>
     </div>`;
 
-  let modifie = false;
-  const enAttente = new Map(); // champ -> minuteur d'un texte en cours de frappe
+  let edition = null;
   const zone = ouvrirModale(
     cand.entreprise,
     corps,
@@ -1123,61 +1188,24 @@ async function ouvrirDetailCandidature(numero) {
     {
       avecEtat: true,
       surFermeture: async () => {
-        await envoyerEnAttente();
-        if (modifie) rendre();
+        await edition.envoyerEnAttente();
+        if (edition.aModifie()) rendre();
       },
     }
   );
-  const indicateur = zone.racine.querySelector(".modale-etat");
-  let minuteurIndicateur = null;
-  const signaler = (texte) => {
-    indicateur.textContent = texte;
-    indicateur.classList.toggle("visible", !!texte);
-    clearTimeout(minuteurIndicateur);
-    if (texte) minuteurIndicateur = setTimeout(() => { indicateur.classList.remove("visible"); }, 2400);
-  };
-
-  async function enregistrerChamp(nom, brut) {
-    const champ = zone.racine.querySelector(`[data-champ="${nom}"]`);
-    const valeur = brut === "" ? null : brut;
-    const actuelle = cand[nom] === undefined ? null : cand[nom];
-    if (String(valeur ?? "") === String(actuelle ?? "")) return;
-    if (nom === "poste" && !valeur) {
-      champ.value = cand.poste;
-      toast(t("formulaire.poste_obligatoire"), true);
-      return;
-    }
-    signaler(t("formulaire.enregistrement_en_cours"));
-    try {
-      const misAJour = await api(`/api/candidatures/${numero}`, { methode: "PATCH", corps: { [nom]: valeur } });
-      cand = { ...cand, ...misAJour };
-      modifie = true;
-      signaler(t("formulaire.enregistre"));
+  edition = editionDirecte(zone, {
+    donnees: () => cand,
+    envoyer: (nom, valeur) => api(`/api/candidatures/${numero}`, { methode: "PATCH", corps: { [nom]: valeur } }),
+    fusionner: (misAJour) => { cand = { ...cand, ...misAJour }; },
+    verifier: (nom, valeur) => (nom === "poste" && !valeur ? t("formulaire.poste_obligatoire") : null),
+    apres: async (nom) => {
       if (nom === "statut") {
         zone.racine.querySelector("#detail-statut").innerHTML = pastilleStatutDetail(cand.statut);
         await rafraichirAnnexes();
       }
       if (nom === "lien_offre") zone.racine.querySelector("#detail-lien-actions").innerHTML = lienOffre();
-    } catch (erreur) {
-      signaler("");
-      champ.value = actuelle ?? "";
-      toast(erreur.message, true);
-    }
-  }
-
-  function annulerEnAttente() {
-    enAttente.forEach((minuteur) => clearTimeout(minuteur));
-    enAttente.clear();
-  }
-
-  async function envoyerEnAttente() {
-    const noms = [...enAttente.keys()];
-    annulerEnAttente();
-    for (const nom of noms) {
-      const champ = zone.racine.querySelector(`[data-champ="${nom}"]`);
-      if (champ) await enregistrerChamp(nom, champ.value);
-    }
-  }
+    },
+  });
 
   async function rafraichirAnnexes() {
     const conteneur = zone.racine.querySelector("#detail-annexes");
@@ -1195,25 +1223,6 @@ async function ouvrirDetailCandidature(numero) {
     }
   }
 
-  // Un seul écouteur pour tous les champs : les listes et les dates s'enregistrent
-  // au changement, les champs de texte un instant après la dernière frappe.
-  zone.corps.addEventListener("change", (evenement) => {
-    const nom = evenement.target.dataset && evenement.target.dataset.champ;
-    if (!nom) return;
-    clearTimeout(enAttente.get(nom));
-    enAttente.delete(nom);
-    enregistrerChamp(nom, evenement.target.value);
-  });
-  zone.corps.addEventListener("input", (evenement) => {
-    const cible = evenement.target;
-    const nom = cible.dataset && cible.dataset.champ;
-    if (!nom || !(cible.tagName === "TEXTAREA" || cible.type === "text" || cible.type === "url")) return;
-    clearTimeout(enAttente.get(nom));
-    enAttente.set(nom, setTimeout(() => { enAttente.delete(nom); enregistrerChamp(nom, cible.value); }, 900));
-  });
-  zone.corps.addEventListener("keydown", (evenement) => {
-    if (evenement.key === "Enter" && evenement.target.tagName === "INPUT") evenement.target.blur();
-  });
   zone.racine.querySelector("#detail-entreprise").addEventListener("click", (evenement) => {
     evenement.preventDefault();
     ouvrirDetailEntreprise(cand.entreprise_id);
@@ -1230,8 +1239,8 @@ async function ouvrirDetailCandidature(numero) {
     try {
       await api(`/api/candidatures/${numero}`, { methode: "DELETE" });
       toast(t("formulaire.candidature_supprimee"));
-      modifie = true;
-      annulerEnAttente(); // plus rien à enregistrer : la candidature n'existe plus
+      edition.marquerModifie();
+      edition.annulerEnAttente(); // plus rien à enregistrer : la candidature n'existe plus
       fermerModale(zone);
     } catch (erreur) {
       toast(erreur.message, true);
@@ -1277,7 +1286,7 @@ async function vueEntreprises() {
   return `
     <div class="entete-vue">
       <h1>${t("nav.entreprises")}</h1>
-      <button class="btn btn-accent" onclick="ouvrirFormEntreprise()">${t("commun.ajouter")}</button>
+      <button class="btn btn-accent" onclick="ouvrirCreationEntreprise()">${t("commun.ajouter")}</button>
     </div>
     ${banniereFusion}
     ${liste.length ? `<div class="grille-entreprises">${cartes}</div>` : `
@@ -1285,7 +1294,7 @@ async function vueEntreprises() {
         <div class="icone">${ICONES.entreprises}</div>
         <div class="titre">${t("entreprises.vide_titre")}</div>
         <p>${t("entreprises.vide_texte")}</p>
-        <button class="btn btn-accent" onclick="ouvrirFormEntreprise()">${t("entreprises.ajouter_bouton")}</button>
+        <button class="btn btn-accent" onclick="ouvrirCreationEntreprise()">${t("entreprises.ajouter_bouton")}</button>
       </div>`}`;
 }
 
@@ -1348,123 +1357,145 @@ async function ouvrirFusionEntreprises() {
   });
 }
 
-async function ouvrirFormEntreprise(numero = null) {
-  const creation = numero === null;
-  let ent = {};
-  if (!creation) {
-    const liste = await api("/api/entreprises");
-    ent = liste.find((e) => e.id === numero) || {};
-  }
-  const corps = `
-    <form id="form-entreprise" class="grille-form" onsubmit="return false;">
-      ${champTexte("nom", t("entreprises.nom_requis"), ent.nom, "text", true)}
-      ${champTexte("site_web", t("entreprises.site_web"), ent.site_web, "url", true)}
-      ${champZone("contexte_actus", t("entreprises.contexte_label"), ent.contexte_actus)}
-      ${champTexte("derniere_recherche", t("entreprises.derniere_recherche_le"), ent.derniere_recherche, "date", true)}
-    </form>`;
-  const pied = creation
-    ? `<button class="btn" onclick="fermerPanneau()">${t("commun.annuler")}</button>
-       <button class="btn btn-accent" id="btn-enregistrer">${t("entreprises.ajouter_entreprise")}</button>`
-    : `<button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-       <button class="btn btn-accent" id="btn-enregistrer">${t("commun.enregistrer")}</button>`;
-  ouvrirPanneau(creation ? t("entreprises.nouvelle_entreprise") : t("commun.titre_modifier", { nom: ent.nom }), corps, pied);
-
-  document.getElementById("btn-enregistrer").addEventListener("click", async () => {
-    const donnees = lireFormulaire(document.getElementById("form-entreprise"));
+/* Création : un petit formulaire dans une fenêtre. Une fois l'entreprise créée, on ouvre tout de
+   suite sa fiche, où chaque champ se modifie sur place. */
+function ouvrirCreationEntreprise() {
+  const zone = ouvrirModale(
+    t("entreprises.nouvelle_entreprise"),
+    `<form id="form-entreprise" class="grille-form" onsubmit="return false;">
+      ${champTexte("nom", t("entreprises.nom_requis"), "", "text", true)}
+      ${champTexte("site_web", t("entreprises.site_web"), "", "url", true)}
+      ${champZone("contexte_actus", t("entreprises.contexte_label"), "")}
+      ${champTexte("derniere_recherche", t("entreprises.derniere_recherche_le"), "", "date", true)}
+    </form>`,
+    `<button class="btn" onclick="fermerModale()">${t("commun.annuler")}</button>
+     <button class="btn btn-accent" id="btn-enregistrer">${t("entreprises.ajouter_entreprise")}</button>`
+  );
+  const enregistrer = async () => {
+    const donnees = lireFormulaire(zone.racine.querySelector("#form-entreprise"));
+    const { derniere_recherche: derniere, ...creation } = donnees;
     try {
-      if (creation) {
-        await api("/api/entreprises", { methode: "POST", corps: donnees });
-        toast(t("entreprises.entreprise_enregistree"));
-      } else {
-        await api(`/api/entreprises/${numero}`, { methode: "PATCH", corps: donnees });
-        toast(t("entreprises.entreprise_enregistree"));
-      }
-      fermerPanneau();
+      const { id } = await api("/api/entreprises", { methode: "POST", corps: creation });
+      if (derniere) await api(`/api/entreprises/${id}`, { methode: "PATCH", corps: { derniere_recherche: derniere } });
+      toast(t("entreprises.entreprise_enregistree"));
+      fermerModale(zone);
       rendre();
+      ouvrirDetailEntreprise(id);
     } catch (erreur) {
       toast(erreur.message, true);
     }
-  });
-  if (!creation) {
-    document.getElementById("btn-supprimer").addEventListener("click", async () => {
-      const accord = await confirmer(
-        t("entreprises.supprimer_titre"),
-        t("entreprises.supprimer_texte", { nom: ent.nom })
-      );
-      if (!accord) return;
-      try {
-        await api(`/api/entreprises/${numero}`, { methode: "DELETE" });
-        toast(t("entreprises.entreprise_supprimee"));
-        fermerPanneau();
-        rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
-  }
+  };
+  zone.racine.querySelector("#btn-enregistrer").addEventListener("click", enregistrer);
+  const nom = zone.racine.querySelector('[name="nom"]');
+  if (nom) nom.focus();
 }
 
+function annexesEntreprise(numero, candidaturesEnt, lettresEnt, fichesEnt, notesEnt, docsEnt) {
+  const ligneCandidature = (c) => `
+    <div class="ligne-liee" onclick="ouvrirDetailCandidature(${c.id})">
+      <span class="cellule-principale">${echapper(c.poste)}</span>
+      <span class="puce puce-statut" style="--couleur-statut:${COULEURS_STATUT[c.statut]}"><span class="point"></span>${echapper(tv(c.statut))}</span>
+    </div>`;
+  return `
+    <h3 class="section-panneau">${t("entreprises.candidatures_titre", { n: candidaturesEnt.length })}</h3>
+    ${candidaturesEnt.length ? `<div class="liste-liee">${candidaturesEnt.map(ligneCandidature).join("")}</div>` : `<p class="sous-titre">${t("entreprises.aucune_candidature")}</p>`}
+    ${sectionPreparation(lettresEnt, fichesEnt, notesEnt, docsEnt, `nouvelleNotePourEntreprise(${numero})`)}`;
+}
+
+/* Fiche d'une entreprise : une fenêtre centrée dont chaque champ se modifie sur place, comme le
+   détail d'une candidature (voir editionDirecte). */
 async function ouvrirDetailEntreprise(numero) {
-  try {
-    const [listeEntreprises, listeCandidatures, lettresEnt, fichesEnt, notesEnt, docsEnt] = await Promise.all([
-      api("/api/entreprises"),
+  const chargerAnnexes = async () => {
+    const [listeCandidatures, lettresEnt, fichesEnt, notesEnt, docsEnt] = await Promise.all([
       api("/api/candidatures"),
       api(`/api/lettres?entreprise=${numero}`),
       api(`/api/fiches?entreprise=${numero}`),
       api(`/api/notes?entreprise=${numero}`),
       api(`/api/documents?entreprise=${numero}`),
     ]);
-    const ent = listeEntreprises.find((e) => e.id === numero);
+    return [listeCandidatures.filter((c) => c.entreprise_id === numero), lettresEnt, fichesEnt, notesEnt, docsEnt];
+  };
+  let ent;
+  let annexes;
+  try {
+    const liste = await api("/api/entreprises");
+    ent = liste.find((e) => e.id === numero);
     if (!ent) { toast(t("entreprises.introuvable"), true); return; }
-    const candidaturesEnt = listeCandidatures.filter((c) => c.entreprise === ent.nom);
-
-    const ligneCandidature = (c) => `
-      <div class="ligne-liee" onclick="ouvrirDetailCandidature(${c.id})">
-        <span class="cellule-principale">${echapper(c.poste)}</span>
-        <span class="puce puce-statut" style="--couleur-statut:${COULEURS_STATUT[c.statut]}"><span class="point"></span>${echapper(tv(c.statut))}</span>
-      </div>`;
-
-    const corps = `
-      <div class="fiche-entete-detail">
-        <div>
-          <h2>${echapper(ent.nom)}</h2>
-          ${ent.site_web ? `<p class="fiche-soustitre"><a class="lien-detail" href="${echapper(ent.site_web)}" target="_blank" rel="noopener">${echapper(ent.site_web)}</a></p>` : ""}
-        </div>
-      </div>
-      <h3 class="section-panneau">${t("entreprises.contexte_actus")}</h3>
-      ${ent.contexte_actus
-        ? `<div class="texte-long">${echapper(ent.contexte_actus)}</div>`
-        : `<div class="valeur-affichee vide">${t("entreprises.pas_de_contexte_fiche")}</div>`}
-      ${ent.derniere_recherche ? `<p class="cellule-secondaire" style="margin-top:8px;">${t("entreprises.derniere_recherche_texte", { date: dateFr(ent.derniere_recherche) })}</p>` : ""}
-
-      <h3 class="section-panneau">${t("entreprises.candidatures_titre", { n: candidaturesEnt.length })}</h3>
-      ${candidaturesEnt.length ? `<div class="liste-liee">${candidaturesEnt.map(ligneCandidature).join("")}</div>` : `<p class="sous-titre">${t("entreprises.aucune_candidature")}</p>`}
-      ${sectionPreparation(lettresEnt, fichesEnt, notesEnt, docsEnt)}`;
-
-    const pied = `
-      <button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-      <button class="btn btn-accent" id="btn-modifier">${t("commun.modifier")}</button>`;
-    ouvrirPanneau(ent.nom, corps, pied);
-
-    document.getElementById("btn-modifier").addEventListener("click", () => ouvrirFormEntreprise(numero));
-    document.getElementById("btn-supprimer").addEventListener("click", async () => {
-      const accord = await confirmer(
-        t("entreprises.supprimer_titre"),
-        t("entreprises.supprimer_texte", { nom: ent.nom })
-      );
-      if (!accord) return;
-      try {
-        await api(`/api/entreprises/${numero}`, { methode: "DELETE" });
-        toast(t("entreprises.entreprise_supprimee"));
-        fermerPanneau();
-        rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
+    annexes = await chargerAnnexes();
   } catch (erreur) {
     toast(erreur.message, true);
+    return;
   }
+
+  const lienSite = () => (ent.site_web
+    ? `<a class="btn btn-mini" href="${echapperAttribut(/^https?:\/\//i.test(ent.site_web) ? ent.site_web : `https://${ent.site_web}`)}" target="_blank" rel="noopener">${t("entreprises.ouvrir_site")}</a>`
+    : "");
+
+  const corps = `
+    <div class="detail-candidature">
+      <div class="detail-tete">
+        <div class="detail-titre">
+          <input type="text" class="detail-poste" id="detail-nom" data-champ="nom" value="${echapperAttribut(ent.nom)}" aria-label="${echapperAttribut(t("entreprises.nom_requis"))}">
+        </div>
+      </div>
+
+      <h3 class="section-panneau">${t("entreprises.section_infos")}</h3>
+      <div class="grille-detail">
+        <div class="champ pleine-largeur">
+          <label for="detail-site_web">${t("entreprises.site_web")}</label>
+          <div class="champ-avec-action">
+            <input type="url" id="detail-site_web" data-champ="site_web" value="${echapperAttribut(ent.site_web ?? "")}">
+            <span id="detail-site-actions">${lienSite()}</span>
+          </div>
+        </div>
+        ${champDetail("derniere_recherche", t("entreprises.derniere_recherche_le"), ent.derniere_recherche, "date")}
+      </div>
+
+      <h3 class="section-panneau">${t("entreprises.contexte_actus")}</h3>
+      <div class="grille-detail">${zoneDetail("contexte_actus", "", ent.contexte_actus)}</div>
+
+      <div id="detail-annexes">${annexesEntreprise(numero, ...annexes)}</div>
+    </div>`;
+
+  let edition = null;
+  const zone = ouvrirModale(
+    ent.nom,
+    corps,
+    `<button class="btn btn-danger" id="btn-supprimer" style="margin-right:auto;">${t("commun.supprimer")}</button>
+     <button class="btn btn-accent" onclick="fermerModale()">${t("commun.fermer")}</button>`,
+    false, false,
+    {
+      avecEtat: true,
+      surFermeture: async () => {
+        await edition.envoyerEnAttente();
+        if (edition.aModifie()) rendre();
+      },
+    }
+  );
+  edition = editionDirecte(zone, {
+    donnees: () => ent,
+    envoyer: (nom, valeur) => api(`/api/entreprises/${numero}`, { methode: "PATCH", corps: { [nom]: valeur } }),
+    fusionner: (misAJour) => { ent = { ...ent, ...misAJour }; },
+    verifier: (nom, valeur) => (nom === "nom" && !valeur ? t("entreprises.nom_obligatoire") : null),
+    apres: (nom) => {
+      if (nom === "nom") zone.racine.querySelector(".modale-titre").textContent = ent.nom;
+      if (nom === "site_web") zone.racine.querySelector("#detail-site-actions").innerHTML = lienSite();
+    },
+  });
+
+  zone.racine.querySelector("#btn-supprimer").addEventListener("click", async () => {
+    const accord = await confirmer(t("entreprises.supprimer_titre"), t("entreprises.supprimer_texte", { nom: ent.nom }));
+    if (!accord) return;
+    try {
+      await api(`/api/entreprises/${numero}`, { methode: "DELETE" });
+      toast(t("entreprises.entreprise_supprimee"));
+      edition.marquerModifie();
+      edition.annulerEnAttente(); // plus rien à enregistrer : l'entreprise n'existe plus
+      fermerModale(zone);
+    } catch (erreur) {
+      toast(erreur.message, true); // refusé tant qu'il reste des candidatures ou des pièces liées
+    }
+  });
 }
 
 /* ========================================================================
@@ -2288,13 +2319,9 @@ async function ouvrirRecapitulatif(numero) {
    ======================================================================== */
 
 document.getElementById("btn-nouvelle").addEventListener("click", () => ouvrirFormCandidature());
-document.getElementById("panneau-fermer").addEventListener("click", fermerPanneau);
-document.getElementById("voile").addEventListener("click", fermerPanneau);
 document.addEventListener("keydown", (evenement) => {
   if (evenement.key === "Escape") {
-    // Échap ferme d'abord la fenêtre du dessus, puis (seulement s'il n'y en a plus) le panneau.
-    if (pileModales.length) fermerModale();
-    else fermerPanneau();
+    if (pileModales.length) fermerModale(); // Échap ferme la fenêtre du dessus
   }
   if ((evenement.metaKey || evenement.ctrlKey) && evenement.key.toLowerCase() === "k") {
     evenement.preventDefault();

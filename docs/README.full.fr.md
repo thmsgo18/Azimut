@@ -66,7 +66,7 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 - **Entreprises** avec contexte et actualités ; détection des doublons probables (« Mistral » / « Mistral AI ») et **fusion en un clic**.
 - **Recherche globale** (raccourci <kbd>⌘K</kbd>) qui fouille tout - postes, notes, textes d'offres, notes d'entretien, documents, lettres et fiches - avec un code couleur par type de résultat.
 - **Détection de quasi-doublons** à la création d'une candidature (intitulé proche, ou même lien d'offre une fois débarrassé du tracking) : un simple avertissement, jamais un blocage.
-- **Fiches d'entreprise en lecture seule** : cliquer sur une entreprise ouvre une fiche propre dans un panneau latéral - les liens (le site) sont juste cliquables, rien ne se modifie par accident. Un bouton **Modifier** explicite bascule vers le formulaire d'édition. (Une candidature, elle, s'ouvre dans une fenêtre où tout se modifie sur place.)
+- **Fiches d'entreprise modifiables sur place** : cliquer sur une entreprise ouvre une fenêtre (comme une candidature) où le nom, le site, le contexte et la date de dernière recherche se modifient directement - chaque changement est enregistré tout de suite, sans bouton à presser d'abord. Les candidatures, documents, lettres, fiches et notes liés à l'entreprise sont listés dessous, et un clic ouvre chacun. La suppression est refusée tant qu'il reste quelque chose de rattaché.
 - **Interface bilingue** (français / anglais) : se change dans Réglages, s'applique immédiatement à toute l'interface. Les valeurs stockées en base (statut, source…) restent en français en interne - seul l'affichage change.
 
 **Pilotage**
