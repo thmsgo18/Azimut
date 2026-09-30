@@ -24,3 +24,26 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests
+
+      # Le lanceur lui-même (celui que l'utilisateur double-clique), sans ouvrir de fenêtre :
+      # il crée l'environnement Python, installe les dépendances, puis on vérifie que l'appli
+      # s'importe. C'est ce qui arrive à quelqu'un qui télécharge le ZIP.
+      - name: Lanceur macOS / Linux
+        if: runner.os != 'Windows'
+        env:
+          AZIMUT_INSTALLER_SEULEMENT: "1"
+        run: |
+          rm -rf venv
+          if [ "$RUNNER_OS" = "macOS" ]; then ./Azimut.app/Contents/MacOS/azimut; else ./azimut.sh; fi
+          ./venv/bin/python -c "import serveur, cvs, pieces_liees; print('lanceur OK')"
+          # un deuxième lancement ne réinstalle rien
+          ./azimut.sh
+      - name: Lanceur Windows
+        if: runner.os == 'Windows'
+        shell: cmd
+        env:
+          AZIMUT_INSTALLER_SEULEMENT: "1"
+        run: |
+          if exist venv rmdir /s /q venv
+          call Azimut.bat
+          venv\Scripts\python.exe -c "import serveur, cvs, pieces_liees; print('lanceur OK')"

@@ -57,5 +57,11 @@ if errorlevel 1 (
     copy /y requirements.txt "venv\.requirements-installed" >nul
 )
 
+rem Mode "installer seulement" (utilise par la CI) : AZIMUT_INSTALLER_SEULEMENT=1 s'arrete ici.
+if defined AZIMUT_INSTALLER_SEULEMENT (
+    echo Installation terminee.
+    exit /b 0
+)
+
 echo Ouverture de la fenetre Azimut...
 start "" "venv\Scripts\pythonw.exe" app_bureau.py

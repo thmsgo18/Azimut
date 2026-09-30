@@ -36,6 +36,15 @@ class TestLanceurs(unittest.TestCase):
                 self.assertRegex(texte, r"(cmp -s|fc /b) requirements\.txt")
                 self.assertIn("pip", texte)
 
+    def test_chaque_lanceur_a_un_mode_installer_seulement_pour_la_ci(self):
+        """La CI exécute vraiment les lanceurs sur les 3 systèmes, sans ouvrir de fenêtre."""
+        for lanceur in TOUS:
+            with self.subTest(lanceur.name):
+                self.assertIn("AZIMUT_INSTALLER_SEULEMENT", lanceur.read_text(encoding="utf-8"))
+        workflow = (PROJET / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+        self.assertIn("Azimut.bat", workflow)
+        self.assertIn("azimut.sh", workflow)
+
     def test_chaque_lanceur_verifie_la_version_de_python(self):
         for lanceur in TOUS:
             with self.subTest(lanceur.name):

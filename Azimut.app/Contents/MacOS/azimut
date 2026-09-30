@@ -56,4 +56,11 @@ if ! cmp -s requirements.txt venv/.requirements-installed 2>/dev/null; then
     cp requirements.txt venv/.requirements-installed
 fi
 
+# Mode « installer seulement » (utilisé par la CI, ou pour préparer un poste sans ouvrir la
+# fenêtre) : AZIMUT_INSTALLER_SEULEMENT=1 s'arrête une fois l'environnement prêt.
+if [ -n "$AZIMUT_INSTALLER_SEULEMENT" ]; then
+    echo "Installation terminée."
+    exit 0
+fi
+
 exec ./venv/bin/python app_bureau.py
