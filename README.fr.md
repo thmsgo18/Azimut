@@ -263,7 +263,7 @@ Une fiche prépare un entretien pour **une ou plusieurs offres d'une même entre
 
 ### Notes d'entretien
 
-Une vraie prise de notes, sur **une entreprise ou une offre précise**, en **Markdown avec rendu en direct** : écris à gauche, le résultat s'affiche à droite. Gras, italique, titres, listes à puces ou numérotées (qui se poursuivent quand tu appuies sur Entrée), **cases à cocher** cliquables, citations, liens, tableaux. Une barre d'outils et les raccourcis <kbd>⌘B</kbd> / <kbd>⌘I</kbd> aident si tu ne connais pas la syntaxe. Trois affichages : *Écrire*, *Côte à côte*, *Aperçu* ; le contexte de l'offre (texte, lettres, fiches) s'affiche à côté si tu le souhaites. L'enregistrement est automatique.
+Une vraie prise de notes, sur **une entreprise ou une offre précise**, en **Markdown avec rendu en direct** : écris à gauche, le résultat s'affiche à droite. Gras, italique, titres, listes à puces ou numérotées (qui se poursuivent quand tu appuies sur Entrée), **cases à cocher** cliquables, citations, liens, tableaux. Une barre d'outils et les raccourcis <kbd>⌘B</kbd> / <kbd>⌘I</kbd> aident si tu ne connais pas la syntaxe. Trois affichages : *Écrire*, *Côte à côte*, *Aperçu* ; le contexte de l'offre (texte, lettres, fiches) s'affiche à côté si tu le souhaites. L'enregistrement est automatique, une note s'**exporte en PDF** en un clic, et **elle se crée toute seule** : donne une date d'entretien à une offre et une note vide, datée de ce jour, t'attend (elle suit la date si l'entretien est décalé).
 
 <p align="center"><img src="docs/screenshot-entretien.png" width="760" alt="Note d'entretien en Markdown avec rendu en direct"></p>
 

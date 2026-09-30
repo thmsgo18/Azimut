@@ -101,10 +101,11 @@ entreprises_similaires(nom, exclure_id=None) / paires_entreprises_suspectes()
 
 # candidatures.py - alimente automatiquement le journal (evenements.py)
 verifier_doublon_candidature(entreprise_nom, poste) -> id | None
-ajouter_candidature(entreprise_nom, poste, **champs) -> id
+ajouter_candidature(entreprise_nom, poste, note_entretien=True, **champs) -> id   # avec date_entretien : note créée aussi
 # déclenche aussi sauvegarde.sauvegarder_base() tous les INTERVALLE_SAUVEGARDE_AUTO
 # (4) candidatures - best effort, ne lève jamais si la sauvegarde échoue
-modifier_candidature(id, **champs)         # changement de statut → événement journalisé
+modifier_candidature(id, **champs)         # changement de statut → événement journalisé ; une date_entretien
+                                           # nouvelle crée la note d'entretien de ce jour (note_entretien=False pour l'éviter)
 supprimer_candidature(id)                  # supprime son journal ; les documents, lettres, fiches
                                            # et notes qui la visaient sont CONSERVÉS (lien retiré)
 lister_candidatures(statut=None, sous_domaine=None)
@@ -177,6 +178,12 @@ modifier_fiche(...) / supprimer_fiche(id)          # `donnees` = dict décrit da
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / recuperer_note(id)
 modifier_note(id, titre=, contenu=, date_entretien=, entreprise=, candidature_id=) / supprimer_note(id)
+assurer_note_entretien(candidature_id) -> id | None   # la note de la date d'entretien de l'offre : créée (vide,
+    # « Entretien - poste »), ou l'ancienne note restée vide déplacée à la nouvelle date ; jamais de doublon, jamais
+    # une note remplie déplacée. Appelée toute seule par ajouter_candidature / modifier_candidature (voir plus bas).
+
+# notes_pdf.py - export PDF d'une note (reportlab, pur Python) : le Markdown est mis en page comme à l'écran
+notes_pdf.generer_pdf(note, chemin_sortie=None) -> octets     # `note` = recuperer_note(id) ; CLI : cli.py notes pdf ID
 
 # agent.py + generation.py - génération par IA (jamais d'écriture depuis agent.py)
 agent.generer_lettre_motivation(entreprise_nom, cv_texte, offres=None, langue=None, generale=False) -> texte

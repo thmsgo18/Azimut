@@ -30,6 +30,7 @@ import import_csv
 import import_excel
 import lettres
 import notes_entretien
+import notes_pdf
 from exceptions import ErreurSuivi
 
 
@@ -366,6 +367,10 @@ def construire_analyseur():
 
     voir = actions.add_parser("voir", help="Afficher une note d'entretien")
     voir.add_argument("id", type=int, help="Numéro de la note")
+
+    pdf = actions.add_parser("pdf", help="Exporter une note d'entretien en PDF")
+    pdf.add_argument("id", type=int, help="Numéro de la note")
+    pdf.add_argument("--sortie", help="Fichier PDF à écrire (défaut : titre de la note, dans le dossier courant)")
 
     supprimer = actions.add_parser("supprimer", help="Supprimer une note d'entretien")
     supprimer.add_argument("id", type=int, help="Numéro de la note")
@@ -821,6 +826,11 @@ def _executer_notes(args, chemin_db):
             print(f"  Entretien le : {_date_fr(note['date_entretien'])}")
         print()
         print(note["contenu"])
+    elif args.action == "pdf":
+        note = notes_entretien.recuperer_note(args.id, chemin_db=chemin_db)
+        sortie = Path(args.sortie).expanduser() if args.sortie else Path(notes_pdf.nom_de_fichier(note['titre']))
+        notes_pdf.generer_pdf(note, sortie)
+        print(f"✓ Note n°{args.id} exportée : {sortie}")
     elif args.action == "supprimer":
         notes_entretien.supprimer_note(args.id, chemin_db=chemin_db)
         print(f"✓ Note n°{args.id} supprimée.")

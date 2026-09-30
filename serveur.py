@@ -36,6 +36,7 @@ import import_csv
 import import_excel
 import lettres
 import notes_entretien
+import notes_pdf
 import rapide
 import recherche
 import reglages
@@ -700,6 +701,16 @@ def api_notes_voir(numero):
 def api_notes_modifier(numero):
     donnees = request.get_json(silent=True) or {}
     return jsonify(notes_entretien.modifier_note(numero, **donnees))
+
+
+@app.route("/api/notes/<int:numero>/pdf")
+def api_notes_pdf(numero):
+    """La note (Markdown) mise en page en PDF, à télécharger."""
+    note = notes_entretien.recuperer_note(numero)
+    return send_file(
+        io.BytesIO(notes_pdf.generer_pdf(note)), mimetype="application/pdf", as_attachment=True,
+        download_name=_nom_fichier_ascii(f"{note['titre']}.pdf"),
+    )
 
 
 @app.route("/api/notes/<int:numero>", methods=["DELETE"])

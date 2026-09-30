@@ -263,7 +263,7 @@ A sheet prepares an interview for **one or more jobs at the same company**: comp
 
 ### Interview notes
 
-Real note-taking, on **a company or one specific job**, in **Markdown with live rendering**: write on the left, the result shows on the right. Bold, italic, headings, bullet or numbered lists (which continue when you press Enter), clickable **checkboxes**, quotes, links, tables. A toolbar and the <kbd>⌘B</kbd> / <kbd>⌘I</kbd> shortcuts help if you don't know the syntax. Three layouts: *Write*, *Side by side*, *Preview*; the job's context (text, letters, sheets) can show alongside. Saving is automatic.
+Real note-taking, on **a company or one specific job**, in **Markdown with live rendering**: write on the left, the result shows on the right. Bold, italic, headings, bullet or numbered lists (which continue when you press Enter), clickable **checkboxes**, quotes, links, tables. A toolbar and the <kbd>⌘B</kbd> / <kbd>⌘I</kbd> shortcuts help if you don't know the syntax. Three layouts: *Write*, *Side by side*, *Preview*; the job's context (text, letters, sheets) can show alongside. Saving is automatic, a note **exports as a PDF** in one click, and **it creates itself**: give a job an interview date and an empty note dated that day is waiting for you (it follows the date if the interview moves).
 
 <p align="center"><img src="docs/screenshot-entretien.png" width="760" alt="Interview note in Markdown with live rendering"></p>
 

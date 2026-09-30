@@ -104,7 +104,7 @@ Five sections help you prepare and keep track of everything around a job: **Docu
 - **Preview in a window**: clicking a row opens a window - never the whole page - with the PDF (or the image) and, when there is one, a **Text** tab (to copy, or to download as `.md`). You can edit the title, the type (documents) or the linked jobs there, or delete. Deleting a job never deletes its documents, letters, sheets or notes: only the link is removed.
 - **Downloads**: a direct link to a PDF would make the native window navigate to the file with no way back; Azimut goes through the system's "Save as" box instead (and a regular download in a browser).
 
-**Interviews** is note-taking: one note per interview, on **a company or one specific job** (one or the other, never both), with a title, a date and a large text field **saved as you type** (and when you leave the page). The text is written in **Markdown with live rendering**: headings, bold, italic, strikethrough, bullet or numbered lists (which continue with Enter, Tab to nest them), clickable **checkboxes** in the rendering, quotes, code, links, tables. A toolbar and the ⌘B / ⌘I (Ctrl+B / Ctrl+I) shortcuts help; three layouts (*Write*, *Side by side*, *Preview*) and a context panel (the company, the job, ready documents, letters and sheets) are remembered. Whatever you type is escaped before being formatted: no HTML tag ever runs.
+**Interviews** is note-taking: one note per interview, on **a company or one specific job** (one or the other, never both), with a title, a date and a large text field **saved as you type** (and when you leave the page). The text is written in **Markdown with live rendering**: headings, bold, italic, strikethrough, bullet or numbered lists (which continue with Enter, Tab to nest them), clickable **checkboxes** in the rendering, quotes, code, links, tables. A toolbar and the ⌘B / ⌘I (Ctrl+B / Ctrl+I) shortcuts help; three layouts (*Write*, *Side by side*, *Preview*) and a context panel (the company, the job, ready documents, letters and sheets) are remembered. Whatever you type is escaped before being formatted: no HTML tag ever runs. **Export as PDF** turns a note into a clean document (same layout rules, page numbers) through the native "Save as" window - `python cli.py notes pdf 3` does the same from a terminal. **The note creates itself**: as soon as a job gets an interview date (in its window, the CLI, the API), an empty note titled "Interview - job", dated that day, is linked to it; if the interview moves and the note is still empty, it moves too, and anything you wrote is never touched.
 
 **Résumé** gathers **your résumés**. Each can have a **file** (PDF, Word or text: to download, to send; its text copies in one click), an **editable source** on your computer - a LaTeX project's folder, a `.tex` file or a Word file - and a pasted text. Azimut **never** touches the source: it keeps the path (to copy, or to open from the app), re-reads the text every time - the résumé evolves between two letters - and tells the AI where to read it and where to edit it. The **main résumé** is the one the AI reads by default; you can pick another for each generation. If the source is no longer reachable (another machine, a moved folder), the file's text takes over.
 
@@ -179,6 +179,7 @@ python cli.py fiches ajouter --entreprise "Atelier Boréal" --json sheet.json --
 python cli.py notes ajouter --candidature-id 12 --titre "Technical interview" --contenu "Questions about evals."
 python cli.py notes lister --entreprise "AgentikCo"
 python cli.py notes voir 3
+python cli.py notes pdf 3 --sortie note.pdf   # export a note as a PDF
 python cli.py documents importer --entreprise "Wavestone" --poste "Stage IA" --fichier offer.pdf --type "Offre (PDF)"
 python cli.py documents modifier 3 --candidature-id 67 --candidature-id 68   # replaces the linked jobs
 python cli.py cv ajouter --nom "French résumé" --langue fr --fichier cv.pdf --source ~/Documents/cv-fr
@@ -303,6 +304,8 @@ ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiche
 # notes_entretien.py - linked to a company OR one specific job
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
+assurer_note_entretien(candidature_id) -> id | None   # the note for the job's interview date (created automatically, see below)
+notes_pdf.generer_pdf(note, chemin_sortie=None) -> bytes   # PDF export of a note; CLI: cli.py notes pdf ID
 
 # documents.py - any file, linked to ONE company and to ONE OR MORE of its jobs
 importer_document(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None, generale=None, type_document=None) -> id
@@ -355,6 +358,7 @@ azimut/
   fiches.py         # interview sheets (data -> PDF, or an imported file kept as is)
   fiches_pdf.py     # PDF rendering of a sheet (reportlab, same PDF on all 3 OSes)
   notes_entretien.py # interview notes (Markdown): one company OR one specific job
+  notes_pdf.py      # PDF export of a note (reportlab, same PDF on all 3 OSes)
   cvs.py            # résumés: file, editable source (LaTeX / Word), main résumé read by the AI
   generation.py     # AI generation: checks everything BEFORE calling the AI, then saves
   guides_ia.py      # reads the skills/*/AGENT.md guides: their rules block is also the API prompt

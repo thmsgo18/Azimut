@@ -104,7 +104,7 @@ Cinq sections servent à préparer et à garder trace de tout ce qui entoure une
 - **Aperçu en fenêtre** : cliquer une ligne ouvre une fenêtre - jamais la page entière - avec le PDF (ou l'image) et, quand il y en a un, un onglet **Texte** (à copier, ou à télécharger en `.md`). On peut y modifier le titre, le type (documents) ou les offres liées, ou supprimer. Supprimer une offre ne supprime jamais ses documents, lettres, fiches ni notes : seul le lien est retiré.
 - **Téléchargements** : un lien direct vers un PDF ferait naviguer la fenêtre native vers le fichier sans retour possible ; Azimut passe donc par la boîte « Enregistrer sous » du système (et par un téléchargement normal dans un navigateur).
 
-**Entretiens** est une prise de notes : une note par entretien, sur **une entreprise ou une offre précise** (au choix, jamais les deux), avec un titre, une date et un grand champ de texte **enregistré au fil de la frappe** (et à la sortie de la page). Le texte s'écrit en **Markdown avec rendu en direct** : titres, gras, italique, barré, listes à puces ou numérotées (qui se poursuivent avec Entrée, Tab pour les imbriquer), **cases à cocher** cliquables dans le rendu, citations, code, liens, tableaux. Une barre d'outils et les raccourcis ⌘B / ⌘I (Ctrl+B / Ctrl+I) aident ; trois affichages (*Écrire*, *Côte à côte*, *Aperçu*) et un panneau de contexte (l'entreprise, l'offre, les documents, lettres et fiches prêts) se règlent une fois pour toutes. Tout ce qui est tapé est échappé avant d'être mis en forme : aucune balise HTML ne s'exécute.
+**Entretiens** est une prise de notes : une note par entretien, sur **une entreprise ou une offre précise** (au choix, jamais les deux), avec un titre, une date et un grand champ de texte **enregistré au fil de la frappe** (et à la sortie de la page). Le texte s'écrit en **Markdown avec rendu en direct** : titres, gras, italique, barré, listes à puces ou numérotées (qui se poursuivent avec Entrée, Tab pour les imbriquer), **cases à cocher** cliquables dans le rendu, citations, code, liens, tableaux. Une barre d'outils et les raccourcis ⌘B / ⌘I (Ctrl+B / Ctrl+I) aident ; trois affichages (*Écrire*, *Côte à côte*, *Aperçu*) et un panneau de contexte (l'entreprise, l'offre, les documents, lettres et fiches prêts) se règlent une fois pour toutes. Tout ce qui est tapé est échappé avant d'être mis en forme : aucune balise HTML ne s'exécute. **Exporter en PDF** transforme une note en document propre (mêmes règles de mise en page, numéros de page) via la fenêtre native « Enregistrer sous » - `python cli.py notes pdf 3` fait pareil depuis un terminal. **La note se crée toute seule** : dès qu'une offre reçoit une date d'entretien (dans sa fenêtre, la CLI, l'API), une note vide « Entretien - poste », datée de ce jour, lui est liée ; si l'entretien est décalé et que la note est restée vide, elle suit ; ce que tu as écrit n'est jamais touché.
 
 **CV** rassemble **tes CV**. Chacun peut avoir un **fichier** (PDF, Word ou texte : à télécharger, à envoyer ; son texte se copie en un clic), une **source modifiable** sur ton ordinateur - le dossier d'un projet LaTeX, un fichier `.tex` ou un fichier Word - et un texte collé. Azimut ne touche **jamais** à la source : il garde le chemin (à copier, ou à ouvrir depuis l'appli), relit le texte à chaque fois - le CV évolue entre deux lettres - et dit à l'IA où le lire et où le modifier. Le **CV principal** est celui que l'IA lit par défaut ; on peut en choisir un autre à chaque génération. Si la source n'est plus accessible (autre machine, dossier déplacé), le texte du fichier prend le relais.
 
@@ -179,6 +179,7 @@ python cli.py fiches ajouter --entreprise "Atelier Boréal" --json fiche.json --
 python cli.py notes ajouter --candidature-id 12 --titre "Entretien technique" --contenu "Questions sur les évals."
 python cli.py notes lister --entreprise "AgentikCo"
 python cli.py notes voir 3
+python cli.py notes pdf 3 --sortie note.pdf   # exporter une note en PDF
 python cli.py documents importer --entreprise "Wavestone" --poste "Stage IA" --fichier offre.pdf --type "Offre (PDF)"
 python cli.py documents modifier 3 --candidature-id 67 --candidature-id 68   # remplace les offres liées
 python cli.py cv ajouter --nom "CV français" --langue fr --fichier cv.pdf --source ~/Documents/cv-fr
@@ -303,6 +304,8 @@ ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiche
 # notes_entretien.py - liées à une entreprise OU à une offre précise
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
+assurer_note_entretien(candidature_id) -> id | None   # la note de la date d'entretien de l'offre (créée automatiquement, voir plus bas)
+notes_pdf.generer_pdf(note, chemin_sortie=None) -> octets   # export PDF d'une note ; CLI : cli.py notes pdf ID
 
 # documents.py - tout fichier, lié à UNE entreprise et à UNE OU PLUSIEURS de ses offres
 importer_document(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None, generale=None, type_document=None) -> id
@@ -355,6 +358,7 @@ azimut/
   fiches.py         # fiches d'entretien (données -> PDF, ou fichier importé tel quel)
   fiches_pdf.py     # rendu PDF d'une fiche (reportlab, mêmes PDF sur les 3 OS)
   notes_entretien.py # notes d'entretien (Markdown) : une entreprise OU une offre précise
+  notes_pdf.py      # export PDF d'une note (reportlab, mêmes PDF sur les 3 OS)
   cvs.py            # les CV : fichier, source modifiable (LaTeX / Word), CV principal lu par l'IA
   generation.py     # génération par IA : vérifie tout AVANT d'appeler l'IA, puis enregistre
   guides_ia.py      # lit les guides skills/*/AGENT.md : le bloc de règles sert aussi de consigne à l'API

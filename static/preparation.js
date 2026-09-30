@@ -1150,6 +1150,7 @@ async function vueEditeurNote(id) {
       <button class="btn" onclick="location.hash='#/entretiens'">${t("entretiens.retour")}</button>
       <div style="flex:1;"></div>
       <span class="sous-titre" id="indicateur-note"></span>
+      <button class="btn" id="btn-pdf-note">${t("entretiens.exporter_pdf")}</button>
       <button class="btn btn-danger" id="btn-supprimer-note">${t("commun.supprimer")}</button>
     </div>
     <div class="editeur-note${contexteOuvert ? "" : " sans-contexte"}">
@@ -1405,6 +1406,10 @@ function activerEditeurNote(id) {
   });
   date.addEventListener("change", () => envoyer({ date_entretien: date.value || null }));
 
+  document.getElementById("btn-pdf-note").addEventListener("click", async () => {
+    await enregistrer(); // le PDF reflète ce qui vient d'être tapé
+    await telechargerFichier(`/api/notes/${id}/pdf`, `${titre.value.trim() || "note"}.pdf`);
+  });
   document.getElementById("btn-supprimer-note").addEventListener("click", async () => {
     const accord = await confirmer(t("entretiens.supprimer_titre"), t("entretiens.supprimer_texte"));
     if (!accord) return;
