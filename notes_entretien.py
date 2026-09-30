@@ -89,6 +89,43 @@ _SELECTION = (
 )
 
 
+def titre_note_entretien(poste):
+    """Le titre des notes créées automatiquement pour la date d'un entretien."""
+    return f"Entretien - {poste}"
+
+
+def assurer_note_entretien(candidature_id, chemin_db=None):
+    """Une note d'entretien existe pour la date d'entretien de cette offre.
+
+    - pas de date d'entretien, ou une note de l'offre porte déjà cette date : rien à faire ;
+    - une note créée automatiquement et jamais remplie (titre « Entretien - poste », vide)
+      existe pour une ancienne date : elle prend la nouvelle (entretien reporté) ;
+    - sinon : une nouvelle note vide, datée du jour de l'entretien, liée à l'offre.
+
+    Ce que l'utilisateur a écrit n'est jamais déplacé ni supprimé. Retourne l'id de la note
+    créée ou déplacée, ou None."""
+    conn = db.ouvrir(chemin_db)
+    try:
+        ligne = conn.execute(
+            "SELECT poste, date_entretien FROM candidatures WHERE id = ?", (candidature_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    if ligne is None:
+        raise EntiteIntrouvable(f"Aucune candidature avec l'id {candidature_id}.")
+    date, titre = ligne["date_entretien"], titre_note_entretien(ligne["poste"])
+    if not date:
+        return None
+    existantes = lister_notes(candidature_id=candidature_id, chemin_db=chemin_db)
+    if any(n["date_entretien"] == date for n in existantes):
+        return None
+    for note in existantes:
+        if note["titre"] == titre and not (note["contenu"] or "").strip():
+            modifier_note(note["id"], date_entretien=date, chemin_db=chemin_db)
+            return note["id"]
+    return ajouter_note(candidature_id=candidature_id, titre=titre, date_entretien=date, chemin_db=chemin_db)
+
+
 def lister_notes(entreprise_id=None, candidature_id=None, recherche=None, chemin_db=None):
     """Notes les plus récentes d'abord (date d'entretien si renseignée, sinon
     date de création). `entreprise_id` inclut les notes de ses offres ;

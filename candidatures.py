@@ -69,12 +69,15 @@ def verifier_doublon_candidature(entreprise_nom, poste, chemin_db=None):
         conn.close()
 
 
-def ajouter_candidature(entreprise_nom, poste, chemin_db=None, **champs):
+def ajouter_candidature(entreprise_nom, poste, chemin_db=None, note_entretien=True, **champs):
     """Ajoute une candidature et retourne son id.
 
     - Crée l'entreprise si elle n'existe pas encore (sans doublon).
     - Lève DoublonCandidature si une candidature (entreprise, poste) existe déjà.
     - Valide tous les champs optionnels (valeurs autorisées, dates, entiers).
+    - Avec une date d'entretien, crée la note d'entretien de cette date
+      (notes_entretien.assurer_note_entretien) - sauf `note_entretien=False`, pour les
+      imports, qui apportent leurs propres notes.
     """
     if not poste or not str(poste).strip():
         raise ValeurNonAutorisee("L'intitulé du poste est obligatoire.")
@@ -109,6 +112,10 @@ def ajouter_candidature(entreprise_nom, poste, chemin_db=None, **champs):
         total = conn.execute("SELECT COUNT(*) FROM candidatures").fetchone()[0]
     finally:
         conn.close()
+    if note_entretien and valides.get("date_entretien"):
+        import notes_entretien
+
+        notes_entretien.assurer_note_entretien(nouvel_id, chemin_db=chemin_db)
     if total % INTERVALLE_SAUVEGARDE_AUTO == 0:
         try:
             sauvegarde.sauvegarder_base(chemin_db=chemin_db)
@@ -117,9 +124,11 @@ def ajouter_candidature(entreprise_nom, poste, chemin_db=None, **champs):
     return nouvel_id
 
 
-def modifier_candidature(id_candidature, chemin_db=None, **champs):
+def modifier_candidature(id_candidature, chemin_db=None, note_entretien=True, **champs):
     """Modifie une candidature existante. Champs modifiables : ceux du modèle
-    (statut, date_entretien, notes, ...) - jamais id ni entreprise_id."""
+    (statut, date_entretien, notes, ...) - jamais id ni entreprise_id. Quand la date
+    d'entretien change, la note d'entretien de cette date est créée (ou l'ancienne, restée
+    vide, est déplacée) : voir notes_entretien.assurer_note_entretien."""
     valides = valider_champs("candidatures", champs)
     if not valides:
         raise ValeurNonAutorisee("Aucun champ à modifier n'a été fourni.")
@@ -141,9 +150,14 @@ def modifier_candidature(id_candidature, chemin_db=None, **champs):
         )
         _journaliser_modifications(conn, id_candidature, actuelle, valides)
         conn.commit()
-        return id_candidature
+        date_changee = bool(valides.get("date_entretien")) and valides["date_entretien"] != actuelle["date_entretien"]
     finally:
         conn.close()
+    if note_entretien and date_changee:
+        import notes_entretien
+
+        notes_entretien.assurer_note_entretien(id_candidature, chemin_db=chemin_db)
+    return id_candidature
 
 
 def lister_candidatures(statut=None, sous_domaine=None, chemin_db=None):

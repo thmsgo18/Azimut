@@ -1114,6 +1114,7 @@ async function ouvrirDetailCandidature(numero) {
     api(`/api/candidatures/${numero}/evenements`),
   ]);
   const annexes = await chargerAnnexes();
+  let nbNotes = annexes[2].length;
 
   const lienOffre = () => (cand.lien_offre
     ? `<a class="btn btn-mini" id="detail-ouvrir-offre" href="${echapperAttribut(cand.lien_offre)}" target="_blank" rel="noopener">${t("candidatures.voir_offre")}</a>${cand.lien_dernier_etat === "mort" ? ` <span class="puce puce-lien-mort">${t("candidatures.lien_mort")}</span>` : ""}`
@@ -1204,13 +1205,21 @@ async function ouvrirDetailCandidature(numero) {
         await rafraichirAnnexes();
       }
       if (nom === "lien_offre") zone.racine.querySelector("#detail-lien-actions").innerHTML = lienOffre();
+      if (nom === "date_entretien") {
+        // Azimut crée (ou déplace) tout seul la note d'entretien de cette date.
+        const avant = nbNotes;
+        await rafraichirAnnexes();
+        if (nbNotes > avant) toast(t("candidatures.note_entretien_creee"));
+      }
     },
   });
 
   async function rafraichirAnnexes() {
     const conteneur = zone.racine.querySelector("#detail-annexes");
     if (!conteneur) return;
-    conteneur.innerHTML = annexesCandidature(numero, ...(await chargerAnnexes()));
+    const donnees = await chargerAnnexes();
+    nbNotes = donnees[2].length;
+    conteneur.innerHTML = annexesCandidature(numero, ...donnees);
     brancherAnnexes();
   }
 

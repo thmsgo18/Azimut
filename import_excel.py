@@ -192,7 +192,7 @@ def importer_excel(chemin_fichier, chemin_db=None):
                     f"Candidatures ligne {numero} : « {poste} » chez {entreprise} existe déjà."
                 )
                 continue
-            id_candidature = ajouter_candidature(entreprise, poste, chemin_db=chemin_db, **valeurs)
+            id_candidature = ajouter_candidature(entreprise, poste, chemin_db=chemin_db, note_entretien=False, **valeurs)
             rapport["candidatures_ajoutees"] += 1
             if ancienne_note and str(ancienne_note).strip():
                 ajouter_note(

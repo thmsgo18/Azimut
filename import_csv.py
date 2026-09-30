@@ -108,7 +108,7 @@ def importer_csv(chemin_fichier, correspondance, valeurs_fixes=None, chemin_db=N
                     f"Ligne {numero} : « {poste} » chez {entreprise} existe déjà."
                 )
                 continue
-            ajouter_candidature(entreprise, poste, chemin_db=chemin_db, **valeurs)
+            ajouter_candidature(entreprise, poste, chemin_db=chemin_db, note_entretien=False, **valeurs)
             rapport["candidatures_ajoutees"] += 1
         except ErreurSuivi as erreur:
             rapport["erreurs"].append(f"Ligne {numero} : {erreur}")
