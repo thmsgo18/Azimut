@@ -234,6 +234,8 @@ Une candidature, c'est **une offre chez une entreprise**. Elle avance dans un cy
 - **Entreprises** - créées automatiquement avec les candidatures, avec un contexte (actus, missions, équipe) et une détection de doublons qui repère « Mistral » vs « Mistral AI ». Ouvre une entreprise : ses candidatures, documents, lettres, fiches et notes sont réunis, et son nom, son site ou son contexte se modifient directement, sans bouton « Modifier ».
 - **Documents** - n'importe quel fichier (offre en PDF, CV et lettre envoyés, portfolio, scan…), conservé tel quel. Comme pour les lettres, on choisit **une entreprise** et **une ou plusieurs de ses offres** (ou l'entreprise en général) avec la même barre de recherche, et on peut en déposer **plusieurs d'un coup**. Un clic ouvre l'**aperçu dans une fenêtre** (PDF, image, texte) - jamais en plein écran - et leur texte est retrouvé par la recherche globale.
 
+<p align="center"><img src="docs/screenshot-entreprise.png" width="760" alt="Fenêtre d'une entreprise : nom, site, contexte modifiables sur place, puis ses candidatures et ses fichiers"></p>
+
 <p align="center"><img src="docs/screenshot-documents.png" width="760" alt="Documents rattachés à une entreprise et à ses offres"></p>
 
 ### Lettres de motivation
@@ -267,6 +269,10 @@ Une vraie prise de notes, sur **une entreprise ou une offre précise**, en **Mar
 
 <p align="center"><img src="docs/screenshot-entretien.png" width="760" alt="Note d'entretien en Markdown avec rendu en direct"></p>
 
+Le bouton **Exporter en PDF** transforme la note en document propre - cases à cocher, listes, tableaux et liens compris :
+
+<p align="center"><img src="docs/screenshot-note-pdf.png" width="560" alt="Une note exportée en PDF"></p>
+
 ### CV
 
 Une section pour **tes CV** - le français, l'anglais, celui orienté data : le **fichier** (à télécharger, à envoyer), son **texte** (à copier en un clic), et surtout **où il se modifie** : le dossier de ton projet LaTeX, ou ton fichier Word. Azimut n'y touche jamais, il garde juste le chemin (à copier, ou à ouvrir depuis l'appli). C'est ce qui permet à une IA de **lire le texte brut à jour** et de **savoir où aller le modifier** si tu le lui demandes. Le **CV principal** est celui qu'elle lit pour rédiger tes lettres et adapter tes fiches.
@@ -278,11 +284,13 @@ Une section pour **tes CV** - le français, l'anglais, celui orienté data : le 
 - **Tableau de bord & statistiques** - entonnoir, délais, taux de réponse par source, courbe hebdomadaire, objectif hebdo.
 - **Recherche globale** (<kbd>⌘K</kbd>) - candidatures, entreprises, notes, documents, lettres et fiches, textes compris.
 - **Saisie assistée par IA** (optionnelle, tout fournisseur) - colle une offre, le formulaire se pré-remplit. Rien n'est écrit sans ta confirmation.
-- **Sauvegarde complète et restauration** (Réglages) : une seule archive `.zip` avec la base **et tous les fichiers** (documents, lettres, fiches, CV) - pour changer d'ordinateur ou se remettre d'un pépin. La restauration vérifie l'archive d'abord, n'écrase jamais un fichier et garde ton état précédent de côté.
+- **Sauvegarde complète et restauration** (Réglages, ci-dessous) : une seule archive `.zip` avec la base **et tous les fichiers** (documents, lettres, fiches, CV) - pour changer d'ordinateur ou se remettre d'un pépin. La restauration vérifie l'archive d'abord, n'écrase jamais un fichier et garde ton état précédent de côté.
 - **Export/import Excel**, sauvegardes automatiques de la base (avant toute migration, une copie de sécurité est prise).
 - **100 % local** - rien ne quitte ta machine, sauf export explicite ou activation de l'assistant IA.
 
 Quelques extras (vue compagnon iPhone/iPad, capture rapide depuis Safari) sont détaillés dans [la doc complète](#docs).
+
+<p align="center"><img src="docs/screenshot-sauvegarde.png" width="620" alt="Réglages : sauvegarde complète et restauration"></p>
 
 ## Les skills IA à télécharger
 

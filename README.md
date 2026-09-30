@@ -234,6 +234,8 @@ An application is **one job at one company**. It moves through a simple cycle, a
 - **Companies** - created automatically with applications, with a context (news, missions, team) and duplicate detection that catches "Mistral" vs "Mistral AI". Open a company: its applications, documents, letters, sheets and notes are gathered, and its name, website or context are edited right there, with no "Edit" button.
 - **Documents** - any file (job posting as a PDF, résumé and letter you sent, portfolio, scan…), kept as is. As for letters, you pick **one company** and **one or more of its jobs** (or the company in general) with the same search bar, and you can drop **several files at once**. A click opens the **preview in a window** (PDF, image, text) - never full screen - and their text is found by the global search.
 
+<p align="center"><img src="docs/screenshot-entreprise.png" width="760" alt="A company's window: name, website, context edited in place, then its applications and files"></p>
+
 <p align="center"><img src="docs/screenshot-documents.png" width="760" alt="Documents attached to a company and its jobs"></p>
 
 ### Cover letters
@@ -267,6 +269,10 @@ Real note-taking, on **a company or one specific job**, in **Markdown with live 
 
 <p align="center"><img src="docs/screenshot-entretien.png" width="760" alt="Interview note in Markdown with live rendering"></p>
 
+The **Export as PDF** button turns the note into a clean document - checkboxes, lists, tables and links included:
+
+<p align="center"><img src="docs/screenshot-note-pdf.png" width="560" alt="A note exported as a PDF"></p>
+
 ### Résumés
 
 A section for **your résumés** - the French one, the English one, the data-oriented one: the **file** (to download, to send), its **text** (to copy in one click), and above all **where it is edited**: your LaTeX project's folder, or your Word file. Azimut never touches it, it only keeps the path (to copy, or to open from the app). That is what lets an AI **read the up-to-date raw text** and **know where to edit it** if you ask. The **main résumé** is the one it reads to write your letters and tailor your sheets.
@@ -278,11 +284,13 @@ A section for **your résumés** - the French one, the English one, the data-ori
 - **Dashboard & statistics** - funnel, delays, response rate by source, weekly chart, weekly goal.
 - **Global search** (<kbd>⌘K</kbd>) - applications, companies, notes, documents, letters and sheets, text included.
 - **AI-assisted entry** (optional, any provider) - paste a job posting, the form pre-fills. Nothing written without you confirming.
-- **Full backup and restore** (Settings): one `.zip` with the database **and every file** (documents, letters, sheets, résumés) - to change computer or recover from a mishap. Restoring checks the archive first, never overwrites a file, and keeps your previous state aside.
+- **Full backup and restore** (Settings, below): one `.zip` with the database **and every file** (documents, letters, sheets, résumés) - to change computer or recover from a mishap. Restoring checks the archive first, never overwrites a file, and keeps your previous state aside.
 - **Excel export/import**, automatic database backups (a safety copy is taken before any migration).
 - **100% local** - nothing leaves your machine unless you explicitly export or turn on the AI assistant.
 
 A few extras (iPhone/iPad companion view, quick capture from Safari) are detailed in [the full docs](#docs).
+
+<p align="center"><img src="docs/screenshot-sauvegarde.png" width="620" alt="Settings: full backup and restore"></p>
 
 ## AI skills to download
 
