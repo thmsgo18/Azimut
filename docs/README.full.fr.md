@@ -174,8 +174,8 @@ python cli.py entreprises fusionner 2 5               # garde n°2, fusionne n°
 python cli.py lettres importer --entreprise "CEA" --poste "Stage - Évaluation d'agents IA" --fichier ma-lettre.pdf
 python cli.py lettres ajouter --entreprise "AgentikCo" --fichier lettre.md --candidature-id 12 --candidature-id 14 --generale
 python cli.py lettres lister --recherche orchestration
-python cli.py fiches importer --entreprise "Takima" --fichier ma-fiche.pdf
-python cli.py fiches ajouter --entreprise "Takima" --json fiche.json --candidature-id 50   # Azimut fabrique le PDF
+python cli.py fiches importer --entreprise "Atelier Boréal" --fichier ma-fiche.pdf
+python cli.py fiches ajouter --entreprise "Atelier Boréal" --json fiche.json --candidature-id 50   # Azimut fabrique le PDF
 python cli.py notes ajouter --candidature-id 12 --titre "Entretien technique" --contenu "Questions sur les évals."
 python cli.py notes lister --entreprise "AgentikCo"
 python cli.py notes voir 3

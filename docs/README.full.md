@@ -174,8 +174,8 @@ python cli.py entreprises fusionner 2 5               # keeps #2, merges #5 into
 python cli.py lettres importer --entreprise "CEA" --poste "Stage - Évaluation d'agents IA" --fichier my-letter.pdf
 python cli.py lettres ajouter --entreprise "AgentikCo" --fichier letter.md --candidature-id 12 --candidature-id 14 --generale
 python cli.py lettres lister --recherche orchestration
-python cli.py fiches importer --entreprise "Takima" --fichier my-sheet.pdf
-python cli.py fiches ajouter --entreprise "Takima" --json sheet.json --candidature-id 50   # Azimut builds the PDF
+python cli.py fiches importer --entreprise "Atelier Boréal" --fichier my-sheet.pdf
+python cli.py fiches ajouter --entreprise "Atelier Boréal" --json sheet.json --candidature-id 50   # Azimut builds the PDF
 python cli.py notes ajouter --candidature-id 12 --titre "Technical interview" --contenu "Questions about evals."
 python cli.py notes lister --entreprise "AgentikCo"
 python cli.py notes voir 3

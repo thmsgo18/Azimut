@@ -6,7 +6,7 @@ du texte déjà prêt à afficher ; les champs `html` n'acceptent que <p>, <b>, 
 <ul>, <li>, <br> - le reste est ignoré) :
 
     {
-      "meta": {"company": "Takima",                      # obligatoire
+      "meta": {"company": "Atelier Boréal",                # obligatoire
                "subtitle", "candidate_line", "interview_date", "location",
                "mode", "website", "footer_name", "footer_context"},   # optionnels
       "company_overview": {                              # optionnel
