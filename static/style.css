@@ -1745,6 +1745,7 @@ textarea.zone-longue { min-height: 110px; max-height: 320px; resize: vertical; l
   font-size: 11.5px;
   font-weight: 650;
   color: var(--st-entretien);
+  background: var(--accent-doux);  /* repli pour un WebKit sans color-mix (macOS 12 et avant) */
   background: color-mix(in srgb, var(--st-entretien) 13%, transparent);
   padding: 2px 9px;
   border-radius: 999px;
@@ -1765,8 +1766,8 @@ textarea.zone-longue { min-height: 110px; max-height: 320px; resize: vertical; l
   width: 100%;
   color: inherit;
 }
-.cv-source.ok { border-color: color-mix(in srgb, var(--st-accepte) 35%, transparent); }
-.cv-source.absente { border-color: color-mix(in srgb, var(--st-entretien) 55%, transparent); }
+.cv-source.ok { border-color: var(--st-accepte); border-color: color-mix(in srgb, var(--st-accepte) 35%, transparent); }
+.cv-source.absente { border-color: var(--st-entretien); border-color: color-mix(in srgb, var(--st-entretien) 55%, transparent); }
 .cv-source-icone { color: var(--encre-2); display: grid; place-items: center; flex-shrink: 0; }
 .cv-source.ok .cv-source-icone { color: var(--st-accepte); }
 .cv-source.absente .cv-source-icone { color: var(--st-entretien); }
