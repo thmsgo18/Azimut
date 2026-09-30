@@ -8,7 +8,7 @@
   <p><b>Suivi de ta recherche de stage dans une vraie base de données locale, derrière une appli de bureau native - pas un énième tableur.</b></p>
 
   <p>
-    <a href="https://github.com/thmsgo18/azimut/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/thmsgo18/azimut/tests.yml?style=for-the-badge&label=tests" alt="Tests"></a>
+    <a href="https://github.com/thmsgo18/Azimut/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/thmsgo18/Azimut/tests.yml?style=for-the-badge&label=tests" alt="Tests"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-22c55e?style=for-the-badge" alt="Licence MIT"></a>
     <img src="https://img.shields.io/badge/plateforme-macOS%20%7C%20Windows%20%7C%20Linux-3d8ff0?style=for-the-badge" alt="Plateforme macOS, Windows, Linux">
   </p>
@@ -16,6 +16,7 @@
   <p>
     <a href="#installation">Installation</a> •
     <a href="#fonctionnalités">Fonctionnalités</a> •
+    <a href="#les-skills-ia-à-télécharger">Skills IA</a> •
     <a href="#ligne-de-commande--ia">CLI & IA</a> •
     <a href="#docs">Docs</a>
   </p>
@@ -34,7 +35,7 @@ Aucun compte, aucun cloud, aucun abonnement. Tout vit dans un seul fichier, sur 
 <table>
 <tr>
 <td width="50%"><img src="docs/screenshot-candidatures.png" alt="Liste des candidatures, statut modifiable en un clic"></td>
-<td width="50%"><img src="docs/screenshot-statistiques.png" alt="Statistiques"></td>
+<td width="50%"><img src="docs/screenshot-detail.png" alt="Fenêtre d'une candidature : chaque champ se modifie sur place"></td>
 </tr>
 </table>
 
@@ -44,8 +45,12 @@ Aucun compte, aucun cloud, aucun abonnement. Tout vit dans un seul fichier, sur 
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshot-lettres.png" alt="Lettres de motivation, liées à une offre ou à l'entreprise"></td>
-<td width="50%"><img src="docs/screenshot-entretien.png" alt="Note d'entretien enregistrée au fil de la frappe, avec le contexte de l'offre"></td>
+<td width="50%"><img src="docs/screenshot-lettres.png" alt="Lettres de motivation, liées à une ou plusieurs offres, ou à l'entreprise"></td>
+<td width="50%"><img src="docs/screenshot-entretien.png" alt="Note d'entretien en Markdown avec rendu en direct"></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/screenshot-fiches.png" alt="Fiches d'entretien"></td>
+<td width="50%"><img src="docs/screenshot-cv.png" alt="Section CV : fichier, source LaTeX ou Word, CV principal"></td>
 </tr>
 </table>
 
@@ -77,11 +82,11 @@ Tu peux fermer le Terminal, on n'en a plus besoin.
 
 **Étape 2 - Télécharger Azimut**
 
-1. Clique sur [**ce lien pour télécharger le ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip). Tu peux aussi aller sur [la page GitHub du projet](https://github.com/thmsgo18/azimut), cliquer sur le bouton vert **<> Code** puis sur **Download ZIP**.
+1. Clique sur [**ce lien pour télécharger le ZIP**](https://github.com/thmsgo18/Azimut/archive/refs/heads/main.zip). Tu peux aussi aller sur [la page GitHub du projet](https://github.com/thmsgo18/Azimut), cliquer sur le bouton vert **<> Code** puis sur **Download ZIP**.
 2. Ouvre le **Finder**, puis le dossier **Téléchargements** dans la barre latérale.
-   - Avec **Safari**, le ZIP est déjà décompressé : tu vois directement un dossier `azimut-main`.
-   - Avec **Chrome** ou **Firefox**, double-clique sur `azimut-main.zip` pour obtenir le dossier `azimut-main`.
-3. *(Conseillé)* Glisse le dossier `azimut-main` dans ton dossier **Documents** (ou ailleurs, mais pas dans la Corbeille). Tu peux le renommer `Azimut`.
+   - Avec **Safari**, le ZIP est déjà décompressé : tu vois directement un dossier `Azimut-main`.
+   - Avec **Chrome** ou **Firefox**, double-clique sur `Azimut-main.zip` pour obtenir le dossier `Azimut-main`.
+3. *(Conseillé)* Glisse le dossier `Azimut-main` dans ton dossier **Documents** (ou ailleurs, mais pas dans la Corbeille). Tu peux le renommer `Azimut`.
 
 **Étape 3 - Lancer Azimut**
 
@@ -117,10 +122,10 @@ Les lancements suivants sont instantanés. **Astuce :** glisse `Azimut.app` dans
 
 **Étape 2 - Télécharger Azimut**
 
-1. Clique sur [**ce lien pour télécharger le ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip). Tu peux aussi aller sur [la page GitHub](https://github.com/thmsgo18/azimut) → bouton vert **<> Code** → **Download ZIP**.
+1. Clique sur [**ce lien pour télécharger le ZIP**](https://github.com/thmsgo18/Azimut/archive/refs/heads/main.zip). Tu peux aussi aller sur [la page GitHub](https://github.com/thmsgo18/Azimut) → bouton vert **<> Code** → **Download ZIP**.
 2. Ouvre l'**Explorateur de fichiers** (icône dossier jaune dans la barre des tâches, ou <kbd>⊞ Win</kbd> + <kbd>E</kbd>), puis **Téléchargements**.
-3. **Fais un clic droit** sur `azimut-main.zip` → **Extraire tout…** → **Extraire**. Un dossier `azimut-main` apparaît. Ne lance pas Azimut depuis l'intérieur du ZIP, ça ne fonctionnerait pas.
-4. *(Conseillé)* Déplace le dossier `azimut-main` dans **Documents**. Tu peux le renommer `Azimut`.
+3. **Fais un clic droit** sur `Azimut-main.zip` → **Extraire tout…** → **Extraire**. Un dossier `Azimut-main` apparaît. Ne lance pas Azimut depuis l'intérieur du ZIP, ça ne fonctionnerait pas.
+4. *(Conseillé)* Déplace le dossier `Azimut-main` dans **Documents**. Tu peux le renommer `Azimut`.
 
 **Étape 3 - Lancer Azimut**
 
@@ -163,15 +168,15 @@ Sur les versions plus anciennes (Ubuntu 22.04, Debian 11), remplace `gir1.2-webk
 Avec Git :
 
 ```bash
-git clone https://github.com/thmsgo18/azimut.git ~/Azimut
+git clone https://github.com/thmsgo18/Azimut.git ~/Azimut
 ```
 
-Ou sans Git : [télécharge le ZIP](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip), puis dans ton gestionnaire de fichiers, clic droit sur `azimut-main.zip` → **Extraire ici**.
+Ou sans Git : [télécharge le ZIP](https://github.com/thmsgo18/Azimut/archive/refs/heads/main.zip), puis dans ton gestionnaire de fichiers, clic droit sur `Azimut-main.zip` → **Extraire ici**.
 
 **Étape 3 - Lancer Azimut**
 
 ```bash
-cd ~/Azimut          # ou le dossier azimut-main extrait
+cd ~/Azimut          # ou le dossier Azimut-main extrait
 chmod +x azimut.sh   # une seule fois
 ./azimut.sh
 ```
@@ -189,21 +194,107 @@ Le premier lancement installe les dépendances (1 à 3 minutes), puis la fenêtr
 ### Mettre à jour Azimut sans perdre ses données
 
 - **Avec Git** : dans le dossier d'Azimut, `git pull`, puis relance.
-- **Avec le ZIP** : télécharge le nouveau ZIP et décompresse-le. Copie ton fichier **`suivi_candidatures.db`** de l'ancien dossier vers le nouveau, ainsi que les dossiers `documents`, `lettres`, `fiches`, `profil` et `sauvegardes` si tu as gardé l'emplacement par défaut. Supprime ensuite l'ancien dossier. Au premier lancement, la nouvelle version met ta base à jour toute seule, et garde une copie de sécurité de l'ancienne.
+- **Avec le ZIP** : télécharge le nouveau ZIP et décompresse-le. Copie ton fichier **`suivi_candidatures.db`** de l'ancien dossier vers le nouveau, ainsi que les dossiers `documents`, `lettres`, `fiches`, `cv`, `profil` et `sauvegardes` si tu as gardé l'emplacement par défaut. Supprime ensuite l'ancien dossier. Au premier lancement, la nouvelle version met ta base à jour toute seule, et garde une copie de sécurité de l'ancienne.
 
 ## Fonctionnalités
 
-- **Liste & pipeline kanban** - vue liste filtrable par défaut (statut modifiable en un clic, lien direct vers l'offre), ou kanban en glisser-déposer.
-- **Entreprises** - liées à chaque candidature, avec une détection de doublons qui repère « Mistral » vs « Mistral AI ».
-- **Lettres de motivation** - génère-les avec l'IA, rédige-les avec Claude Code, ou **glisse-dépose celles que tu as déjà écrites** (PDF, Word, texte). Chaque lettre est liée à une entreprise et à une ou plusieurs de ses offres, ou à l'entreprise en général.
-- **Fiches d'entretien** - présentation de l'entreprise, détail des postes, questions à poser : générées par l'IA (en PDF) ou ajoutées telles quelles.
-- **Notes d'entretien** - une vraie prise de notes, enregistrée au fil de la frappe, sur une entreprise ou une offre précise.
-- **Tableau de bord & statistiques** - entonnoir, taux de réponse par source, courbe hebdomadaire, objectif hebdo.
+### Suivre ses candidatures
+
+Une candidature, c'est **une offre chez une entreprise**. Elle avance dans un cycle simple, et tout ce qui la concerne - dates, liens, documents, lettres, fiches, notes - reste rattaché à elle.
+
+| Statut | Ce que ça veut dire |
+| :--- | :--- |
+| **À préparer** | L'offre est repérée, rien n'est encore parti (brouillon, capture rapide, offre à traiter) |
+| **Envoyée** | La candidature est partie |
+| **Réponse reçue** | L'entreprise a répondu (accusé de réception, test technique, prise de contact) |
+| **Entretien** | Un entretien est planifié ou a eu lieu |
+| **Refus** / **Accepté** | Le point final |
+
+- **Deux vues.** La **liste** (filtrable, avec un bouton « Voir l'offre » et le statut modifiable en un clic sur sa pastille) et le **pipeline** kanban : glisse une carte d'une colonne à l'autre pour changer son statut.
+- **Un clic sur une offre ouvre sa fenêtre - et tout s'y modifie sur place.** Plus de bouton « Modifier » à presser d'abord : date d'envoi, réponse reçue le, entretien le, début souhaité, source, statut, durée, gratification, ville, mode de travail, liens, texte de l'offre, notes… Chaque changement est enregistré tout de suite (un texte, un instant après la dernière frappe), et un « Enregistré » discret le confirme.
+
+<p align="center"><img src="docs/screenshot-detail.png" width="760" alt="Fenêtre d'une candidature"></p>
+
+- **Sous les champs :** la **préparation** (les documents, lettres, fiches et notes liés à cette offre, à rouvrir en un clic) et l'**historique** - une chronologie horodatée, tenue toute seule : création, changement de statut, réponse reçue, entretien planifié.
+
+<p align="center"><img src="docs/screenshot-detail-bas.png" width="760" alt="Préparation, documents et historique d'une candidature"></p>
+
+**Un exemple, de l'offre à la réponse**
+
+1. Tu repères une offre chez Mistral AI : **Nouvelle candidature**. Colle le texte de l'offre (avec une clé API, le formulaire se pré-remplit ; sinon, remplis-le). L'entreprise est créée toute seule, et un doublon est signalé avant d'être créé.
+2. Tu envoies ta candidature : passe-la en **Envoyée** (pastille de statut, ou glisse la carte dans le pipeline). La date d'envoi et l'historique se remplissent.
+3. Mistral répond : dans la fenêtre de l'offre, renseigne **Réponse reçue le**, passe le statut en **Réponse reçue**, puis en **Entretien** avec la **date d'entretien** : elle apparaît dans « Entretiens à venir » du tableau de bord.
+4. Tu prépares l'entretien : une **fiche d'entretien** pour l'offre, tes **notes** pendant l'échange (voir plus bas), le **CV** et la **lettre** envoyés rangés dans les **documents** de l'offre.
+5. La réponse tombe : **Accepté** ou **Refus**. Les statistiques (entonnoir, délais, taux de réponse par source) se mettent à jour.
+
+**Autour des candidatures :** détection de doublons (un doublon exact est refusé, un intitulé proche est signalé), détection des **liens d'offres morts**, comparateur d'offres côte à côte, import CSV (LinkedIn, Indeed…) et Excel, objectif hebdomadaire, tableau de bord et statistiques.
+
+### Entreprises et documents
+
+- **Entreprises** - créées automatiquement avec les candidatures, avec un contexte (actus, missions, équipe) et une détection de doublons qui repère « Mistral » vs « Mistral AI ». Ouvre une entreprise : ses candidatures, documents, lettres, fiches et notes sont réunis.
+- **Documents** - n'importe quel fichier (offre en PDF, CV et lettre envoyés, portfolio, scan…), conservé tel quel. Comme pour les lettres, on choisit **une entreprise** et **une ou plusieurs de ses offres** (ou l'entreprise en général) avec la même barre de recherche, et on peut en déposer **plusieurs d'un coup**. Un clic ouvre l'**aperçu dans une fenêtre** (PDF, image, texte) - jamais en plein écran - et leur texte est retrouvé par la recherche globale.
+
+<p align="center"><img src="docs/screenshot-documents.png" width="760" alt="Documents rattachés à une entreprise et à ses offres"></p>
+
+### Lettres de motivation
+
+Trois façons d'en avoir une :
+
+1. **Avec l'IA d'Azimut** (clé API) : elle lit ton CV et l'offre, fait une recherche sur l'entreprise, et enregistre la lettre (texte + PDF).
+2. **Avec une IA installée sur ton ordinateur** (Claude Code ou autre), **sans clé API** : ouvre le dossier d'Azimut avec elle et demande la lettre. Elle suit le guide [`skills/lettre-motivation/AGENT.md`](skills/lettre-motivation/AGENT.md) et enregistre le résultat au bon endroit - voir [les skills](#les-skills-ia-à-télécharger).
+3. **Ajouter la tienne** : glisse-dépose un PDF, un Word ou un texte, ou cherche-le dans tes fichiers. Il est conservé tel quel.
+
+Le formulaire est le même dans les trois cas : une **barre de recherche** sur les entreprises *et* les offres, **une seule entreprise** mais **plusieurs offres** cochables, et « aussi sur l'entreprise en général » pour une lettre qui ne vise pas qu'un poste.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshot-nouvelle-lettre.png" alt="Nouvelle lettre : recherche, une entreprise, plusieurs offres"></td>
+<td width="50%"><img src="docs/screenshot-apercu-lettre.png" alt="Aperçu d'une lettre : onglets Aperçu et Texte, copie du texte"></td>
+</tr>
+</table>
+
+Un clic sur une lettre l'ouvre dans une fenêtre, avec deux onglets : **Aperçu** (le PDF) et **Texte** (à copier ou à télécharger en `.md`).
+
+### Fiches d'entretien
+
+Une fiche prépare un entretien pour **une ou plusieurs offres d'une même entreprise** : présentation de l'entreprise (chiffres clés, clients, sources), détail de chaque poste (accroche, stack, missions), **questions à poser** adaptées à ton profil, et le lien de l'offre - seulement s'il répond encore. Comme les lettres, elle se génère avec l'IA d'Azimut, se demande à une IA installée sur ton ordinateur (guide [`skills/fiche-entretien/AGENT.md`](skills/fiche-entretien/AGENT.md), sans clé API), ou s'ajoute telle quelle. Le PDF est fabriqué par Azimut lui-même : le même sur macOS, Windows et Linux.
+
+<p align="center"><img src="docs/screenshot-apercu-fiche.png" width="760" alt="Aperçu d'une fiche d'entretien en PDF"></p>
+
+### Notes d'entretien
+
+Une vraie prise de notes, sur **une entreprise ou une offre précise**, en **Markdown avec rendu en direct** : écris à gauche, le résultat s'affiche à droite. Gras, italique, titres, listes à puces ou numérotées (qui se poursuivent quand tu appuies sur Entrée), **cases à cocher** cliquables, citations, liens, tableaux. Une barre d'outils et les raccourcis <kbd>⌘B</kbd> / <kbd>⌘I</kbd> aident si tu ne connais pas la syntaxe. Trois affichages : *Écrire*, *Côte à côte*, *Aperçu* ; le contexte de l'offre (texte, lettres, fiches) s'affiche à côté si tu le souhaites. L'enregistrement est automatique.
+
+<p align="center"><img src="docs/screenshot-entretien.png" width="760" alt="Note d'entretien en Markdown avec rendu en direct"></p>
+
+### CV
+
+Une section pour **tes CV** - le français, l'anglais, celui orienté data : le **fichier** (à télécharger, à envoyer), son **texte** (à copier en un clic), et surtout **où il se modifie** : le dossier de ton projet LaTeX, ou ton fichier Word. Azimut n'y touche jamais, il garde juste le chemin (à copier, ou à ouvrir depuis l'appli). C'est ce qui permet à une IA de **lire le texte brut à jour** et de **savoir où aller le modifier** si tu le lui demandes. Le **CV principal** est celui qu'elle lit pour rédiger tes lettres et adapter tes fiches.
+
+<p align="center"><img src="docs/screenshot-cv.png" width="760" alt="Section CV"></p>
+
+### Et aussi
+
+- **Tableau de bord & statistiques** - entonnoir, délais, taux de réponse par source, courbe hebdomadaire, objectif hebdo.
+- **Recherche globale** (<kbd>⌘K</kbd>) - candidatures, entreprises, notes, documents, lettres et fiches, textes compris.
 - **Saisie assistée par IA** (optionnelle, tout fournisseur) - colle une offre, le formulaire se pré-remplit. Rien n'est écrit sans ta confirmation.
-- **Export/import Excel**, import CSV depuis LinkedIn/Indeed, sauvegardes automatiques de la base.
+- **Export/import Excel**, sauvegardes automatiques de la base (avant toute migration, une copie de sécurité est prise).
 - **100 % local** - rien ne quitte ta machine, sauf export explicite ou activation de l'assistant IA.
 
 Quelques extras (vue compagnon iPhone/iPad, capture rapide depuis Safari) sont détaillés dans [la doc complète](#docs).
+
+## Les skills IA à télécharger
+
+Un **skill** est une « recette » qu'on donne à une IA (Claude Code, Claude.ai…) pour qu'elle fasse une tâche précise toujours de la même façon. Azimut en propose deux, dans le dossier [`skills/`](skills/), **téléchargeables** :
+
+| Skill | Ce qu'il fait | Télécharger |
+| :--- | :--- | :--- |
+| **`lettre-motivation`** | Rédige une lettre de motivation personnalisée à partir de ton CV et d'une offre, après une recherche approfondie sur l'entreprise, avec un style qui ne sonne pas « généré » (texte, ou lettre LaTeX complète dans un projet latex-forge). | [**lettre-motivation.skill**](https://github.com/thmsgo18/Azimut/raw/main/skills/lettre-motivation.skill) |
+| **`fiche-entretien`** | Prépare une fiche d'entretien en PDF pour une ou plusieurs offres d'une même entreprise : présentation de l'entreprise, détail des postes (avec le lien de l'offre s'il est encore en ligne), questions à poser adaptées à ton profil. | [**fiche-entretien.skill**](https://github.com/thmsgo18/Azimut/raw/main/skills/fiche-entretien.skill) |
+
+**Les utiliser :** télécharge le fichier `.skill` et importe-le dans ta liste de skills (Claude Code, Claude.ai…). Ensuite, demande simplement « fais-moi une lettre de motivation pour cette offre » ou « prépare-moi une fiche pour mon entretien chez X ». Ce sont les skills d'origine de l'auteur : ils fonctionnent seuls, sans Azimut, et mentionnent son contexte (prénom, projet latex-forge) - à adapter à ton usage.
+
+**Pour que le résultat arrive directement dans Azimut**, chaque skill a son guide adapté au projet - [`skills/lettre-motivation/AGENT.md`](skills/lettre-motivation/AGENT.md) et [`skills/fiche-entretien/AGENT.md`](skills/fiche-entretien/AGENT.md) : mêmes règles de fond, mais l'IA lit ton CV et tes offres, et enregistre la lettre ou la fiche par la ligne de commande d'Azimut. Il suffit d'**ouvrir le dossier d'Azimut avec ton IA** : elle trouve ces guides toute seule (via [`AGENT.md`](AGENT.md) et [`CLAUDE.md`](CLAUDE.md)), **sans clé API**. La génération par clé API utilise le **même bloc de règles** : les deux chemins produisent le même travail. Détails dans [`skills/README.md`](skills/README.md).
 
 ## Ligne de commande & IA
 
@@ -212,9 +303,10 @@ Toutes les fonctions restent pilotables en ligne de commande :
 ```bash
 ./suivi candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée
 ./suivi candidatures lister --statut Envoyée
+./suivi cv voir                     # le CV principal, et où se trouve sa source modifiable
 ```
 
-Azimut fournit aussi tout ce dont une IA a besoin pour tenir la base à jour directement et sans risque - champs validés, doublons détectés, jamais de SQL brut. Voir [`CLAUDE.md`](CLAUDE.md) et [`AGENT.md`](AGENT.md).
+Azimut fournit aussi tout ce dont une IA a besoin pour tenir la base à jour directement et sans risque - champs validés, doublons détectés, jamais de SQL brut : voir [`CLAUDE.md`](CLAUDE.md) (règles générales) et [`AGENT.md`](AGENT.md) (quel guide suivre : ajouter une offre, rédiger une lettre, préparer une fiche…).
 
 ## Docs
 

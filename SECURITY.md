@@ -8,7 +8,7 @@ Azimut has a single rolling release on the `main` branch. Only the latest commit
 
 ## Reporting a vulnerability
 
-If you find a security issue, please **do not open a public issue**. Instead, use [GitHub's private vulnerability reporting](https://github.com/thmsgo18/azimut/security/advisories/new) on this repository, or open a regular issue asking for a private contact if that option is unavailable to you.
+If you find a security issue, please **do not open a public issue**. Instead, use [GitHub's private vulnerability reporting](https://github.com/thmsgo18/Azimut/security/advisories/new) on this repository, or open a regular issue asking for a private contact if that option is unavailable to you.
 
 Please include: the affected file(s) or feature, steps to reproduce, and the potential impact. I'll do my best to respond and fix confirmed issues promptly, this is a solo, part time project.
 
@@ -33,7 +33,7 @@ Azimut n'a qu'une seule version continue, sur la branche `main`. Seul le dernier
 
 ### Signaler une vulnérabilité
 
-Si tu trouves un problème de sécurité, **n'ouvre pas d'issue publique**. Utilise plutôt le [signalement privé de vulnérabilité de GitHub](https://github.com/thmsgo18/azimut/security/advisories/new) sur ce dépôt, ou ouvre une issue classique demandant un contact privé si cette option ne t'est pas accessible.
+Si tu trouves un problème de sécurité, **n'ouvre pas d'issue publique**. Utilise plutôt le [signalement privé de vulnérabilité de GitHub](https://github.com/thmsgo18/Azimut/security/advisories/new) sur ce dépôt, ou ouvre une issue classique demandant un contact privé si cette option ne t'est pas accessible.
 
 Merci d'inclure : le ou les fichiers/fonctionnalités concernés, les étapes pour reproduire, et l'impact potentiel. Je ferai au mieux pour répondre et corriger rapidement les problèmes confirmés, c'est un projet solo, à temps partiel.
 

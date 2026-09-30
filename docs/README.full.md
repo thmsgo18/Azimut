@@ -12,9 +12,9 @@ Everything runs locally. No data ever leaves the machine, except by explicit act
 
 ## Install
 
-Azimut runs on macOS, Windows, and Linux - the exact same codebase everywhere. Only the launcher differs, and it installs Python's dependencies by itself the first time you run it (one-time internet connection required); every launch after that is instant. You need [Python 3.9+](https://python.org) installed on the machine (on Windows, tick "Add python.exe to PATH" during install).
+Azimut runs on macOS, Windows, and Linux - the exact same codebase everywhere. Only the launcher differs, and it installs Python's dependencies by itself the first time you run it (one-time internet connection required); every launch after that is instant. You need [Python 3.9+](https://python.org) installed on the machine (on Windows, tick "Add python.exe to PATH" during install; on macOS, Apple's own is fine). The test suite runs in CI on macOS, Windows and Linux with Python 3.9 **and** 3.13. After an update, the launcher reinstalls the dependencies by itself if `requirements.txt` changed.
 
-[**Download the ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip) and unzip it anywhere, or `git clone https://github.com/thmsgo18/azimut.git` (recommended if you're comfortable with a terminal - makes future updates a `git pull` away). Then, depending on your OS:
+[**Download the ZIP**](https://github.com/thmsgo18/Azimut/archive/refs/heads/main.zip) and unzip it anywhere, or `git clone https://github.com/thmsgo18/Azimut.git` (recommended if you're comfortable with a terminal - makes future updates a `git pull` away). Then, depending on your OS:
 
 - **macOS** - double-click **`Azimut.app`**. If macOS blocks it the first time: right-click → *Open* (once only). Fallback if that fails: `Azimut (terminal).command` opens the same window from the Terminal, with the install logs visible.
 - **Windows** - double-click **`Azimut.bat`**.
@@ -51,10 +51,11 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 ## Features
 
 **Application tracking**
-- A **filterable list** by default - change a status by clicking its pill, an "Open posting" button on each row - or a **kanban** pipeline (drag and drop to change status), with a side panel to inspect, add, or delete.
+- A **filterable list** by default - change a status by clicking its pill, an "Open posting" button on each row - or a **kanban** pipeline (drag and drop to change status). **Click a job to open its window**: every field (dates, source, status, links, text, notes…) is edited in place and saved by itself, with no "Modify" button - see [the README](../README.md#tracking-your-applications).
 - **Automatic timeline** per application: creation, status change, reply, interview scheduled - timestamped without lifting a finger.
-- **Attached documents**: CV, cover letter, the offer as a PDF, or any other file - attachable at creation or from the detail view, several at once.
-- **Cover letters, interview sheets and interview notes** attached to a job or to a company: see [Preparing your applications](#preparing-your-applications).
+- **Documents**: any file (job posting as a PDF, résumé and letter you sent, portfolio, scan…), attached to **one company and to one or several of its jobs** (or to the company in general) with the same search bar and selection as a letter; several files at once, preview in a window (PDF, image, text), text found by the search.
+- **Cover letters, interview sheets and interview notes** attached to a job or to a company: see [Preparing your applications](#preparing-your-applications). Notes are written in **Markdown with live rendering** (bold, lists, checkboxes…).
+- **Résumés**: a dedicated section - several résumés (file, text to copy), where each one is edited (LaTeX folder or Word file, which the AI reads and knows how to edit) and a main résumé.
 - **Recruitment portal access**: URL, username and password per application (masked in the interface, never exported).
 - **Comparator**: check several applications in list view to line them up side by side (stipend, duration, work mode, dates…) to decide between multiple ongoing offers.
 - **Dead job-link detection**: a conservative HTTP check (run automatically every 6h while Azimut is open, or on demand) flags withdrawn postings (404/410) - often a sign a role has been filled - with no false positives on a mere network hiccup.
@@ -63,9 +64,9 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 
 **Organization**
 - **Companies** with context and news notes; detects probable duplicates ("Mistral" / "Mistral AI") and **merges them in one click**.
-- **Global search** (shortcut <kbd>⌘K</kbd>) across everything - titles, notes, job text, interview notes, letters and sheets - color-coded by result type.
+- **Global search** (shortcut <kbd>⌘K</kbd>) across everything - titles, notes, job text, interview notes, documents, letters and sheets - color-coded by result type.
 - **Near-duplicate detection** when creating an application (a similar title, or the same job link once tracking params are stripped): a simple warning, never a block.
-- **Read-only detail views**: clicking an application or a company opens a clean, read-only sheet - links (the job posting, the portal, a company's website) are just clickable, nothing gets edited by accident. An explicit **Modify** button switches to the edit form.
+- **Read-only company sheets**: clicking a company opens a clean sheet in a side panel - links (the website) are just clickable, nothing gets edited by accident. An explicit **Modify** button switches to the edit form. (An application, on the other hand, opens in a window where everything is edited in place.)
 - **Bilingual interface** (French / English): switch it in Réglages, applies immediately across the whole interface. Values stored in the database (status, source…) stay French internally - only the display changes.
 
 **Insights**
@@ -85,12 +86,35 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 A short walkthrough of the everyday flow:
 
 1. **Add an application** - click **+ Ajouter** from Candidatures (or **Nouvelle candidature** in the sidebar). Paste the job posting text into the AI box if you've configured a key, or just fill the form. The company is created automatically if it's new.
-2. **Move it through the pipeline** - drag a card between columns in the Kanban view to update its status, or edit it from its sheet.
-3. **Click anything to look, not to edit** - an application or a company opens a clean read-only sheet: click the job link or the portal URL freely, nothing changes. Hit **Modifier** only when you actually want to edit.
-4. **Open a company to find everything there** - its sheet lists its applications, letters, interview sheets and notes, each one click away.
+2. **Move it through the pipeline** - drag a card between columns in the Kanban view to update its status, or change it in one click on its pill.
+3. **Edit everything in place** - a click on an application opens its window: reply date, interview date, source, links, notes… are edited directly and saved by themselves ("Enregistré"), with no "Modify" button.
+4. **Open a company to find everything there** - its sheet lists its applications, documents, letters, interview sheets and notes, each one click away.
 5. **Change a status without opening the sheet** - in the list view, click a row's status pill and pick the new one; the "Open posting" button opens the job ad directly.
 6. **Search anything with ⌘K** - a title, a note, a phrase from a pasted job posting, a word from a letter or an interview note.
-7. **Prepare an interview** - in **Interview sheets**, generate a sheet (or add your own); on the day, open **Interviews**, create a note on the job or the company and write: everything is saved as you type.
+7. **Prepare an interview** - in **Interview sheets**, generate a sheet (or add your own, or ask an AI installed on your computer); on the day, open **Interviews**, create a note on the job or the company and write in Markdown: everything is saved as you type.
+
+## Preparing your applications
+
+Five sections help you prepare and keep track of everything around a job: **Documents**, **Cover letters**, **Interview sheets**, **Interviews** (the notes) and **Résumé**.
+
+**Documents, Cover letters and Interview sheets** work the same way. Each one is linked to **one company** and to **one or more of its jobs** - or to the company in general: ticking "Also about the company in general" lets you target specific jobs and the company at once. A search field filters companies and jobs while you select (the same bar, the same selection, everywhere).
+
+- **Creating a letter or a sheet** in three ways: with Azimut's AI (API key: Anthropic provider, web search included); with **an AI installed on your computer** (Claude Code or other), **no API key** - see below; or by **adding your own**. Everything is checked (same company's jobs, résumé present, at least one job for a sheet) **before** the AI is called, and nothing is saved if the call fails.
+- **Adding a file**: the **drag-and-drop** zone (or the file picker) accepts a PDF, a Word `.docx`, a `.txt` or a `.md` for a letter or a sheet (15 MB max); for a **document**, any format (25 MB max) and several files at once. The file is kept **exactly as it is**; its text is extracted for search. The file name suggests the company ("lettre-motivation-CEA.pdf" proposes CEA).
+- **Preview in a window**: clicking a row opens a window - never the whole page - with the PDF (or the image) and, when there is one, a **Text** tab (to copy, or to download as `.md`). You can edit the title, the type (documents) or the linked jobs there, or delete. Deleting a job never deletes its documents, letters, sheets or notes: only the link is removed.
+- **Downloads**: a direct link to a PDF would make the native window navigate to the file with no way back; Azimut goes through the system's "Save as" box instead (and a regular download in a browser).
+
+**Interviews** is note-taking: one note per interview, on **a company or one specific job** (one or the other, never both), with a title, a date and a large text field **saved as you type** (and when you leave the page). The text is written in **Markdown with live rendering**: headings, bold, italic, strikethrough, bullet or numbered lists (which continue with Enter, Tab to nest them), clickable **checkboxes** in the rendering, quotes, code, links, tables. A toolbar and the ⌘B / ⌘I (Ctrl+B / Ctrl+I) shortcuts help; three layouts (*Write*, *Side by side*, *Preview*) and a context panel (the company, the job, ready documents, letters and sheets) are remembered. Whatever you type is escaped before being formatted: no HTML tag ever runs.
+
+**Résumé** gathers **your résumés**. Each can have a **file** (PDF, Word or text: to download, to send; its text copies in one click), an **editable source** on your computer - a LaTeX project's folder, a `.tex` file or a Word file - and a pasted text. Azimut **never** touches the source: it keeps the path (to copy, or to open from the app), re-reads the text every time - the résumé evolves between two letters - and tells the AI where to read it and where to edit it. The **main résumé** is the one the AI reads by default; you can pick another for each generation. If the source is no longer reachable (another machine, a moved folder), the file's text takes over.
+
+Files live in the data folder (`documents/`, `lettres/`, `fiches/`, `cv/`, `sauvegardes/`); the database only keeps the texts and the paths: to back everything up, copy **the database and this folder**.
+
+### Writing with an AI installed on your computer (no API key)
+
+Open Azimut's folder with your AI (Claude Code, or any agent that reads the folder) and ask "write me a cover letter for application 12" or "prepare an interview sheet for my interview at Wavestone". It finds what to do on its own: [`CLAUDE.md`](../CLAUDE.md) and [`AGENT.md`](../AGENT.md) point it to the guide [`skills/lettre-motivation/AGENT.md`](../skills/lettre-motivation/AGENT.md) or [`skills/fiche-entretien/AGENT.md`](../skills/fiche-entretien/AGENT.md). The guide tells it to read your résumé (`cli.py cv voir`) and the job (`cli.py candidatures voir`), to write by the same rules as API-key generation - **the rules block is the very same text** - then to save the result through the CLI (`cli.py lettres ajouter`, `cli.py fiches ajouter --json`), which files it in the right place and indexes it.
+
+The author's two original skills are also available as [downloadable `.skill` files](../skills/README.md) (`lettre-motivation.skill`, `fiche-entretien.skill`) to install in Claude; they work on their own, without Azimut.
 
 ## Improvement ideas
 
@@ -142,9 +166,9 @@ python cli.py entreprises fusionner 2 5               # keeps #2, merges #5 into
 
 `ajouter` never creates a duplicate: if the name already exists (case- and accent-insensitive comparison), the existing company is found and only its empty fields are filled in. If an existing value differs, nothing is overwritten: a `ConflitMiseAJour` error explains why - `modifier` is what overwrites, explicitly.
 
-`doublons` lists close-name pairs without changing anything; `fusionner <keep> <remove>` moves applications, letters, sheets and notes to the first, fills its empty fields from the second, then deletes it - irreversible, use it after checking the pair.
+`doublons` lists close-name pairs without changing anything; `fusionner <keep> <remove>` moves applications, documents, letters, sheets and notes to the first, fills its empty fields from the second, then deletes it - irreversible, use it after checking the pair.
 
-### Letters, interview sheets and notes
+### Résumés, documents, letters, interview sheets and notes
 
 ```bash
 python cli.py lettres importer --entreprise "CEA" --poste "Stage - Évaluation d'agents IA" --fichier my-letter.pdf
@@ -155,9 +179,16 @@ python cli.py fiches ajouter --entreprise "Takima" --json sheet.json --candidatu
 python cli.py notes ajouter --candidature-id 12 --titre "Technical interview" --contenu "Questions about evals."
 python cli.py notes lister --entreprise "AgentikCo"
 python cli.py notes voir 3
+python cli.py documents importer --entreprise "Wavestone" --poste "Stage IA" --fichier offer.pdf --type "Offre (PDF)"
+python cli.py documents modifier 3 --candidature-id 67 --candidature-id 68   # replaces the linked jobs
+python cli.py cv ajouter --nom "French résumé" --langue fr --fichier cv.pdf --source ~/Documents/cv-fr
+python cli.py cv voir                                # the main résumé + where its editable source lives
+python cli.py cv principal 2                         # choose the main résumé
 ```
 
 `importer` keeps the file **exactly as it is** (PDF, Word, text); `ajouter` builds a PDF from text (letter) or JSON data (sheet). An item is linked to one company and to one or more of its jobs (`--candidature-id` repeatable, or `--poste` to find the job by its title); `--generale` also marks it as being about the company in general. `lister` and `supprimer` exist for letters and sheets; a note targets either a company (`--entreprise`) or one specific job (`--candidature-id`).
+
+`documents importer` accepts any format (25 MB max); `cv ajouter --source` takes a LaTeX folder, a `.tex` file or a Word `.docx` file (Azimut never touches it, it keeps the path: `cv voir` reminds the AI where to read and where to edit).
 
 ### CSV import (LinkedIn, Indeed, or anything else)
 
@@ -208,7 +239,7 @@ The second option is the generic path: **any AI speaking the OpenAI protocol wor
 
 This layer only proposes - never a direct database write, never a made-up value (a field missing from the posting stays empty).
 
-**With no key at all**, Azimut stays fully functional: a Claude-Code-style AI can drive the database directly through the command line or the Python functions documented in [`CLAUDE.md`](../CLAUDE.md), on your existing subscription, with no separate API key. [`AGENT.md`](../AGENT.md) documents the exact procedure an AI should follow to enter an application from a job posting.
+**With no key at all**, Azimut stays fully functional: a Claude-Code-style AI can drive the database directly through the command line or the Python functions documented in [`CLAUDE.md`](../CLAUDE.md), on your existing subscription, with no separate API key. [`AGENT.md`](../AGENT.md) tells an AI which guide to follow - entering an application from a job posting, writing a cover letter, preparing an interview sheet: see [Writing with an AI installed on your computer](#writing-with-an-ai-installed-on-your-computer-no-api-key).
 
 ## Automations and extras
 
@@ -273,9 +304,15 @@ ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiche
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
 
-# documents.py - attached files (CV, cover letters, offers as PDF…)
-ajouter_document(candidature_id, nom_fichier, contenu_bytes, type_document=None) -> id
-lister_documents(candidature_id=None) / supprimer_document(id)
+# documents.py - any file, linked to ONE company and to ONE OR MORE of its jobs
+importer_document(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None, generale=None, type_document=None) -> id
+ajouter_document(candidature_id, nom_fichier, contenu_bytes, type_document=None) -> id   # shortcut: one job
+lister_documents(entreprise_id=None, candidature_id=None, recherche=None) / modifier_document(id, **champs) / supprimer_document(id)
+
+# cvs.py - résumés (file, LaTeX/Word source, text), one "main" read by the AI
+ajouter_cv(nom=None, langue=None, nom_fichier=None, contenu_fichier=None, chemin_source=None, texte=None, principal=None) -> id
+lister_cvs() / modifier_cv(id, **champs) / definir_cv_principal(id) / supprimer_cv(id)
+obtenir_cv_texte(id=None) -> text for the AI (the source, re-read on every call when reachable)
 
 # export_excel.py / import_excel.py
 exporter_excel(chemin_sortie) -> path of the generated file
@@ -295,11 +332,12 @@ azimut/
   Azimut.app                        # double-click: the app (native window)
   Azimut (terminal).command         # fallback: same window, from the Terminal
   Créer un zip à partager.command   # double-click: a zip (no personal data) on the Desktop
-  app_bureau.py     # native window (pywebview) wrapping the internal server
+  app_bureau.py     # native window (pywebview) around the internal server + JS bridge ("Save as"…)
+  pont_bureau.py    # what the window does for the interface, without pywebview (so testable anywhere)
   compagnon.py      # read-only companion server for iPhone/iPad (local network, opt-in)
   serveur.py        # internal server (Flask): JSON API + interface
-  static/           # interface (index.html, style.css, app.js, preparation.js)
-  db.py             # SQLite connection, table creation, migrations
+  static/           # interface: index.html, style.css, app.js, preparation.js (items, notes), cv.js, markdown.js
+  db.py             # SQLite connection, schema, migrations (one transaction, safety copy before any deletion)
   valeurs.py        # allowed values + field validation
   exceptions.py     # business exceptions (French messages)
   entreprises.py    # company CRUD (anti-duplicate, conflicts, merge)
@@ -311,26 +349,28 @@ azimut/
   import_excel.py   # import of such an export (backup / restore)
   import_csv.py     # generic CSV import (LinkedIn, Indeed…), column mapping by hand
   evenements.py     # automatic application timeline
-  documents.py      # attached files (configurable folder)
-  pieces_liees.py   # shared core of letters / sheets: one company, several jobs, imported or generated file
+  pieces_liees.py   # shared core of documents / letters / sheets: one company, several jobs, imported or generated file
+  documents.py      # documents: any file, attached to a company and to one or several jobs
   lettres.py        # cover letters (text -> PDF, or an imported file kept as is)
   fiches.py         # interview sheets (data -> PDF, or an imported file kept as is)
   fiches_pdf.py     # PDF rendering of a sheet (reportlab, same PDF on all 3 OSes)
-  notes_entretien.py # interview notes: one company OR one specific job
+  notes_entretien.py # interview notes (Markdown): one company OR one specific job
+  cvs.py            # résumés: file, editable source (LaTeX / Word), main résumé read by the AI
   generation.py     # AI generation: checks everything BEFORE calling the AI, then saves
-  extraction.py     # text of a PDF / Word / text file (resume, indexing of imported items)
-  profil.py         # the resume used by the AI
+  guides_ia.py      # reads the skills/*/AGENT.md guides: their rules block is also the API prompt
+  extraction.py     # text of a PDF / Word / text file (résumé, indexing of imported documents)
   recherche.py      # multi-type global search
   statistiques.py   # funnel, delays, sources, weekly chart, weekly goal
   reglages.py       # local settings (masked API key, AI provider, data folder, companion code)
-  sauvegarde.py      # dated copies of the database, rotation
+  sauvegarde.py     # dated copies of the database, rotation
   agent.py          # posting analysis, letters, sheets - Anthropic or any OpenAI-compatible provider
   entretien.py      # application summary (Markdown)
   cli.py            # command-line interface
+  skills/           # the downloadable .skill files + an AGENT.md guide per skill (letter, sheet) for an AI
   CLAUDE.md         # how the project works, for AIs (Claude Code…)
-  AGENT.md          # procedure for an AI to enter an application from a job posting
+  AGENT.md          # which guide to follow per request + how to enter an application
   suivi             # terminal executable (equivalent of python cli.py)
-  .github/workflows/tests.yml  # CI: runs the test suite on every push
+  .github/workflows/tests.yml  # CI: the test suite on 3 OSes × Python 3.9 and 3.13
   tests/            # a hermetic suite (never the real database) - python -m unittest discover -s tests
   suivi_candidatures.db   # the database - sole source of truth (not versioned)
 ```

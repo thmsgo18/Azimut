@@ -12,9 +12,9 @@ Tout tourne en local. Aucune donnée ne quitte la machine, sauf action explicite
 
 ## Installation
 
-Azimut tourne sur macOS, Windows et Linux - exactement le même code partout. Seul le lanceur change, et il installe lui-même les dépendances Python au premier lancement (connexion Internet nécessaire une seule fois) ; les suivants sont immédiats. Il faut [Python 3.9+](https://python.org) installé sur la machine (sous Windows, cocher « Add python.exe to PATH » pendant l'installation).
+Azimut tourne sur macOS, Windows et Linux - exactement le même code partout. Seul le lanceur change, et il installe lui-même les dépendances Python au premier lancement (connexion Internet nécessaire une seule fois) ; les suivants sont immédiats. Il faut [Python 3.9+](https://python.org) installé sur la machine (sous Windows, cocher « Add python.exe to PATH » pendant l'installation ; sous macOS, celui d'Apple convient). La suite de tests tourne en CI sur macOS, Windows et Linux avec Python 3.9 **et** 3.13. Après une mise à jour, le lanceur réinstalle tout seul les dépendances si `requirements.txt` a changé.
 
-[**Télécharger le ZIP**](https://github.com/thmsgo18/azimut/archive/refs/heads/main.zip) et le dézipper n'importe où, ou `git clone https://github.com/thmsgo18/azimut.git` (recommandé si tu es à l'aise avec un terminal - les mises à jour suivantes ne seront qu'un `git pull`). Ensuite, selon ton OS :
+[**Télécharger le ZIP**](https://github.com/thmsgo18/Azimut/archive/refs/heads/main.zip) et le dézipper n'importe où, ou `git clone https://github.com/thmsgo18/Azimut.git` (recommandé si tu es à l'aise avec un terminal - les mises à jour suivantes ne seront qu'un `git pull`). Ensuite, selon ton OS :
 
 - **macOS** - double-cliquer sur **`Azimut.app`**. Si macOS la bloque au premier lancement : clic droit → *Ouvrir* (une seule fois). En secours si ça ne marche pas : `Azimut (terminal).command` ouvre la même fenêtre depuis le Terminal, avec les messages d'installation visibles.
 - **Windows** - double-cliquer sur **`Azimut.bat`**.
@@ -51,10 +51,11 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 ## Fonctionnalités
 
 **Suivi des candidatures**
-- **Liste filtrable** par défaut - statut modifiable d'un clic sur sa puce, bouton « Voir l'offre » par ligne - ou pipeline **kanban** (glisser-déposer pour changer le statut), avec panneau latéral d'ajout/consultation/suppression.
+- **Liste filtrable** par défaut - statut modifiable d'un clic sur sa puce, bouton « Voir l'offre » par ligne - ou pipeline **kanban** (glisser-déposer pour changer le statut). **Un clic sur une offre ouvre sa fenêtre** : tous ses champs (dates, source, statut, liens, texte, notes…) se modifient sur place et s'enregistrent tout seuls, sans bouton « Modifier » - voir [le README](../README.fr.md#suivre-ses-candidatures).
 - **Journal automatique** par candidature : création, changement de statut, réponse, entretien planifié - horodaté sans rien faire.
-- **Documents joints** : CV, lettre de motivation, offre en PDF ou tout autre fichier, attachables dès la création ou depuis la fiche, plusieurs à la fois.
-- **Lettres, fiches et notes d'entretien** rattachées à l'offre ou à l'entreprise : voir la section [Préparer ses candidatures](#préparer-ses-candidatures).
+- **Documents** : tout fichier (offre en PDF, CV et lettre envoyés, portfolio, scan…), rattaché à **une entreprise et à une ou plusieurs de ses offres** (ou à l'entreprise en général) avec la même barre de recherche et la même sélection que pour une lettre ; plusieurs fichiers d'un coup, aperçu dans une fenêtre (PDF, image, texte), texte retrouvé par la recherche.
+- **Lettres, fiches et notes d'entretien** rattachées à l'offre ou à l'entreprise : voir la section [Préparer ses candidatures](#préparer-ses-candidatures). Les notes s'écrivent en **Markdown avec rendu en direct** (gras, listes, cases à cocher…).
+- **CV** : une section dédiée - plusieurs CV (fichier, texte à copier), l'endroit où chacun se modifie (dossier LaTeX ou fichier Word, que l'IA lit et sait modifier) et un CV principal.
 - **Accès aux portails de recrutement** : URL, identifiant et mot de passe par candidature (masqué dans l'interface, jamais exporté).
 - **Comparateur** : coche plusieurs candidatures en vue liste pour les mettre côte à côte (gratification, durée, mode de travail, dates…) et arbitrer entre plusieurs propositions en cours.
 - **Détection des liens d'offres morts** : un ping HTTP conservateur (relancé automatiquement toutes les 6h pendant qu'Azimut tourne, ou à la demande) signale les offres retirées (404/410) - souvent le signe qu'un poste est pourvu - sans jamais de faux positif sur une simple panne réseau.
@@ -63,9 +64,9 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 
 **Organisation**
 - **Entreprises** avec contexte et actualités ; détection des doublons probables (« Mistral » / « Mistral AI ») et **fusion en un clic**.
-- **Recherche globale** (raccourci <kbd>⌘K</kbd>) qui fouille tout - postes, notes, textes d'offres, notes d'entretien, lettres et fiches - avec un code couleur par type de résultat.
+- **Recherche globale** (raccourci <kbd>⌘K</kbd>) qui fouille tout - postes, notes, textes d'offres, notes d'entretien, documents, lettres et fiches - avec un code couleur par type de résultat.
 - **Détection de quasi-doublons** à la création d'une candidature (intitulé proche, ou même lien d'offre une fois débarrassé du tracking) : un simple avertissement, jamais un blocage.
-- **Fiches en lecture seule** : cliquer sur une candidature ou une entreprise ouvre une fiche propre, en lecture seule - les liens (l'offre, le portail, le site d'une entreprise) sont juste cliquables, rien ne se modifie par accident. Un bouton **Modifier** explicite bascule vers le formulaire d'édition.
+- **Fiches d'entreprise en lecture seule** : cliquer sur une entreprise ouvre une fiche propre dans un panneau latéral - les liens (le site) sont juste cliquables, rien ne se modifie par accident. Un bouton **Modifier** explicite bascule vers le formulaire d'édition. (Une candidature, elle, s'ouvre dans une fenêtre où tout se modifie sur place.)
 - **Interface bilingue** (français / anglais) : se change dans Réglages, s'applique immédiatement à toute l'interface. Les valeurs stockées en base (statut, source…) restent en français en interne - seul l'affichage change.
 
 **Pilotage**
@@ -85,26 +86,35 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 Le déroulé du quotidien, en bref :
 
 1. **Ajouter une candidature** - clique sur **+ Ajouter** depuis Candidatures (ou **Nouvelle candidature** dans la barre latérale). Colle le texte de l'offre dans la zone IA si une clé est configurée, ou remplis simplement le formulaire. L'entreprise est créée automatiquement si elle est nouvelle.
-2. **La faire avancer dans le pipeline** - glisse une carte d'une colonne à l'autre en vue kanban pour changer son statut, ou modifie-la depuis sa fiche.
-3. **Cliquer pour regarder, pas pour modifier** - une candidature ou une entreprise ouvre une fiche propre en lecture seule : clique librement sur le lien de l'offre ou du portail, rien ne change. N'appuie sur **Modifier** que quand tu veux vraiment éditer.
-4. **Ouvrir une entreprise pour tout y retrouver** - sa fiche liste ses candidatures, ses lettres, ses fiches et ses notes d'entretien, chacune à un clic de distance.
+2. **La faire avancer dans le pipeline** - glisse une carte d'une colonne à l'autre en vue kanban pour changer son statut, ou change-le d'un clic sur sa pastille.
+3. **Tout modifier sur place** - un clic sur une candidature ouvre sa fenêtre : date de réponse, date d'entretien, source, liens, notes… se modifient directement et s'enregistrent tout seuls (« Enregistré »), sans bouton « Modifier ».
+4. **Ouvrir une entreprise pour tout y retrouver** - sa fiche liste ses candidatures, ses documents, lettres, fiches et notes d'entretien, chacun à un clic de distance.
 5. **Changer un statut sans ouvrir la fiche** - en vue liste, clique sur la puce de statut d'une ligne et choisis le nouveau ; le bouton « Voir l'offre » ouvre l'annonce directement.
 6. **Chercher n'importe quoi avec ⌘K** - un intitulé, une note, une phrase d'une offre collée, un mot d'une lettre ou d'une note d'entretien.
-7. **Préparer un entretien** - dans **Fiches d'entretien**, génère une fiche (ou ajoute la tienne) ; le jour J, ouvre **Entretiens**, crée une note sur l'offre ou l'entreprise et écris : tout est enregistré au fil de la frappe.
+7. **Préparer un entretien** - dans **Fiches d'entretien**, génère une fiche (ou ajoute la tienne, ou demande-la à une IA installée sur ton ordinateur) ; le jour J, ouvre **Entretiens**, crée une note sur l'offre ou l'entreprise et écris en Markdown : tout est enregistré au fil de la frappe.
 
 ## Préparer ses candidatures
 
-Trois sections, sous les candidatures, servent à préparer et à garder trace de tout ce qui entoure une offre.
+Cinq sections servent à préparer et à garder trace de tout ce qui entoure une offre : **Documents**, **Lettres de motivation**, **Fiches d'entretien**, **Entretiens** (les notes) et **CV**.
 
-**Lettres** et **Fiches d'entretien** fonctionnent de la même façon. Chacune est liée à **une seule entreprise** et à **une ou plusieurs de ses offres** - ou à l'entreprise en général : cocher « Aussi sur l'entreprise en général » permet de viser à la fois des offres précises et l'entreprise. Un champ de recherche filtre les entreprises et les offres pendant la sélection.
+**Documents, Lettres de motivation et Fiches d'entretien** fonctionnent de la même façon. Chacun est lié à **une seule entreprise** et à **une ou plusieurs de ses offres** - ou à l'entreprise en général : cocher « Aussi sur l'entreprise en général » permet de viser à la fois des offres précises et l'entreprise. Un champ de recherche filtre les entreprises et les offres pendant la sélection (la même barre, la même sélection, partout).
 
-- **Créer avec l'IA** : une lettre se génère avec la clé API d'Azimut (fournisseur Anthropic, recherche web incluse) ou se rédige avec Claude Code grâce au skill téléchargeable. Une fiche se génère avec l'IA (présentation de l'entreprise, détail de chaque poste avec le lien de l'offre *seulement s'il répond encore*, questions à poser adaptées à ton CV) ; Azimut fabrique lui-même le PDF. Tout est vérifié (mêmes offres, CV présent, au moins une offre pour une fiche) **avant** d'appeler l'IA, et rien n'est enregistré si l'appel échoue.
-- **Ajouter la tienne** : le bouton « Ajouter ma lettre » / « Ajouter ma fiche » ouvre une zone où **glisser-déposer** un fichier (PDF, Word `.docx`, `.txt` ou `.md`, 15 Mo max) ou le chercher sur l'ordinateur. Le fichier est conservé **tel quel** ; son texte est extrait pour la recherche. Le nom du fichier suggère l'entreprise (« lettre-motivation-CEA.pdf » propose CEA).
-- Cliquer une ligne ouvre l'**aperçu** (le PDF s'affiche dans la fenêtre), avec téléchargement, modification du titre ou des offres liées, suppression. Supprimer une offre ne supprime jamais ses lettres, fiches ni notes : seul le lien est retiré.
+- **Créer une lettre ou une fiche** de trois façons : avec l'IA d'Azimut (clé API : fournisseur Anthropic, recherche web incluse) ; avec **une IA installée sur l'ordinateur** (Claude Code ou autre), **sans clé API** - voir plus bas ; ou en **ajoutant la tienne**. Tout est vérifié (mêmes offres, CV présent, au moins une offre pour une fiche) **avant** d'appeler l'IA, et rien n'est enregistré si l'appel échoue.
+- **Ajouter un fichier** : la zone de **glisser-déposer** (ou le sélecteur de fichiers) accepte un PDF, un Word `.docx`, un `.txt` ou un `.md` pour une lettre ou une fiche (15 Mo max) ; pour un **document**, n'importe quel format (25 Mo max) et plusieurs fichiers d'un coup. Le fichier est conservé **tel quel** ; son texte est extrait pour la recherche. Le nom du fichier suggère l'entreprise (« lettre-motivation-CEA.pdf » propose CEA).
+- **Aperçu en fenêtre** : cliquer une ligne ouvre une fenêtre - jamais la page entière - avec le PDF (ou l'image) et, quand il y en a un, un onglet **Texte** (à copier, ou à télécharger en `.md`). On peut y modifier le titre, le type (documents) ou les offres liées, ou supprimer. Supprimer une offre ne supprime jamais ses documents, lettres, fiches ni notes : seul le lien est retiré.
+- **Téléchargements** : un lien direct vers un PDF ferait naviguer la fenêtre native vers le fichier sans retour possible ; Azimut passe donc par la boîte « Enregistrer sous » du système (et par un téléchargement normal dans un navigateur).
 
-**Entretiens** est une prise de notes classique : une note par entretien, sur **une entreprise ou une offre précise** (au choix, jamais les deux), avec un titre, une date et un grand champ de texte **enregistré au fil de la frappe** (et à la sortie de la page). Le panneau de droite rappelle le contexte : l'entreprise, l'offre, les lettres et fiches prêtes.
+**Entretiens** est une prise de notes : une note par entretien, sur **une entreprise ou une offre précise** (au choix, jamais les deux), avec un titre, une date et un grand champ de texte **enregistré au fil de la frappe** (et à la sortie de la page). Le texte s'écrit en **Markdown avec rendu en direct** : titres, gras, italique, barré, listes à puces ou numérotées (qui se poursuivent avec Entrée, Tab pour les imbriquer), **cases à cocher** cliquables dans le rendu, citations, code, liens, tableaux. Une barre d'outils et les raccourcis ⌘B / ⌘I (Ctrl+B / Ctrl+I) aident ; trois affichages (*Écrire*, *Côte à côte*, *Aperçu*) et un panneau de contexte (l'entreprise, l'offre, les documents, lettres et fiches prêts) se règlent une fois pour toutes. Tout ce qui est tapé est échappé avant d'être mis en forme : aucune balise HTML ne s'exécute.
 
-Les fichiers vivent dans le dossier de données (`lettres/`, `fiches/`, `documents/`, `profil/`), la base ne garde que les textes et les chemins : pour tout sauvegarder, copie **la base et ce dossier**.
+**CV** rassemble **tes CV**. Chacun peut avoir un **fichier** (PDF, Word ou texte : à télécharger, à envoyer ; son texte se copie en un clic), une **source modifiable** sur ton ordinateur - le dossier d'un projet LaTeX, un fichier `.tex` ou un fichier Word - et un texte collé. Azimut ne touche **jamais** à la source : il garde le chemin (à copier, ou à ouvrir depuis l'appli), relit le texte à chaque fois - le CV évolue entre deux lettres - et dit à l'IA où le lire et où le modifier. Le **CV principal** est celui que l'IA lit par défaut ; on peut en choisir un autre à chaque génération. Si la source n'est plus accessible (autre machine, dossier déplacé), le texte du fichier prend le relais.
+
+Les fichiers vivent dans le dossier de données (`documents/`, `lettres/`, `fiches/`, `cv/`, `sauvegardes/`), la base ne garde que les textes et les chemins : pour tout sauvegarder, copie **la base et ce dossier**.
+
+### Rédiger avec une IA installée sur l'ordinateur (sans clé API)
+
+Ouvre le dossier d'Azimut avec ton IA (Claude Code, ou tout agent qui lit le dossier) et demande « fais-moi une lettre de motivation pour la candidature 12 » ou « prépare-moi une fiche pour mon entretien chez Wavestone ». Elle trouve seule quoi faire : [`CLAUDE.md`](../CLAUDE.md) et [`AGENT.md`](../AGENT.md) l'aiguillent vers le guide [`skills/lettre-motivation/AGENT.md`](../skills/lettre-motivation/AGENT.md) ou [`skills/fiche-entretien/AGENT.md`](../skills/fiche-entretien/AGENT.md). Le guide lui dit de lire ton CV (`cli.py cv voir`) et l'offre (`cli.py candidatures voir`), de rédiger selon les mêmes règles que la génération par clé API - **le bloc de règles est le même texte** - puis d'enregistrer le résultat par la CLI (`cli.py lettres ajouter`, `cli.py fiches ajouter --json`), qui range le fichier au bon endroit et l'indexe.
+
+Les deux skills d'origine de l'auteur sont aussi disponibles en [`.skill` téléchargeables](../skills/README.md) (`lettre-motivation.skill`, `fiche-entretien.skill`) pour les installer dans Claude ; ils fonctionnent seuls, sans Azimut.
 
 ## Idées d'améliorations
 
@@ -156,9 +166,9 @@ python cli.py entreprises fusionner 2 5               # garde n°2, fusionne n°
 
 `ajouter` ne crée jamais de doublon : si le nom existe déjà (comparaison insensible à la casse et aux accents), l'entreprise existante est retrouvée et seuls ses champs vides sont complétés. Si une valeur existante diffère, rien n'est écrasé : une erreur `ConflitMiseAJour` l'explique - c'est `modifier` qui écrase, explicitement.
 
-`doublons` liste les paires au nom proche sans rien modifier ; `fusionner <conserver> <supprimer>` déplace candidatures, lettres, fiches et notes vers la première, complète ses champs vides depuis la seconde, puis la supprime - irréversible, à utiliser après avoir vérifié la paire.
+`doublons` liste les paires au nom proche sans rien modifier ; `fusionner <conserver> <supprimer>` déplace candidatures, documents, lettres, fiches et notes vers la première, complète ses champs vides depuis la seconde, puis la supprime - irréversible, à utiliser après avoir vérifié la paire.
 
-### Lettres, fiches et notes d'entretien
+### CV, documents, lettres, fiches et notes d'entretien
 
 ```bash
 python cli.py lettres importer --entreprise "CEA" --poste "Stage - Évaluation d'agents IA" --fichier ma-lettre.pdf
@@ -169,9 +179,16 @@ python cli.py fiches ajouter --entreprise "Takima" --json fiche.json --candidatu
 python cli.py notes ajouter --candidature-id 12 --titre "Entretien technique" --contenu "Questions sur les évals."
 python cli.py notes lister --entreprise "AgentikCo"
 python cli.py notes voir 3
+python cli.py documents importer --entreprise "Wavestone" --poste "Stage IA" --fichier offre.pdf --type "Offre (PDF)"
+python cli.py documents modifier 3 --candidature-id 67 --candidature-id 68   # remplace les offres liées
+python cli.py cv ajouter --nom "CV français" --langue fr --fichier cv.pdf --source ~/Documents/cv-fr
+python cli.py cv voir                                # le CV principal + où se trouve sa source modifiable
+python cli.py cv principal 2                         # choisir le CV principal
 ```
 
 `importer` conserve le fichier **tel quel** (PDF, Word, texte) ; `ajouter` fabrique un PDF depuis un texte (lettre) ou des données JSON (fiche). Une pièce est liée à une entreprise et à une ou plusieurs de ses offres (`--candidature-id` répétable, ou `--poste` pour retrouver l'offre par son intitulé) ; `--generale` la marque aussi comme portant sur l'entreprise en général. `lister`, `supprimer` existent pour lettres et fiches ; une note vise soit une entreprise (`--entreprise`), soit une offre précise (`--candidature-id`).
+
+`documents importer` accepte n'importe quel format (25 Mo max) ; `cv ajouter --source` prend un dossier LaTeX, un fichier `.tex` ou un fichier Word `.docx` (Azimut n'y touche jamais, il garde le chemin : `cv voir` le rappelle à l'IA pour qu'elle sache où lire et où modifier).
 
 ### Import CSV (LinkedIn, Indeed, ou autre)
 
@@ -222,7 +239,7 @@ La deuxième option est la voie générique : **toute IA qui parle le protocole 
 
 Cette couche ne fait que proposer - jamais d'écriture directe en base, jamais d'information inventée (un champ absent de l'offre reste vide).
 
-**Sans clé du tout**, Azimut reste entièrement fonctionnel : une IA de type Claude Code peut piloter la base directement via la ligne de commande ou les fonctions Python documentées dans [`CLAUDE.md`](../CLAUDE.md), sur ton abonnement existant, sans clé API séparée. [`AGENT.md`](../AGENT.md) documente la procédure exacte qu'une IA doit suivre pour saisir une candidature à partir d'une offre.
+**Sans clé du tout**, Azimut reste entièrement fonctionnel : une IA de type Claude Code peut piloter la base directement via la ligne de commande ou les fonctions Python documentées dans [`CLAUDE.md`](../CLAUDE.md), sur ton abonnement existant, sans clé API séparée. [`AGENT.md`](../AGENT.md) dit à une IA quel guide suivre - saisir une candidature à partir d'une offre, rédiger une lettre, préparer une fiche : voir [Rédiger avec une IA installée sur l'ordinateur](#rédiger-avec-une-ia-installée-sur-lordinateur-sans-clé-api).
 
 ## Automatisations et extras
 
@@ -287,9 +304,15 @@ ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiche
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
 
-# documents.py - fichiers joints (CV, lettres, offres en PDF…)
-ajouter_document(candidature_id, nom_fichier, contenu_bytes, type_document=None) -> id
-lister_documents(candidature_id=None) / supprimer_document(id)
+# documents.py - tout fichier, lié à UNE entreprise et à UNE OU PLUSIEURS de ses offres
+importer_document(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None, generale=None, type_document=None) -> id
+ajouter_document(candidature_id, nom_fichier, contenu_bytes, type_document=None) -> id   # raccourci : une offre
+lister_documents(entreprise_id=None, candidature_id=None, recherche=None) / modifier_document(id, **champs) / supprimer_document(id)
+
+# cvs.py - les CV (fichier, source LaTeX/Word, texte), un « principal » lu par l'IA
+ajouter_cv(nom=None, langue=None, nom_fichier=None, contenu_fichier=None, chemin_source=None, texte=None, principal=None) -> id
+lister_cvs() / modifier_cv(id, **champs) / definir_cv_principal(id) / supprimer_cv(id)
+obtenir_cv_texte(id=None) -> texte pour l'IA (la source relue à chaque appel si elle est accessible)
 
 # export_excel.py / import_excel.py
 exporter_excel(chemin_sortie) -> chemin du fichier généré
@@ -309,11 +332,12 @@ azimut/
   Azimut.app                        # double-clic : l'application (fenêtre native)
   Azimut (terminal).command         # secours : même fenêtre, depuis le Terminal
   Créer un zip à partager.command   # double-clic : zip (sans données) sur le Bureau
-  app_bureau.py     # fenêtre native (pywebview) autour du serveur interne
+  app_bureau.py     # fenêtre native (pywebview) autour du serveur interne + pont JS (« Enregistrer sous »…)
+  pont_bureau.py    # ce que la fenêtre fait pour l'interface, sans pywebview (donc testable partout)
   compagnon.py      # serveur compagnon en lecture seule pour iPhone/iPad (réseau local, opt-in)
   serveur.py        # serveur interne (Flask) : API JSON + interface
-  static/           # interface (index.html, style.css, app.js, preparation.js)
-  db.py             # connexion SQLite, création des tables, migrations
+  static/           # interface : index.html, style.css, app.js, preparation.js (pièces, notes), cv.js, markdown.js
+  db.py             # connexion SQLite, schéma, migrations (une transaction, copie de sécurité avant suppression)
   valeurs.py        # valeurs autorisées + validation des champs
   exceptions.py     # exceptions métier (messages en français)
   entreprises.py    # CRUD entreprises (anti-doublon, conflits, fusion)
@@ -325,15 +349,16 @@ azimut/
   import_excel.py   # import d'un export .xlsx (sauvegarde / restauration)
   import_csv.py     # import CSV générique (LinkedIn, Indeed…), correspondance de colonnes à la main
   evenements.py     # journal automatique des candidatures (timeline)
-  documents.py      # fichiers joints (dossier configurable)
-  pieces_liees.py   # noyau commun lettres / fiches : une entreprise, plusieurs offres, fichier importé ou généré
+  pieces_liees.py   # noyau commun documents / lettres / fiches : une entreprise, plusieurs offres, fichier importé ou généré
+  documents.py      # documents : tout fichier, rattaché à une entreprise et à une ou plusieurs offres
   lettres.py        # lettres de motivation (texte -> PDF, ou fichier importé tel quel)
   fiches.py         # fiches d'entretien (données -> PDF, ou fichier importé tel quel)
   fiches_pdf.py     # rendu PDF d'une fiche (reportlab, mêmes PDF sur les 3 OS)
-  notes_entretien.py # notes d'entretien : une entreprise OU une offre précise
+  notes_entretien.py # notes d'entretien (Markdown) : une entreprise OU une offre précise
+  cvs.py            # les CV : fichier, source modifiable (LaTeX / Word), CV principal lu par l'IA
   generation.py     # génération par IA : vérifie tout AVANT d'appeler l'IA, puis enregistre
-  extraction.py     # texte d'un PDF / Word / texte (CV, indexation des pièces importées)
-  profil.py         # le CV utilisé par l'IA
+  guides_ia.py      # lit les guides skills/*/AGENT.md : le bloc de règles sert aussi de consigne à l'API
+  extraction.py     # texte d'un PDF / Word / texte (CV, indexation des documents importés)
   recherche.py      # recherche globale multi-types
   statistiques.py   # entonnoir, délais, sources, courbe hebdomadaire, objectif
   reglages.py       # réglages locaux (clé API masquée, fournisseur IA, dossier, code compagnon)
@@ -341,11 +366,12 @@ azimut/
   agent.py          # analyse d'offres, lettres, fiches - Anthropic ou tout fournisseur compatible OpenAI
   entretien.py      # récapitulatif d'une candidature (Markdown)
   cli.py            # interface en ligne de commande
+  skills/           # les .skill à télécharger + un guide AGENT.md par skill (lettre, fiche) pour une IA
   CLAUDE.md         # mode d'emploi du projet pour les IA (Claude Code…)
-  AGENT.md          # procédure pour qu'une IA saisisse une candidature à partir d'une offre
+  AGENT.md          # quel guide suivre selon la demande + procédure pour saisir une candidature
   suivi             # exécutable terminal (équivalent de python cli.py)
-  .github/workflows/tests.yml  # CI : la suite de tests tourne à chaque push
-  tests/            # une suite hermétique (jamais la vraie base) - python -m unittest discover -s tests
+  .github/workflows/tests.yml  # CI : la suite de tests sur 3 OS × Python 3.9 et 3.13
+  tests/            # suite hermétique (jamais la vraie base) - python -m unittest discover -s tests
   suivi_candidatures.db   # la base - seule source de vérité (non versionnée)
 ```
 
