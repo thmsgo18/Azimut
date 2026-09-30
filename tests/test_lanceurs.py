@@ -33,8 +33,20 @@ class TestLanceurs(unittest.TestCase):
             with self.subTest(lanceur.name):
                 texte = lanceur.read_text(encoding="utf-8")
                 self.assertIn(".requirements-installed", texte)
-                self.assertRegex(texte, r"(cmp -s|fc /b) requirements\.txt")
+                self.assertRegex(texte, r"(cmp -s|fc /b) requirements\.txt|requirements\.txt.*\.read_bytes\(\)")
                 self.assertIn("pip", texte)
+
+    def test_le_lanceur_macos_ne_depend_pas_des_outils_systeme_sur_le_dossier_projet(self):
+        """Lancé depuis le Dock, le lanceur reçoit « Operation not permitted » quand cat, cp, cmp ou
+        un script #!/bin/sh (venv/bin/pip) touchent le dossier Documents : seul le Python du venv y
+        a accès. Vécu : l'appli refusait de se lancer avec « Installation des dépendances impossible »."""
+        texte = LANCEURS_SH[0].read_text(encoding="utf-8")
+        code = "\n".join(l for l in texte.splitlines() if not l.lstrip().startswith("#"))
+        for interdit in (r"\bcat requirements", r"\bcp requirements", r"\bcmp\b", r"venv/bin/pip"):
+            with self.subTest(interdit):
+                self.assertNotRegex(code, interdit)
+        self.assertIn("-m pip install", code)
+        self.assertIn('elif ! ./venv/bin/python -c "import serveur"', code)  # un pip qui échoue ne bloque pas un environnement sain
 
     def test_chaque_lanceur_a_un_mode_installer_seulement_pour_la_ci(self):
         """La CI exécute vraiment les lanceurs sur les 3 systèmes, sans ouvrir de fenêtre."""

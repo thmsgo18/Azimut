@@ -47,14 +47,19 @@ fc /b requirements.txt "venv\.requirements-installed" >nul 2>nul
 if errorlevel 1 (
     echo Installation des dependances ^(voir requirements.txt^)...
     "venv\Scripts\python.exe" -m pip install --quiet --upgrade pip
-    "venv\Scripts\pip.exe" install --quiet -r requirements.txt
+    "venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt
     if errorlevel 1 (
-        echo Installation impossible ^(connexion Internet requise au premier
-        echo lancement et apres une mise a jour d'Azimut^).
-        pause
-        exit /b 1
+        rem Bloquant seulement si l'application ne peut vraiment pas demarrer.
+        "venv\Scripts\python.exe" -c "import serveur" >nul 2>nul
+        if errorlevel 1 (
+            echo Installation impossible ^(connexion Internet requise au premier
+            echo lancement et apres une mise a jour d'Azimut^).
+            pause
+            exit /b 1
+        )
+    ) else (
+        copy /y requirements.txt "venv\.requirements-installed" >nul
     )
-    copy /y requirements.txt "venv\.requirements-installed" >nul
 )
 
 rem Mode "installer seulement" (utilise par la CI) : AZIMUT_INSTALLER_SEULEMENT=1 s'arrete ici.

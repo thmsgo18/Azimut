@@ -43,13 +43,16 @@ fi
 if ! cmp -s requirements.txt venv/.requirements-installed 2>/dev/null; then
     echo "Installation des dépendances (voir requirements.txt)…"
     ./venv/bin/python -m pip install --quiet --upgrade pip
-    if ! ./venv/bin/pip install --quiet -r requirements.txt; then
+    if ./venv/bin/python -m pip install --quiet -r requirements.txt; then
+        # cat et non cp : cp peut échouer sous macOS (attributs étendus) dans un dossier protégé.
+        cat requirements.txt > venv/.requirements-installed 2>/dev/null || true
+    elif ! ./venv/bin/python -c "import serveur"; then
+        # Bloquant seulement si l'application ne peut vraiment pas démarrer.
         echo "✗ Installation impossible (connexion Internet requise au premier lancement"
         echo "  et après une mise à jour d'Azimut)."
         read -r -p "Appuyer sur Entrée pour fermer…"
         exit 1
     fi
-    cp requirements.txt venv/.requirements-installed
 fi
 
 # Mode « installer seulement » (utilisé par la CI, ou pour préparer un poste sans ouvrir la

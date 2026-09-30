@@ -41,19 +41,41 @@ if [ ! -x "venv/bin/python" ]; then
     fi
 fi
 
+# Lancé depuis le Dock, ce script n'a pas les droits du Terminal sur le dossier Documents :
+# les outils système (cat, cp, cmp, un script #!/bin/sh comme venv/bin/pip) y reçoivent
+# « Operation not permitted », alors que le Python du venv y lit et écrit normalement. Toute
+# lecture ou écriture de fichier passe donc par lui (jamais par cat/cp/cmp, ni par venv/bin/pip).
+dependances_a_jour() {
+    ./venv/bin/python -c '
+import pathlib, sys
+try:
+    sys.exit(0 if pathlib.Path("requirements.txt").read_bytes() == pathlib.Path("venv/.requirements-installed").read_bytes() else 1)
+except OSError:
+    sys.exit(1)' >/dev/null 2>&1
+}
+marquer_dependances() {
+    ./venv/bin/python -c '
+import pathlib
+pathlib.Path("venv/.requirements-installed").write_bytes(pathlib.Path("requirements.txt").read_bytes())' >>/tmp/azimut-install.log 2>&1 || true
+}
+
 # Dépendances : (ré)installées dès que requirements.txt a changé depuis la dernière
 # installation - y compris après une mise à jour d'Azimut qui en ajoute de nouvelles
 # (un simple « import flask » réussirait à tort avec un ancien environnement).
-if ! cmp -s requirements.txt venv/.requirements-installed 2>/dev/null; then
+if ! dependances_a_jour; then
     : >>/tmp/azimut-install.log
     # pip à jour d'abord : l'ancien pip du Python d'Apple ne sait pas
     # installer pyobjc (utilisé par la fenêtre native).
     ./venv/bin/python -m pip install --quiet --upgrade pip >>/tmp/azimut-install.log 2>&1
-    if ! ./venv/bin/pip install --quiet -r requirements.txt >>/tmp/azimut-install.log 2>&1; then
-        dialogue "Installation des dépendances impossible. Vérifier la connexion Internet (nécessaire au premier lancement et après une mise à jour d'Azimut), puis relancer Azimut. Détail : /tmp/azimut-install.log"
+    if ./venv/bin/python -m pip install --quiet -r requirements.txt >>/tmp/azimut-install.log 2>&1; then
+        marquer_dependances
+    elif ! ./venv/bin/python -c "import serveur" >>/tmp/azimut-install.log 2>&1; then
+        # Ce n'est bloquant que si l'application ne peut vraiment pas démarrer : un pip qui
+        # échoue alors que tout est déjà installé ne doit jamais empêcher de lancer Azimut.
+        detail="$(tail -n 3 /tmp/azimut-install.log 2>/dev/null | tr '"' "'" | tr '\n' ' ')"
+        dialogue "Installation des dépendances impossible. Vérifier la connexion Internet (nécessaire au premier lancement et après une mise à jour d'Azimut), puis relancer Azimut. Détail : ${detail} (journal complet : /tmp/azimut-install.log)"
         exit 1
     fi
-    cp requirements.txt venv/.requirements-installed
 fi
 
 # Mode « installer seulement » (utilisé par la CI, ou pour préparer un poste sans ouvrir la
