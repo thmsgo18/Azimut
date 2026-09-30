@@ -47,6 +47,15 @@ class BaseGeneration(unittest.TestCase):
 
 
 class TestGenererLettre(BaseGeneration):
+    def test_le_cv_choisi_est_celui_transmis_a_l_ia_sinon_le_principal(self):
+        self._cv("Camille Martin - CV principal en français.")
+        autre = cvs.ajouter_cv(nom="EN", texte="Camille Martin - English resume.", chemin_db=self.chemin_db)
+        with patch("agent.generer_lettre_motivation", return_value="Lettre.") as ia:
+            generation.generer_lettre("AgentikCo", [self.o1], cv_id=autre, chemin_db=self.chemin_db)
+            self.assertIn("English resume", ia.call_args.args[1])
+            generation.generer_lettre("AgentikCo", [self.o2], chemin_db=self.chemin_db)
+            self.assertIn("CV principal en français", ia.call_args.args[1])
+
     def test_succes_enregistre_la_lettre_avec_ses_offres(self):
         self._cv()
         with patch("agent.generer_lettre_motivation", return_value="Madame, Monsieur,\n\nMa lettre.") as ia:
