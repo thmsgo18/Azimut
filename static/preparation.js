@@ -263,71 +263,86 @@ async function creerSelecteurCible(racine, options = {}) {
 }
 
 /* ========================================================================
-   Zone de dépôt d'un fichier (glisser-déposer ou parcourir)
+   Zone de dépôt de fichiers (glisser-déposer ou parcourir)
    ======================================================================== */
 
+/* Options : extensions (liste, ou null = tous les formats), tailleMax, multiple (plusieurs
+   fichiers d'un coup), surFichier(premier) après chaque ajout. */
 function creerZoneDepot(racine, options = {}) {
-  const extensions = options.extensions || [".pdf", ".docx", ".txt", ".md"];
+  const extensions = options.extensions === undefined ? [".pdf", ".docx", ".txt", ".md"] : options.extensions;
   const tailleMax = options.tailleMax || 15 * 1024 * 1024;
-  let fichier = null;
+  const multiple = !!options.multiple;
+  let fichiers = [];
 
   racine.innerHTML = `
     <div class="zone-depot" tabindex="0" role="button" aria-label="${echapperAttribut(t("depot.titre"))}">
       <div class="icone"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4"/><path d="m7 9 5-5 5 5"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div>
-      <div class="zone-depot-titre">${t("depot.titre")}</div>
-      <div class="zone-depot-sous">${t("depot.sous_titre")}</div>
-      <div class="zone-depot-fichier" hidden></div>
-      <input type="file" accept="${extensions.join(",")}" hidden>
+      <div class="zone-depot-titre">${t(multiple ? "depot.titre_multiple" : "depot.titre")}</div>
+      <div class="zone-depot-sous">${extensions ? t("depot.sous_titre") : t("depot.sous_titre_tous")}</div>
+      <div class="zone-depot-fichiers" hidden></div>
+      <input type="file" ${extensions ? `accept="${extensions.join(",")}"` : ""}${multiple ? " multiple" : ""} hidden>
     </div>`;
   const zone = racine.querySelector(".zone-depot");
   const champ = racine.querySelector('input[type="file"]');
-  const infos = racine.querySelector(".zone-depot-fichier");
+  const liste = racine.querySelector(".zone-depot-fichiers");
+  if (multiple) zone.dataset.multiple = "";
 
   function afficher() {
-    const rempli = fichier !== null;
+    const rempli = fichiers.length > 0;
     zone.classList.toggle("rempli", rempli);
-    racine.querySelector(".zone-depot-titre").hidden = rempli;
-    racine.querySelector(".zone-depot-sous").hidden = rempli;
-    infos.hidden = !rempli;
-    infos.innerHTML = rempli
-      ? `<span class="nom">${echapper(fichier.name)}</span><span class="taille">${tailleLisible(fichier.size)}</span>
-         <button type="button" class="btn btn-mini" data-role="retirer">${t("depot.changer")}</button>`
-      : "";
+    racine.querySelector(".zone-depot-titre").hidden = rempli && !multiple;
+    racine.querySelector(".zone-depot-sous").hidden = rempli && !multiple;
+    liste.hidden = !rempli;
+    liste.innerHTML = fichiers.map((fichier, rang) => `
+      <div class="zone-depot-fichier">
+        <span class="nom">${echapper(fichier.name)}</span><span class="taille">${tailleLisible(fichier.size)}</span>
+        <button type="button" class="btn btn-mini" data-retirer="${rang}">${t(multiple ? "depot.retirer" : "depot.changer")}</button>
+      </div>`).join("");
   }
 
-  function accepter(nouveau) {
-    if (!nouveau) return;
-    const extension = (nouveau.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
-    if (!extensions.includes(extension)) {
-      toast(t("depot.format_refuse", { ext: extension || "?" }), true);
-      return;
+  function accepter(nouveaux) {
+    let ajoutes = false;
+    for (const nouveau of nouveaux) {
+      const extension = (nouveau.name.match(/\.[^.]+$/) || [""])[0].toLowerCase();
+      if (extensions && !extensions.includes(extension)) {
+        toast(t("depot.format_refuse", { ext: extension || "?" }), true);
+        continue;
+      }
+      if (nouveau.size > tailleMax) {
+        toast(t("depot.trop_gros", { taille: tailleLisible(tailleMax) }), true);
+        continue;
+      }
+      if (multiple) fichiers.push(nouveau);
+      else fichiers = [nouveau];
+      ajoutes = true;
     }
-    if (nouveau.size > tailleMax) {
-      toast(t("depot.trop_gros", { taille: tailleLisible(tailleMax) }), true);
-      return;
-    }
-    fichier = nouveau;
+    if (!ajoutes) return;
     afficher();
-    if (options.surFichier) options.surFichier(nouveau);
+    if (options.surFichier) options.surFichier(fichiers[0]);
   }
 
   zone.addEventListener("click", (evenement) => {
-    if (evenement.target.closest('[data-role="retirer"]')) {
-      fichier = null;
+    const retirer = evenement.target.closest("[data-retirer]");
+    if (retirer) {
+      fichiers.splice(Number(retirer.dataset.retirer), 1);
       champ.value = "";
       afficher();
-      champ.click();
+      if (options.surFichier && fichiers.length) options.surFichier(fichiers[0]);
+      if (!multiple) champ.click();
       return;
     }
-    if (!fichier) champ.click();
+    if (multiple || !fichiers.length) champ.click();
   });
   zone.addEventListener("keydown", (evenement) => {
-    if ((evenement.key === "Enter" || evenement.key === " ") && !fichier) {
+    if ((evenement.key === "Enter" || evenement.key === " ") && (multiple || !fichiers.length)) {
       evenement.preventDefault();
       champ.click();
     }
   });
-  champ.addEventListener("change", () => accepter(champ.files[0]));
+  champ.addEventListener("change", () => {
+    accepter(Array.from(champ.files));
+    champ.value = "";
+  });
   ["dragenter", "dragover"].forEach((nom) => {
     zone.addEventListener(nom, (evenement) => {
       evenement.preventDefault();
@@ -338,23 +353,26 @@ function creerZoneDepot(racine, options = {}) {
   zone.addEventListener("drop", (evenement) => {
     evenement.preventDefault();
     zone.classList.remove("survol");
-    const fichiers = evenement.dataTransfer && evenement.dataTransfer.files;
-    if (fichiers && fichiers.length > 1) toast(t("depot.un_seul_fichier"), true);
-    accepter(fichiers && fichiers[0]);
+    const deposes = Array.from((evenement.dataTransfer && evenement.dataTransfer.files) || []);
+    if (!multiple && deposes.length > 1) toast(t("depot.un_seul_fichier"), true);
+    accepter(multiple ? deposes : deposes.slice(0, 1));
   });
 
   afficher();
-  return { fichier: () => fichier };
+  return { fichier: () => fichiers[0] || null, fichiers: () => fichiers.slice() };
 }
 
 /* ========================================================================
-   Lettres de motivation et fiches d'entretien : listes, aperçu, actions
+   Lettres de motivation, fiches d'entretien et documents : listes, aperçu, actions
    ======================================================================== */
 
-function puceOrigine(section, source) {
-  const cle = source === "api" ? "origine_api" : source === "claude_code" ? "origine_claude_code" : "origine_manuelle";
-  return `<span class="puce">${echapper(t(`${section}.${cle}`))}</span>`;
-}
+/* Chaque section est décrite ici : la même liste, le même aperçu et la même fenêtre
+   d'ajout servent aux trois. `typeLibelle` : colonne « Type » propre aux documents. */
+const SECTIONS_PIECES = {
+  lettres: { avecType: false, multiple: false },
+  fiches: { avecType: false, multiple: false },
+  documents: { avecType: true, multiple: true },
+};
 
 function offresLiees(piece) {
   const puces = piece.candidatures.map(
@@ -364,8 +382,15 @@ function offresLiees(piece) {
   return puces.length ? `<div class="offres-liees">${puces.join("")}</div>` : "";
 }
 
+function ouvrirNouveauDepuisSection(section) {
+  if (section === "lettres") return ouvrirNouvelleLettre();
+  if (section === "fiches") return ouvrirNouvelleFiche();
+  return ouvrirImportPiece("documents");
+}
+
 async function vuePieces(section) {
   const filtre = etat.filtresPieces[section].recherche;
+  const avecType = SECTIONS_PIECES[section].avecType;
   const liste = await api(`/api/${section}` + (filtre ? `?recherche=${encodeURIComponent(filtre)}` : ""));
   const lignes = liste
     .map((piece) => `
@@ -373,19 +398,19 @@ async function vuePieces(section) {
       <td class="cellule-principale cellule-titre" title="${echapperAttribut(piece.titre)}">${echapper(piece.titre)}
         ${piece.chemin_fichier && !piece.fichier_disponible ? `<span class="puce puce-lien-mort" title="${echapperAttribut(t("pieces.fichier_introuvable_titre"))}">${t("pieces.fichier_introuvable")}</span>` : ""}
       </td>
+      ${avecType ? `<td><span class="puce">${echapper(tv(piece.type_document || "Autre"))}</span></td>` : ""}
       <td>${echapper(piece.entreprise)}</td>
       <td>${offresLiees(piece)}</td>
-      <td>${puceOrigine(section, piece.source)}</td>
       <td class="cellule-date">${dateFr(piece.date_creation)}</td>
       <td onclick="event.stopPropagation()"><div class="actions-ligne">
-        ${piece.fichier_disponible ? `<a class="btn btn-discret btn-mini" href="/api/${section}/${piece.id}/telecharger">${t("pieces.telecharger")}</a>` : ""}
+        ${piece.fichier_disponible ? `<button class="btn btn-discret btn-mini" onclick="telechargerPiece('${section}', ${piece.id})">${t("pieces.telecharger")}</button>` : ""}
         <button class="btn btn-danger btn-mini" onclick="supprimerPiece('${section}', ${piece.id})">${t("commun.supprimer")}</button>
       </div></td>
     </tr>`)
     .join("");
   const boutons = `
-    <button class="btn" onclick="ouvrirImportPiece('${section}')">${t(`${section}.ajouter_la_mienne`)}</button>
-    <button class="btn btn-accent" onclick="${section === "lettres" ? "ouvrirNouvelleLettre()" : "ouvrirNouvelleFiche()"}">${t(`${section}.nouvelle`)}</button>`;
+    ${section === "documents" ? "" : `<button class="btn" onclick="ouvrirImportPiece('${section}')">${t(`${section}.ajouter_la_mienne`)}</button>`}
+    <button class="btn btn-accent" onclick="ouvrirNouveauDepuisSection('${section}')">${t(`${section}.nouvelle`)}</button>`;
   return `
     <div class="entete-vue">
       <h1>${t(`nav.${section}`)}</h1>
@@ -397,8 +422,9 @@ async function vuePieces(section) {
     ${liste.length ? `
       <div class="enveloppe-tableau"><table class="tableau">
         <thead><tr>
-          <th>${t("pieces.col_titre")}</th><th>${t("pieces.col_entreprise")}</th>
-          <th>${t("pieces.col_offres")}</th><th>${t("pieces.col_origine")}</th>
+          <th>${t("pieces.col_titre")}</th>
+          ${avecType ? `<th>${t("documents.col_type")}</th>` : ""}
+          <th>${t("pieces.col_entreprise")}</th><th>${t("pieces.col_offres")}</th>
           <th>${t("pieces.col_creee_le")}</th><th></th>
         </tr></thead>
         <tbody>${lignes}</tbody>
@@ -430,66 +456,156 @@ function activerPieces(section) {
 
 async function supprimerPiece(section, id, apres) {
   const accord = await confirmer(t(`${section}.supprimer_titre`), t(`${section}.supprimer_texte`));
-  if (!accord) return;
+  if (!accord) return false;
   try {
     await api(`/api/${section}/${id}`, { methode: "DELETE" });
     toast(t(`${section}.supprimee`));
-    if (apres) apres();
+    if (apres) await apres();
     rendre();
+    return true;
   } catch (erreur) {
     toast(erreur.message, true);
+    return false;
   }
 }
 
-/* Aperçu : le PDF affiché dans la fenêtre (ou, à défaut, le texte), avec de quoi le
-   télécharger, le modifier ou le supprimer. */
-async function ouvrirApercuPiece(section, id) {
+/* Télécharge le fichier d'une pièce SANS quitter la page (voir telechargerFichier dans app.js). */
+async function telechargerPiece(section, id, format) {
   try {
     const piece = await api(`/api/${section}/${id}`);
-    const meta = `
-      <div class="apercu-meta">
-        <span class="puce">${echapper(piece.entreprise)}</span>
-        ${piece.candidatures.map((c) => `<span class="puce">${echapper(c.poste)}</span>`).join("")}
-        ${piece.generale ? `<span class="puce puce-cible entreprise">${t("selecteur.entreprise_en_general")}</span>` : ""}
-        ${puceOrigine(section, piece.source)}
-        <span class="cellule-secondaire">${dateFr(piece.date_creation)}</span>
-      </div>`;
-    let contenu;
-    if (piece.apercu_pdf) {
-      contenu = `<iframe class="apercu-cadre" src="/api/${section}/${piece.id}/apercu" title="${echapperAttribut(piece.titre)}"></iframe>`;
-    } else if (piece.contenu) {
-      contenu = `<div class="apercu-texte">${echapper(piece.contenu)}</div>`;
-    } else {
-      contenu = `<p class="sous-titre">${t("pieces.aucun_apercu")}</p>`;
-    }
-    ouvrirModale(
-      piece.titre,
-      meta + contenu,
-      `<button class="btn btn-danger" id="btn-piece-supprimer" style="margin-right:auto;">${t("commun.supprimer")}</button>
-       <button class="btn" id="btn-piece-modifier">${t("commun.modifier")}</button>
-       ${piece.contenu ? `<a class="btn" href="/api/${section}/${piece.id}/telecharger?format=texte">${t("pieces.telecharger_texte")}</a>` : ""}
-       ${piece.fichier_disponible ? `<a class="btn btn-accent" href="/api/${section}/${piece.id}/telecharger">${t("pieces.telecharger")}</a>` : ""}
-       <button class="btn" onclick="fermerModale()">${t("commun.fermer")}</button>`,
-      false, true
-    );
-    document.getElementById("btn-piece-modifier").addEventListener("click", () => ouvrirModifierPiece(section, piece));
-    document.getElementById("btn-piece-supprimer").addEventListener("click", () => {
-      fermerModale();
-      supprimerPiece(section, piece.id);
-    });
+    const nom = format === "texte"
+      ? `${piece.titre}.md`
+      : (piece.nom_fichier || `${piece.titre}.pdf`);
+    await telechargerFichier(`/api/${section}/${id}/telecharger${format ? `?format=${format}` : ""}`, nom);
   } catch (erreur) {
     toast(erreur.message, true);
   }
 }
 
-async function ouvrirModifierPiece(section, piece) {
-  ouvrirModale(
+/* Copie un texte dans le presse-papiers (API moderne, sinon repli par une zone cachée). */
+async function copierTexte(texte, messageOk) {
+  let reussi = false;
+  try {
+    await navigator.clipboard.writeText(texte);
+    reussi = true;
+  } catch {
+    const zone = document.createElement("textarea");
+    zone.value = texte;
+    zone.setAttribute("readonly", "");
+    zone.style.cssText = "position:fixed;left:-9999px;top:0;";
+    document.body.appendChild(zone);
+    zone.select();
+    try { reussi = document.execCommand("copy"); } catch { reussi = false; }
+    zone.remove();
+  }
+  toast(reussi ? (messageOk || t("commun.copie")) : t("commun.copie_impossible"), !reussi);
+  return reussi;
+}
+
+/* Aperçu EN FENÊTRE : le fichier (PDF, image) et son texte, jamais une navigation
+   de la page - on ferme la fenêtre et on retrouve exactement où on en était.
+   `options.apres` s'exécute quand la pièce a été modifiée ou supprimée. */
+async function ouvrirApercuPiece(section, id, options = {}) {
+  let piece;
+  try {
+    piece = await api(`/api/${section}/${id}`);
+  } catch (erreur) {
+    toast(erreur.message, true);
+    return;
+  }
+  const texte = (piece.contenu || "").trim();
+  const vues = [];
+  if (piece.type_apercu === "pdf" || piece.type_apercu === "image") vues.push("fichier");
+  if (texte) vues.push("texte");
+  const enMarkdown = section === "fiches" && piece.source !== "manuelle";
+
+  const meta = `
+    <div class="apercu-meta">
+      <span class="puce">${echapper(piece.entreprise)}</span>
+      ${section === "documents" ? `<span class="puce">${echapper(tv(piece.type_document || "Autre"))}</span>` : ""}
+      ${piece.candidatures.map((c) => `<span class="puce">${echapper(c.poste)}</span>`).join("")}
+      ${piece.generale ? `<span class="puce puce-cible entreprise">${t("selecteur.entreprise_en_general")}</span>` : ""}
+      <span class="cellule-secondaire">${dateFr(piece.date_creation)}</span>
+    </div>`;
+  const barre = `
+    <div class="apercu-barre">
+      ${vues.length > 1 ? `
+        <div class="bascule apercu-onglets">
+          <button type="button" data-vue="fichier">${t("pieces.vue_apercu")}</button>
+          <button type="button" data-vue="texte">${t("pieces.vue_texte")}</button>
+        </div>` : "<span></span>"}
+      <div class="apercu-actions"></div>
+    </div>`;
+  const zone = ouvrirModale(
+    piece.titre,
+    `${meta}${barre}<div class="apercu-zone"></div>`,
+    `<button class="btn btn-danger" id="btn-piece-supprimer" style="margin-right:auto;">${t("commun.supprimer")}</button>
+     <button class="btn" id="btn-piece-modifier">${t("commun.modifier")}</button>
+     <button class="btn btn-accent" onclick="fermerModale()">${t("commun.fermer")}</button>`,
+    false, true
+  );
+  const cadre = zone.racine.querySelector(".apercu-zone");
+  const actions = zone.racine.querySelector(".apercu-actions");
+
+  function afficherVue(nom) {
+    zone.racine.querySelectorAll(".apercu-onglets button").forEach((b) => b.classList.toggle("actif", b.dataset.vue === nom));
+    if (nom === "fichier") {
+      cadre.innerHTML = piece.type_apercu === "image"
+        ? `<div class="apercu-image-cadre"><img class="apercu-image" src="/api/${section}/${piece.id}/apercu" alt="${echapperAttribut(piece.titre)}"></div>`
+        : `<iframe class="apercu-cadre" src="/api/${section}/${piece.id}/apercu" title="${echapperAttribut(piece.titre)}"></iframe>`;
+      actions.innerHTML = piece.fichier_disponible
+        ? `<button type="button" class="btn btn-mini" data-action="telecharger">${t("pieces.telecharger")}</button>` : "";
+    } else if (nom === "texte") {
+      cadre.innerHTML = enMarkdown
+        ? `<div class="apercu-texte rendu-markdown">${rendreMarkdown(texte)}</div>`
+        : `<div class="apercu-texte">${echapper(texte)}</div>`;
+      actions.innerHTML = `
+        <button type="button" class="btn btn-mini" data-action="copier">${t("pieces.copier_texte")}</button>
+        <button type="button" class="btn btn-mini" data-action="telecharger-texte">${t("pieces.telecharger_texte")}</button>`;
+    } else {
+      cadre.innerHTML = `
+        <div class="etat-vide compact"><p>${t("pieces.aucun_apercu")}</p></div>`;
+      actions.innerHTML = piece.fichier_disponible
+        ? `<button type="button" class="btn btn-mini btn-accent" data-action="telecharger">${t("pieces.telecharger")}</button>` : "";
+    }
+  }
+  zone.racine.querySelectorAll(".apercu-onglets button").forEach((b) => b.addEventListener("click", () => afficherVue(b.dataset.vue)));
+  actions.addEventListener("click", (evenement) => {
+    const action = evenement.target.closest("[data-action]");
+    if (!action) return;
+    if (action.dataset.action === "copier") copierTexte(texte, t("pieces.texte_copie"));
+    else if (action.dataset.action === "telecharger") telechargerPiece(section, piece.id);
+    else if (action.dataset.action === "telecharger-texte") telechargerPiece(section, piece.id, "texte");
+  });
+  afficherVue(vues[0] || null);
+
+  zone.racine.querySelector("#btn-piece-modifier").addEventListener("click", () => {
+    ouvrirModifierPiece(section, piece, async () => {
+      fermerModale(zone);
+      if (options.apres) await options.apres();
+      ouvrirApercuPiece(section, piece.id, options);
+    });
+  });
+  zone.racine.querySelector("#btn-piece-supprimer").addEventListener("click", async () => {
+    const supprimee = await supprimerPiece(section, piece.id, options.apres);
+    if (supprimee) fermerModale(zone);
+  });
+}
+
+async function ouvrirModifierPiece(section, piece, apres) {
+  const v = etat.valeurs;
+  const zone = ouvrirModale(
     t("pieces.modifier_titre"),
     `<div class="grille-form">
        <div class="champ pleine-largeur">
          <label for="piece-titre">${t("pieces.champ_titre")}</label>
          <input type="text" id="piece-titre" value="${echapperAttribut(piece.titre)}">
        </div>
+       ${section === "documents" ? `
+       <div class="champ">
+         <label for="piece-type">${t("documents.col_type")}</label>
+         <select id="piece-type">${optionsSelect(v.types_document, piece.type_document || "Autre", false)}</select>
+       </div>` : ""}
        <div class="champ pleine-largeur">
          <label>${t("pieces.champ_offres")} - ${echapper(piece.entreprise)}</label>
          <div id="piece-selecteur"></div>
@@ -499,24 +615,24 @@ async function ouvrirModifierPiece(section, piece) {
      <button class="btn btn-accent" id="btn-piece-enregistrer">${t("commun.enregistrer")}</button>`,
     false, true
   );
-  const selecteur = await creerSelecteurCible(document.getElementById("piece-selecteur"), {
+  const selecteur = await creerSelecteurCible(zone.racine.querySelector("#piece-selecteur"), {
     mode: "pieces", entrepriseFixe: piece.entreprise_id, offreIds: piece.candidatures.map((c) => c.id),
     generale: piece.generale,
   });
-  document.getElementById("btn-piece-enregistrer").addEventListener("click", async () => {
+  zone.racine.querySelector("#btn-piece-enregistrer").addEventListener("click", async () => {
     const choix = selecteur.lire();
+    const corps = {
+      titre: zone.racine.querySelector("#piece-titre").value,
+      candidature_ids: choix.offreIds,
+      generale: choix.generale,
+    };
+    if (section === "documents") corps.type_document = zone.racine.querySelector("#piece-type").value;
     try {
-      await api(`/api/${section}/${piece.id}`, {
-        methode: "PATCH",
-        corps: {
-          titre: document.getElementById("piece-titre").value,
-          candidature_ids: choix.offreIds,
-          generale: choix.generale,
-        },
-      });
+      await api(`/api/${section}/${piece.id}`, { methode: "PATCH", corps });
       toast(t("pieces.enregistree"));
-      fermerModale();
-      rendre();
+      fermerModale(zone);
+      if (apres) await apres();
+      else rendre();
     } catch (erreur) {
       toast(erreur.message, true);
     }
@@ -524,18 +640,27 @@ async function ouvrirModifierPiece(section, piece) {
 }
 
 /* ------------------------------------------------------------------------
-   Ajouter sa propre lettre / fiche : glisser-déposer un fichier
+   Ajouter son propre fichier (lettre, fiche, document) : glisser-déposer
    ------------------------------------------------------------------------ */
 
-async function ouvrirImportPiece(section) {
-  ouvrirModale(
+/* options : entrepriseFixe (id) + offreIds : ajout depuis une candidature (la sélection est
+   déjà faite) ; apres : rappelé une fois les fichiers ajoutés. */
+async function ouvrirImportPiece(section, options = {}) {
+  const documents = section === "documents";
+  const v = etat.valeurs;
+  const zone = ouvrirModale(
     t(`${section}.ajouter_la_mienne_titre`),
     `<p class="sous-titre" style="margin-top:0;">${t(`${section}.ajouter_la_mienne_texte`)}</p>
      <div id="depot"></div>
-     <h2 style="font-size:13px;margin:18px 0 8px;">${t("pieces.rattacher_a")}</h2>
+     <h2 class="titre-bloc">${t("pieces.rattacher_a")}</h2>
      <div id="import-selecteur"></div>
      <p class="sous-titre" id="suggestion-fichier" style="margin:6px 0 0;" hidden></p>
      <div class="grille-form" style="margin-top:14px;">
+       ${documents ? `
+       <div class="champ">
+         <label for="import-type">${t("documents.col_type")}</label>
+         <select id="import-type">${optionsSelect(v.types_document, options.type || "Autre", false)}</select>
+       </div>` : `
        <div class="champ">
          <label for="import-titre">${t("pieces.champ_titre_facultatif")}</label>
          <input type="text" id="import-titre" placeholder="${echapperAttribut(t("pieces.titre_par_defaut"))}">
@@ -543,7 +668,7 @@ async function ouvrirImportPiece(section) {
        <div class="champ">
          <label for="import-langue">${t("pieces.champ_langue")}</label>
          <input type="text" id="import-langue" placeholder="${echapperAttribut(t("pieces.langue_placeholder"))}">
-       </div>
+       </div>`}
      </div>`,
     `<button class="btn" onclick="fermerModale()">${t("commun.annuler")}</button>
      <button class="btn btn-accent" id="btn-import-piece" disabled>${t("pieces.ajouter")}</button>`,
@@ -551,17 +676,20 @@ async function ouvrirImportPiece(section) {
   );
 
   let selecteur;
-  const bouton = document.getElementById("btn-import-piece");
-  const suggestion = document.getElementById("suggestion-fichier");
+  const bouton = zone.racine.querySelector("#btn-import-piece");
+  const suggestion = zone.racine.querySelector("#suggestion-fichier");
   const actualiserBouton = () => {
     const choix = selecteur.lire();
-    bouton.disabled = !depot.fichier() || !(choix.entrepriseId !== null || choix.entrepriseNom);
+    bouton.disabled = !depot.fichiers().length || !(choix.entrepriseId !== null || choix.entrepriseNom);
   };
-  const depot = creerZoneDepot(document.getElementById("depot"), {
+  const depot = creerZoneDepot(zone.racine.querySelector("#depot"), {
+    multiple: documents,
+    extensions: documents ? null : [".pdf", ".docx", ".txt", ".md"],
+    tailleMax: documents ? 25 * 1024 * 1024 : 15 * 1024 * 1024,
     surFichier: (fichier) => {
       // Le nom du fichier suggère souvent l'entreprise (« lettre-motivation-CEA.pdf ») :
       // on la propose, sans jamais écraser un choix déjà fait.
-      if (selecteur && selecteur.lire().entrepriseNom === "") {
+      if (selecteur && !options.entrepriseFixe && selecteur.lire().entrepriseNom === "") {
         const nom = normaliserTexte(fichier.name);
         const candidates = selecteur.entreprises
           .filter((e) => e.nom.length >= 3 && nom.includes(normaliserTexte(e.nom)))
@@ -575,36 +703,48 @@ async function ouvrirImportPiece(section) {
       actualiserBouton();
     },
   });
-  selecteur = await creerSelecteurCible(document.getElementById("import-selecteur"), { mode: "pieces" });
+  selecteur = await creerSelecteurCible(zone.racine.querySelector("#import-selecteur"), {
+    mode: "pieces", entrepriseFixe: options.entrepriseFixe, offreIds: options.offreIds,
+  });
   selecteur.surChangement(actualiserBouton);
 
   bouton.addEventListener("click", async () => {
     const choix = selecteur.lire();
-    const formulaire = new FormData();
-    formulaire.append("fichier", depot.fichier());
-    formulaire.append("entreprise", choix.entrepriseNom);
-    formulaire.append("candidature_ids", JSON.stringify(choix.offreIds));
-    formulaire.append("generale", choix.generale ? "1" : "0");
-    formulaire.append("titre", document.getElementById("import-titre").value);
-    formulaire.append("langue", document.getElementById("import-langue").value);
+    const fichiers = depot.fichiers();
     bouton.disabled = true;
-    try {
-      etat.versionDb = null;
-      const reponse = await fetch(`/api/${section}/importer`, { method: "POST", body: formulaire });
-      const donnees = await reponse.json();
-      if (!reponse.ok) throw new Error(donnees.erreur || t("commun.erreur_inattendue"));
-      toast(t(`${section}.ajoutee`));
-      fermerModale();
-      rendre();
-    } catch (erreur) {
-      toast(erreur.message, true);
-      bouton.disabled = false;
+    etat.versionDb = null;
+    let reussis = 0;
+    for (const fichier of fichiers) {
+      const formulaire = new FormData();
+      formulaire.append("fichier", fichier);
+      formulaire.append("entreprise", choix.entrepriseNom);
+      formulaire.append("candidature_ids", JSON.stringify(choix.offreIds));
+      formulaire.append("generale", choix.generale ? "1" : "0");
+      if (documents) {
+        formulaire.append("type_document", zone.racine.querySelector("#import-type").value);
+      } else {
+        formulaire.append("titre", zone.racine.querySelector("#import-titre").value);
+        formulaire.append("langue", zone.racine.querySelector("#import-langue").value);
+      }
+      try {
+        const reponse = await fetch(`/api/${section}/importer`, { method: "POST", body: formulaire });
+        const donnees = await reponse.json();
+        if (!reponse.ok) throw new Error(donnees.erreur || t("commun.erreur_inattendue"));
+        reussis += 1;
+      } catch (erreur) {
+        toast(`${fichier.name} : ${erreur.message}`, true);
+      }
     }
+    if (!reussis) { bouton.disabled = false; return; }
+    toast(reussis === 1 ? t(`${section}.ajoutee`) : t("documents.documents_ajoutes", { n: reussis }));
+    fermerModale(zone);
+    if (options.apres) await options.apres();
+    rendre();
   });
 }
 
 /* ------------------------------------------------------------------------
-   Créer avec l'IA
+   Créer avec l'IA (clé API), avec une IA installée sur l'ordinateur, ou en ajoutant son fichier
    ------------------------------------------------------------------------ */
 
 async function lancerGeneration(section, corps, boutons, statut) {
@@ -624,23 +764,43 @@ async function lancerGeneration(section, corps, boutons, statut) {
   }
 }
 
+/* Choix du CV que l'IA lira (seulement s'il y en a plusieurs) : le principal par défaut. */
+function choixCvHtml(cvs) {
+  if (cvs.length < 2) return "";
+  return `
+    <div class="champ" style="margin-top:12px;">
+      <label for="generation-cv">${t("pieces.cv_utilise")}</label>
+      <select id="generation-cv">
+        ${cvs.map((cv) => `<option value="${cv.id}"${cv.principal ? " selected" : ""}>${echapper(cv.nom)}${cv.langue ? ` (${echapper(cv.langue)})` : ""}${cv.principal ? ` - ${echapper(t("cv.principal"))}` : ""}</option>`).join("")}
+      </select>
+    </div>`;
+}
+
+function carteIaLocale(section, nomSkill) {
+  return `
+    <div class="carte bloc-methode">
+      <h2>${t(`${section}.methode_skill_titre`)}</h2>
+      <p class="sous-titre">${t(`${section}.methode_skill_texte`)}</p>
+      <div class="actions-reglages">
+        <a class="btn btn-accent" href="/api/skills/${nomSkill}" data-telechargement="${nomSkill}.skill">${t(`${section}.telecharger_skill`)}</a>
+      </div>
+    </div>`;
+}
+
 async function ouvrirNouvelleLettre() {
-  const [cv, reglagesIa] = await Promise.all([api("/api/profil/cv"), api("/api/reglages")]);
+  const [cvs, reglagesIa] = await Promise.all([api("/api/cvs"), api("/api/reglages")]);
   const peutGenererApi = reglagesIa.cle_api_definie && reglagesIa.fournisseur_ia !== "openai_compatible";
-  ouvrirModale(
+  const zone = ouvrirModale(
     t("lettres.creer_titre"),
-    `<h2 style="font-size:13px;margin:0 0 8px;">${t("pieces.pour_qui")}</h2>
+    `<h2 class="titre-bloc">${t("pieces.pour_qui")}</h2>
      <div id="creation-selecteur"></div>
      <div class="champ" style="margin-top:12px;">
        <label for="lettre-langue">${t("lettres.langue_label")}</label>
        <input type="text" id="lettre-langue" placeholder="${echapperAttribut(t("lettres.langue_placeholder"))}">
      </div>
-     ${!cv.defini ? `<p class="sous-titre" style="color:var(--danger);margin-top:10px;">${t("lettres.cv_manquant")}</p>` : ""}
-     <div class="carte bloc-methode">
-       <h2>${t("lettres.methode_skill_titre")}</h2>
-       <p class="sous-titre">${t("lettres.methode_skill_texte")}</p>
-       <div class="actions-reglages"><a class="btn btn-accent" href="/api/lettres/skill">${t("lettres.telecharger_skill")}</a></div>
-     </div>
+     ${choixCvHtml(cvs)}
+     ${!cvs.length ? `<p class="sous-titre" style="color:var(--danger);margin-top:10px;">${t("lettres.cv_manquant")} <a class="lien-detail" href="#/cv" onclick="fermerModale()">${t("lettres.aller_aux_cv")}</a></p>` : ""}
+     ${carteIaLocale("lettres", "lettre-motivation")}
      <div class="carte bloc-methode">
        <h2>${t("lettres.methode_api_titre")}</h2>
        <p class="sous-titre">${t("lettres.methode_api_texte")}</p>
@@ -656,32 +816,34 @@ async function ouvrirNouvelleLettre() {
     `<button class="btn" onclick="fermerModale()">${t("commun.fermer")}</button>`,
     false, true
   );
-  const selecteur = await creerSelecteurCible(document.getElementById("creation-selecteur"), { mode: "pieces" });
-  const bouton = document.getElementById("btn-generer");
+  const selecteur = await creerSelecteurCible(zone.racine.querySelector("#creation-selecteur"), { mode: "pieces" });
+  const bouton = zone.racine.querySelector("#btn-generer");
   selecteur.surChangement((choix) => {
-    bouton.disabled = !(peutGenererApi && cv.defini && (choix.entrepriseId !== null || choix.entrepriseNom));
+    bouton.disabled = !(peutGenererApi && cvs.length && (choix.entrepriseId !== null || choix.entrepriseNom));
   });
   bouton.addEventListener("click", () => {
     const choix = selecteur.lire();
+    const choixCv = zone.racine.querySelector("#generation-cv");
     lancerGeneration("lettres", {
       entreprise: choix.entrepriseNom,
       candidature_ids: choix.offreIds,
       generale: choix.generale,
-      langue: document.getElementById("lettre-langue").value.trim() || null,
-    }, [bouton], document.getElementById("generation-statut"));
+      langue: zone.racine.querySelector("#lettre-langue").value.trim() || null,
+      cv_id: choixCv ? Number(choixCv.value) : null,
+    }, [bouton], zone.racine.querySelector("#generation-statut"));
   });
-  document.getElementById("btn-vers-import").addEventListener("click", () => {
-    fermerModale();
+  zone.racine.querySelector("#btn-vers-import").addEventListener("click", () => {
+    fermerModale(zone);
     ouvrirImportPiece("lettres");
   });
 }
 
 async function ouvrirNouvelleFiche() {
-  const [cv, reglagesIa] = await Promise.all([api("/api/profil/cv"), api("/api/reglages")]);
+  const [cvs, reglagesIa] = await Promise.all([api("/api/cvs"), api("/api/reglages")]);
   const peutGenerer = reglagesIa.cle_api_definie;
-  ouvrirModale(
+  const zone = ouvrirModale(
     t("fiches.creer_titre"),
-    `<h2 style="font-size:13px;margin:0 0 8px;">${t("fiches.pour_quelles_offres")}</h2>
+    `<h2 class="titre-bloc">${t("fiches.pour_quelles_offres")}</h2>
      <div id="creation-selecteur"></div>
      <div class="grille-form" style="margin-top:12px;">
        <div class="champ">
@@ -693,7 +855,9 @@ async function ouvrirNouvelleFiche() {
          <input type="text" id="fiche-langue" placeholder="${echapperAttribut(t("pieces.langue_placeholder"))}">
        </div>
      </div>
-     ${!cv.defini ? `<p class="sous-titre" style="margin-top:10px;">${t("fiches.cv_conseille")}</p>` : ""}
+     ${choixCvHtml(cvs)}
+     ${!cvs.length ? `<p class="sous-titre" style="margin-top:10px;">${t("fiches.cv_conseille")} <a class="lien-detail" href="#/cv" onclick="fermerModale()">${t("lettres.aller_aux_cv")}</a></p>` : ""}
+     ${carteIaLocale("fiches", "fiche-entretien")}
      <div class="carte bloc-methode">
        <h2>${t("fiches.methode_api_titre")}</h2>
        <p class="sous-titre">${t("fiches.methode_api_texte")}</p>
@@ -709,15 +873,15 @@ async function ouvrirNouvelleFiche() {
     `<button class="btn" onclick="fermerModale()">${t("commun.fermer")}</button>`,
     false, true
   );
-  const selecteur = await creerSelecteurCible(document.getElementById("creation-selecteur"), {
+  const selecteur = await creerSelecteurCible(zone.racine.querySelector("#creation-selecteur"), {
     mode: "pieces", autoriserNouvelle: false,
   });
-  const bouton = document.getElementById("btn-generer");
+  const bouton = zone.racine.querySelector("#btn-generer");
   selecteur.surChangement((choix) => {
     // Une fiche prépare l'entretien pour des postes précis : au moins une offre.
     bouton.disabled = !(peutGenerer && choix.offreIds.length > 0);
     bouton.title = choix.offreIds.length ? "" : t("fiches.choisir_une_offre");
-    const champDate = document.getElementById("fiche-date");
+    const champDate = zone.racine.querySelector("#fiche-date");
     if (champDate && !champDate.value) {
       const avecDate = choix.offres.find((o) => o.date_entretien);
       if (avecDate) champDate.value = avecDate.date_entretien;
@@ -725,36 +889,59 @@ async function ouvrirNouvelleFiche() {
   });
   bouton.addEventListener("click", () => {
     const choix = selecteur.lire();
+    const choixCv = zone.racine.querySelector("#generation-cv");
     lancerGeneration("fiches", {
       entreprise: choix.entrepriseNom,
       candidature_ids: choix.offreIds,
       generale: choix.generale,
-      date_entretien: document.getElementById("fiche-date").value || null,
-      langue: document.getElementById("fiche-langue").value.trim() || null,
-    }, [bouton], document.getElementById("generation-statut"));
+      date_entretien: zone.racine.querySelector("#fiche-date").value || null,
+      langue: zone.racine.querySelector("#fiche-langue").value.trim() || null,
+      cv_id: choixCv ? Number(choixCv.value) : null,
+    }, [bouton], zone.racine.querySelector("#generation-statut"));
   });
-  document.getElementById("btn-vers-import").addEventListener("click", () => {
-    fermerModale();
+  zone.racine.querySelector("#btn-vers-import").addEventListener("click", () => {
+    fermerModale(zone);
     ouvrirImportPiece("fiches");
   });
 }
 
 /* Section « Préparation » d'une candidature ou d'une entreprise : ce qui est
-   déjà prêt (lettres, fiches, notes d'entretien), cliquable. */
-function sectionPreparation(lettres, fiches, notes) {
+   déjà prêt (documents, lettres, fiches, notes d'entretien), cliquable. */
+function sectionPreparation(lettres, fiches, notes, documents = [], creerNote = null) {
   const ligne = (type, titre, clic) => `
     <div class="ligne-liee" onclick="${clic}">
       <span class="puce">${t(`preparation.type_${type}`)}</span>
       <span class="cellule-principale">${echapper(titre)}</span>
     </div>`;
   const lignes = [
+    ...documents.map((d) => ligne("document", d.titre, `ouvrirApercuPiece('documents', ${d.id})`)),
     ...lettres.map((l) => ligne("lettre", l.titre, `ouvrirApercuPiece('lettres', ${l.id})`)),
     ...fiches.map((f) => ligne("fiche", f.titre, `ouvrirApercuPiece('fiches', ${f.id})`)),
-    ...notes.map((n) => ligne("note", n.titre, `fermerPanneau(); location.hash='#/entretiens/${n.id}'`)),
+    ...notes.map((n) => ligne("note", n.titre, `fermerToutesLesFenetres(); fermerPanneau(); location.hash='#/entretiens/${n.id}'`)),
   ];
   return `
     <h3 class="section-panneau">${t("preparation.titre")}</h3>
-    ${lignes.length ? `<div class="liste-liee">${lignes.join("")}</div>` : `<p class="sous-titre">${t("preparation.aucune")}</p>`}`;
+    ${lignes.length ? `<div class="liste-liee">${lignes.join("")}</div>` : `<p class="sous-titre">${t("preparation.aucune")}</p>`}
+    ${creerNote ? `<div class="actions-reglages"><button type="button" class="btn" onclick="${creerNote}">${t("preparation.nouvelle_note")}</button></div>` : ""}`;
+}
+
+function fermerToutesLesFenetres() {
+  while (pileModales.length) fermerModale();
+}
+
+/* Une nouvelle note liée à cette offre, ouverte tout de suite dans l'éditeur. */
+async function nouvelleNotePourOffre(candidatureId) {
+  try {
+    const note = await api("/api/notes", {
+      methode: "POST",
+      corps: { candidature_id: candidatureId, date_entretien: aujourdHuiISO() },
+    });
+    fermerToutesLesFenetres();
+    fermerPanneau();
+    location.hash = `#/entretiens/${note.id}`;
+  } catch (erreur) {
+    toast(erreur.message, true);
+  }
 }
 
 /* ========================================================================
@@ -768,24 +955,12 @@ function puceCible(note) {
 }
 
 async function vueNotes() {
-  const filtres = etat.filtresNotes;
-  const parametres = new URLSearchParams();
-  if (filtres.recherche) parametres.set("recherche", filtres.recherche);
-  if (filtres.candidature) parametres.set("candidature", filtres.candidature);
-  if (filtres.entreprise) parametres.set("entreprise", filtres.entreprise);
-  const [notes, offres] = await Promise.all([
-    api(`/api/notes?${parametres}`),
-    filtres.candidature ? api("/api/candidatures") : Promise.resolve([]),
-  ]);
-  const offreFiltree = filtres.candidature ? offres.find((o) => o.id === filtres.candidature) : null;
-  const puceFiltre = offreFiltree
-    ? `<span class="puce filtre-actif">${t("entretiens.filtre_offre", { offre: echapper(offreFiltree.poste) })}
-        <button class="btn btn-mini btn-discret" id="retirer-filtre-offre" title="${echapperAttribut(t("entretiens.retirer_filtre"))}">×</button></span>`
-    : "";
+  const filtre = etat.filtresNotes.recherche;
+  const notes = await api("/api/notes" + (filtre ? `?recherche=${encodeURIComponent(filtre)}` : ""));
   const lignes = notes.map((note) => `
     <tr onclick="location.hash='#/entretiens/${note.id}'">
       <td class="cellule-principale cellule-titre" title="${echapperAttribut(note.titre)}">${echapper(note.titre)}
-        ${note.contenu.trim() ? `<div class="ligne-extrait">${echapper(note.contenu.trim().replace(/\s+/g, " ").slice(0, 140))}</div>` : `<div class="ligne-extrait">${t("entretiens.note_vide")}</div>`}
+        ${note.contenu.trim() ? `<div class="ligne-extrait">${echapper(Markdown.resume(note.contenu, 140))}</div>` : `<div class="ligne-extrait">${t("entretiens.note_vide")}</div>`}
       </td>
       <td>${puceCible(note)}<div class="cellule-secondaire" style="margin-top:2px;">${echapper(note.entreprise)}</div></td>
       <td class="cellule-date">${dateFr(note.date_entretien || note.date_creation.slice(0, 10))}</td>
@@ -797,8 +972,7 @@ async function vueNotes() {
       <button class="btn btn-accent" onclick="ouvrirNouvelleNote()">${t("entretiens.nouvelle")}</button>
     </div>
     <div class="filtres">
-      <input type="text" id="filtre-notes" class="champ-filtre-large" placeholder="${echapperAttribut(t("entretiens.rechercher_placeholder"))}" value="${echapperAttribut(filtres.recherche)}">
-      ${puceFiltre}
+      <input type="text" id="filtre-notes" class="champ-filtre-large" placeholder="${echapperAttribut(t("entretiens.rechercher_placeholder"))}" value="${echapperAttribut(filtre)}">
     </div>
     ${notes.length ? `
       <div class="enveloppe-tableau"><table class="tableau">
@@ -810,9 +984,9 @@ async function vueNotes() {
       </table></div>` : `
       <div class="etat-vide">
         <div class="icone">${ICONES.entretiens}</div>
-        <div class="titre">${filtres.recherche || filtres.candidature ? t("entretiens.vide_filtre_titre") : t("entretiens.vide_titre")}</div>
-        <p>${filtres.recherche || filtres.candidature ? t("pieces.vide_filtre_texte") : t("entretiens.vide_texte")}</p>
-        ${filtres.recherche ? "" : `<button class="btn btn-accent" onclick="ouvrirNouvelleNote()">${t("entretiens.nouvelle")}</button>`}
+        <div class="titre">${filtre ? t("entretiens.vide_filtre_titre") : t("entretiens.vide_titre")}</div>
+        <p>${filtre ? t("pieces.vide_filtre_texte") : t("entretiens.vide_texte")}</p>
+        ${filtre ? "" : `<button class="btn btn-accent" onclick="ouvrirNouvelleNote()">${t("entretiens.nouvelle")}</button>`}
       </div>`}`;
 }
 
@@ -832,28 +1006,12 @@ function activerNotes() {
       }, 250);
     });
   }
-  const retirer = document.getElementById("retirer-filtre-offre");
-  if (retirer) {
-    retirer.addEventListener("click", () => {
-      etat.filtresNotes.candidature = null;
-      rendre();
-    });
-  }
-}
-
-/* Depuis une candidature : les notes de cette offre (liste filtrée, avec « Nouvelle note »
-   déjà réglée sur elle). */
-function ouvrirNotesDeLOffre(candidatureId) {
-  etat.filtresNotes = { recherche: "", candidature: candidatureId, entreprise: null };
-  fermerPanneau();
-  if (location.hash === "#/entretiens") rendre();
-  else location.hash = "#/entretiens";
 }
 
 async function ouvrirNouvelleNote() {
-  ouvrirModale(
+  const zone = ouvrirModale(
     t("entretiens.nouvelle_titre"),
-    `<h2 style="font-size:13px;margin:0 0 8px;">${t("entretiens.sur_quoi")}</h2>
+    `<h2 class="titre-bloc">${t("entretiens.sur_quoi")}</h2>
      <div id="note-selecteur"></div>
      <div class="grille-form" style="margin-top:14px;">
        <div class="champ">
@@ -869,13 +1027,8 @@ async function ouvrirNouvelleNote() {
      <button class="btn btn-accent" id="btn-creer-note" disabled>${t("entretiens.commencer")}</button>`,
     false, true
   );
-  const filtres = etat.filtresNotes;
-  const selecteur = await creerSelecteurCible(document.getElementById("note-selecteur"), {
-    mode: "note",
-    offreIds: filtres.candidature ? [filtres.candidature] : [],
-    entrepriseId: filtres.entreprise || undefined,
-  });
-  const bouton = document.getElementById("btn-creer-note");
+  const selecteur = await creerSelecteurCible(zone.racine.querySelector("#note-selecteur"), { mode: "note" });
+  const bouton = zone.racine.querySelector("#btn-creer-note");
   selecteur.surChangement((choix) => {
     bouton.disabled = !(choix.entrepriseId !== null || choix.entrepriseNom);
   });
@@ -888,11 +1041,11 @@ async function ouvrirNouvelleNote() {
         corps: {
           entreprise: choix.offreIds.length ? null : choix.entrepriseNom,
           candidature_id: choix.offreIds[0] || null,
-          titre: document.getElementById("note-nouveau-titre").value,
-          date_entretien: document.getElementById("note-nouvelle-date").value || null,
+          titre: zone.racine.querySelector("#note-nouveau-titre").value,
+          date_entretien: zone.racine.querySelector("#note-nouvelle-date").value || null,
         },
       });
-      fermerModale();
+      fermerModale(zone);
       location.hash = `#/entretiens/${note.id}`;
     } catch (erreur) {
       toast(erreur.message, true);
@@ -901,15 +1054,61 @@ async function ouvrirNouvelleNote() {
   });
 }
 
-/* --- Éditeur : la note à gauche (enregistrée au fil de la frappe), son contexte à droite --- */
+/* --- Éditeur : Markdown avec rendu en direct (enregistré au fil de la frappe) --- */
+
+/* Préférences d'affichage de l'éditeur, gardées d'une note à l'autre (sans importance si le
+   stockage local est indisponible). */
+function preferenceNote(cle, defaut) {
+  try { return window.localStorage.getItem(`azimut.note.${cle}`) || defaut; } catch { return defaut; }
+}
+function memoriserPreferenceNote(cle, valeur) {
+  try { window.localStorage.setItem(`azimut.note.${cle}`, valeur); } catch { /* sans importance */ }
+}
+
+const ICONES_BARRE = {
+  liste: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg>',
+  ordonnee: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M4 5.5 5.5 5v3M4 11.5h2.2L4 14h2.4M4 17.2h2.2v.8H4.6M6.2 18v1H4" stroke-width="1.4"/></svg>',
+  tache: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="7" height="7" rx="1.5"/><path d="m5 7.5 1.5 1.5L9 6"/><path d="M14 7h7M14 17h7"/><rect x="3.5" y="13" width="7" height="7" rx="1.5"/></svg>',
+  citation: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h4v4c0 2-1 3.5-3 4M14 8h4v4c0 2-1 3.5-3 4"/></svg>',
+  code: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></svg>',
+  lien: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/></svg>',
+};
+
+function barreOutilsNote() {
+  const bouton = (action, contenu, libelle, classe = "") =>
+    `<button type="button" class="outil-note ${classe}" data-outil="${action}" title="${echapperAttribut(libelle)}" aria-label="${echapperAttribut(libelle)}">${contenu}</button>`;
+  return `
+    <div class="note-barre" role="toolbar" aria-label="${echapperAttribut(t("entretiens.barre_outils"))}">
+      <div class="outils-note">
+        ${bouton("gras", "B", t("entretiens.outil_gras"), "gras")}
+        ${bouton("italique", "I", t("entretiens.outil_italique"), "italique")}
+        ${bouton("barre", "S", t("entretiens.outil_barre"), "barre")}
+        <span class="separateur-outils"></span>
+        ${bouton("titre", "H", t("entretiens.outil_titre"), "titre")}
+        ${bouton("liste", ICONES_BARRE.liste, t("entretiens.outil_liste"))}
+        ${bouton("ordonnee", ICONES_BARRE.ordonnee, t("entretiens.outil_liste_numerotee"))}
+        ${bouton("tache", ICONES_BARRE.tache, t("entretiens.outil_tache"))}
+        ${bouton("citation", ICONES_BARRE.citation, t("entretiens.outil_citation"))}
+        ${bouton("code", ICONES_BARRE.code, t("entretiens.outil_code"))}
+        ${bouton("lien", ICONES_BARRE.lien, t("entretiens.outil_lien"))}
+      </div>
+      <div class="bascule note-modes">
+        <button type="button" data-mode="ecrire">${t("entretiens.mode_ecrire")}</button>
+        <button type="button" data-mode="duo">${t("entretiens.mode_duo")}</button>
+        <button type="button" data-mode="apercu">${t("entretiens.mode_apercu")}</button>
+      </div>
+      <button type="button" class="btn btn-mini" id="btn-contexte">${t("entretiens.contexte_afficher")}</button>
+    </div>`;
+}
 
 async function vueEditeurNote(id) {
   const note = await api(`/api/notes/${id}`);
-  const [offre, entreprises, lettresLiees, fichesLiees] = await Promise.all([
+  const [offre, entreprises, lettresLiees, fichesLiees, docsLies] = await Promise.all([
     note.candidature_id ? api(`/api/candidatures/${note.candidature_id}`) : Promise.resolve(null),
     api("/api/entreprises"),
     api(note.candidature_id ? `/api/lettres?candidature=${note.candidature_id}` : `/api/lettres?entreprise=${note.entreprise_id}`),
     api(note.candidature_id ? `/api/fiches?candidature=${note.candidature_id}` : `/api/fiches?entreprise=${note.entreprise_id}`),
+    api(note.candidature_id ? `/api/documents?candidature=${note.candidature_id}` : `/api/documents?entreprise=${note.entreprise_id}`),
   ]);
   const entreprise = entreprises.find((e) => e.id === note.entreprise_id) || {};
   const ligneLiee = (type, titre, clic) => `
@@ -924,10 +1123,13 @@ async function vueEditeurNote(id) {
       <div><a class="lien-detail" href="#" onclick="event.preventDefault(); ouvrirDetailCandidature(${offre.id})"><strong>${echapper(offre.poste)}</strong></a></div>
       <div style="margin-top:4px;"><span class="puce puce-statut" style="--couleur-statut:${COULEURS_STATUT[offre.statut]}"><span class="point"></span>${echapper(tv(offre.statut))}</span></div>
       ${offre.texte_offre ? `<div class="texte-long" style="margin-top:8px;">${echapper(offre.texte_offre)}</div>` : ""}` : ""}
-    ${lettresLiees.length || fichesLiees.length ? `
+    ${lettresLiees.length || fichesLiees.length || docsLies.length ? `
       <h3>${t("entretiens.contexte_preparation")}</h3>
+      ${docsLies.map((d) => ligneLiee("document", d.titre, `ouvrirApercuPiece('documents', ${d.id})`)).join("")}
       ${lettresLiees.map((l) => ligneLiee("lettre", l.titre, `ouvrirApercuPiece('lettres', ${l.id})`)).join("")}
       ${fichesLiees.map((f) => ligneLiee("fiche", f.titre, `ouvrirApercuPiece('fiches', ${f.id})`)).join("")}` : ""}`;
+  const contexteOuvert = preferenceNote("contexte", "ferme") === "ouvert";
+  const mode = ["ecrire", "duo", "apercu"].includes(preferenceNote("mode", "duo")) ? preferenceNote("mode", "duo") : "duo";
   return `
     <div class="entete-vue">
       <button class="btn" onclick="location.hash='#/entretiens'">${t("entretiens.retour")}</button>
@@ -935,7 +1137,7 @@ async function vueEditeurNote(id) {
       <span class="sous-titre" id="indicateur-note"></span>
       <button class="btn btn-danger" id="btn-supprimer-note">${t("commun.supprimer")}</button>
     </div>
-    <div class="editeur-note">
+    <div class="editeur-note${contexteOuvert ? "" : " sans-contexte"}">
       <div class="carte zone-notes">
         <input type="text" class="note-titre" id="note-titre" value="${echapperAttribut(note.titre)}" aria-label="${echapperAttribut(t("pieces.champ_titre"))}">
         <div class="note-meta">
@@ -943,10 +1145,122 @@ async function vueEditeurNote(id) {
           <label>${t("entretiens.date_entretien")} <input type="date" id="note-date" value="${echapperAttribut(note.date_entretien || "")}"></label>
           <button class="btn btn-mini" id="btn-changer-cible">${t("entretiens.changer_cible")}</button>
         </div>
-        <textarea id="note-contenu" placeholder="${echapperAttribut(t("entretiens.notes_placeholder"))}">${echapper(note.contenu)}</textarea>
+        ${barreOutilsNote()}
+        <div class="note-zones" data-mode="${mode}">
+          <textarea id="note-contenu" spellcheck="true" placeholder="${echapperAttribut(t("entretiens.notes_placeholder"))}">${echapper(note.contenu)}</textarea>
+          <div id="note-apercu" class="note-apercu rendu-markdown" aria-live="off"></div>
+        </div>
+        <p class="note-aide">${t("entretiens.aide_markdown")}</p>
       </div>
       <aside class="carte contexte-note">${contexte}</aside>
     </div>`;
+}
+
+/* --- édition Markdown : mise en forme de la sélection, listes qui se poursuivent --- */
+
+/* Remplace [debut, fin) par `texte` en gardant l'historique d'annulation (⌘Z) quand le
+   navigateur le permet ; place ensuite la sélection sur [selDebut, selFin). */
+function remplacerDansZone(zone, debut, fin, texte, selDebut, selFin) {
+  zone.focus();
+  zone.setSelectionRange(debut, fin);
+  let fait = false;
+  try { fait = document.execCommand("insertText", false, texte); } catch { fait = false; }
+  if (!fait || zone.value.slice(debut, debut + texte.length) !== texte) {
+    zone.setRangeText(texte, debut, fin, "end");
+    zone.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  zone.setSelectionRange(selDebut ?? debut + texte.length, selFin ?? selDebut ?? debut + texte.length);
+}
+
+/* Entoure la sélection (ou un texte d'exemple) ; si elle est déjà entourée, retire l'entourage. */
+function entourerSelection(zone, avant, apres, exemple) {
+  const { selectionStart: debut, selectionEnd: fin, value } = zone;
+  const choisi = value.slice(debut, fin);
+  if (choisi && value.slice(debut - avant.length, debut) === avant && value.slice(fin, fin + apres.length) === apres) {
+    remplacerDansZone(zone, debut - avant.length, fin + apres.length, choisi, debut - avant.length, fin - avant.length);
+    return;
+  }
+  const corps = choisi || exemple;
+  remplacerDansZone(zone, debut, fin, avant + corps + apres, debut + avant.length, debut + avant.length + corps.length);
+}
+
+/* Bornes [debut, fin) des lignes touchées par la sélection. */
+function lignesSelectionnees(zone) {
+  const { value, selectionStart, selectionEnd } = zone;
+  const debut = value.lastIndexOf("\n", selectionStart - 1) + 1;
+  let fin = value.indexOf("\n", selectionEnd > selectionStart ? selectionEnd - 1 : selectionEnd);
+  if (fin === -1) fin = value.length;
+  return { debut, fin };
+}
+
+/* Ajoute (ou retire, si toutes les lignes l'ont déjà) un préfixe de ligne : « - », « > », « 1. »… */
+function prefixerLignes(zone, prefixe, motif, numerote = false) {
+  const { debut, fin } = lignesSelectionnees(zone);
+  const lignes = zone.value.slice(debut, fin).split("\n");
+  const toutesPrefixees = lignes.every((l) => l.trim() === "" || motif.test(l));
+  const nouvelles = lignes.map((ligne, rang) => {
+    if (toutesPrefixees) return ligne.replace(motif, "");
+    if (ligne.trim() === "" && lignes.length > 1) return ligne;
+    return (numerote ? `${rang + 1}. ` : prefixe) + ligne.replace(/^\s*([-*+]|\d+[.)])\s+(\[[ xX]\]\s+)?/, "");
+  });
+  const texte = nouvelles.join("\n");
+  remplacerDansZone(zone, debut, fin, texte, debut, debut + texte.length);
+}
+
+function appliquerOutilNote(zone, outil) {
+  if (outil === "gras") entourerSelection(zone, "**", "**", "gras");
+  else if (outil === "italique") entourerSelection(zone, "*", "*", "italique");
+  else if (outil === "barre") entourerSelection(zone, "~~", "~~", "barré");
+  else if (outil === "code") entourerSelection(zone, "`", "`", "code");
+  else if (outil === "liste") prefixerLignes(zone, "- ", /^\s*[-*+]\s+/);
+  else if (outil === "ordonnee") prefixerLignes(zone, "1. ", /^\s*\d+[.)]\s+/, true);
+  else if (outil === "tache") prefixerLignes(zone, "- [ ] ", /^\s*[-*+]\s+\[[ xX]\]\s+/);
+  else if (outil === "citation") prefixerLignes(zone, "> ", /^\s*>\s?/);
+  else if (outil === "titre") {
+    // Titre : chaque appui monte d'un niveau (# → ## → ### → retour au texte simple).
+    const { debut, fin } = lignesSelectionnees(zone);
+    const ligne = zone.value.slice(debut, fin);
+    const m = /^(#{1,3})\s+/.exec(ligne);
+    const nouvelle = !m ? `# ${ligne}` : m[1].length < 3 ? `${m[1]}# ${ligne.slice(m[0].length)}` : ligne.slice(m[0].length);
+    remplacerDansZone(zone, debut, fin, nouvelle, debut + nouvelle.length);
+  } else if (outil === "lien") {
+    const { selectionStart: debut, selectionEnd: fin, value } = zone;
+    const choisi = value.slice(debut, fin) || "texte";
+    const adresse = "https://";
+    const texte = `[${choisi}](${adresse})`;
+    remplacerDansZone(zone, debut, fin, texte, debut + choisi.length + 3, debut + choisi.length + 3 + adresse.length);
+  }
+}
+
+/* Entrée dans une liste : la ligne suivante reprend le même marqueur ; sur une ligne de
+   liste vide, Entrée termine la liste. Retourne true si l'événement a été géré. */
+function entreeDansListe(zone) {
+  if (zone.selectionStart !== zone.selectionEnd) return false;
+  const position = zone.selectionStart;
+  const debut = zone.value.lastIndexOf("\n", position - 1) + 1;
+  const ligne = zone.value.slice(debut, position);
+  const m = /^(\s*)([-*+]|(\d+)([.)]))\s+(\[[ xX]\]\s+)?(.*)$/.exec(ligne);
+  if (!m) return false;
+  if (m[6].trim() === "") {
+    // Élément vide : on retire le marqueur (la liste se termine).
+    remplacerDansZone(zone, debut, position, "", debut);
+    return true;
+  }
+  const marqueur = m[3] ? `${Number(m[3]) + 1}${m[4]}` : m[2];
+  const suite = `\n${m[1]}${marqueur} ${m[5] ? "[ ] " : ""}`;
+  remplacerDansZone(zone, position, position, suite, position + suite.length);
+  return true;
+}
+
+/* Tab / Maj+Tab dans une liste : imbrique ou remonte l'élément. */
+function indenterListe(zone, arriere) {
+  const { debut, fin } = lignesSelectionnees(zone);
+  const lignes = zone.value.slice(debut, fin).split("\n");
+  if (!lignes.every((l) => /^\s*([-*+]|\d+[.)])\s/.test(l))) return false;
+  const nouvelles = lignes.map((l) => (arriere ? l.replace(/^( {1,2}|\t)/, "") : `  ${l}`));
+  const texte = nouvelles.join("\n");
+  remplacerDansZone(zone, debut, fin, texte, debut, debut + texte.length);
+  return true;
 }
 
 function activerEditeurNote(id) {
@@ -954,6 +1268,8 @@ function activerEditeurNote(id) {
   const titre = document.getElementById("note-titre");
   const date = document.getElementById("note-date");
   const indicateur = document.getElementById("indicateur-note");
+  const apercu = document.getElementById("note-apercu");
+  const zones = document.querySelector(".note-zones");
   if (!contenu) return;
   let minuteur = null;
   let enAttente = false;
@@ -982,19 +1298,84 @@ function activerEditeurNote(id) {
     if (!(await envoyer({ contenu: contenu.value }))) enAttente = true;
   }
 
+  // Le rendu suit la frappe quasi instantanément (un seul rendu par rafale de touches).
+  let rendu = null;
+  const afficherRendu = () => {
+    rendu = null;
+    apercu.innerHTML = Markdown.rendre(contenu.value) || `<p class="apercu-vide">${t("entretiens.apercu_vide")}</p>`;
+  };
+  const planifierRendu = () => { if (rendu === null) rendu = setTimeout(afficherRendu, 16); };
+  afficherRendu();
+
   etat.noteEnCours = { enregistrer };
   contenu.addEventListener("input", () => {
     enAttente = true;
     indicateur.textContent = t("entretiens.enregistrement_en_cours");
+    planifierRendu();
     clearTimeout(minuteur);
     minuteur = setTimeout(enregistrer, 700);
   });
   contenu.addEventListener("keydown", (evenement) => {
-    if ((evenement.metaKey || evenement.ctrlKey) && evenement.key.toLowerCase() === "s") {
+    const commande = evenement.metaKey || evenement.ctrlKey;
+    if (commande && evenement.key.toLowerCase() === "s") {
       evenement.preventDefault();
       enregistrer();
+    } else if (commande && evenement.key.toLowerCase() === "b") {
+      evenement.preventDefault();
+      appliquerOutilNote(contenu, "gras");
+    } else if (commande && evenement.key.toLowerCase() === "i") {
+      evenement.preventDefault();
+      appliquerOutilNote(contenu, "italique");
+    } else if (evenement.key === "Enter" && !evenement.shiftKey && !commande && !evenement.altKey) {
+      if (entreeDansListe(contenu)) evenement.preventDefault();
+    } else if (evenement.key === "Tab" && !commande && !evenement.altKey) {
+      if (indenterListe(contenu, evenement.shiftKey)) evenement.preventDefault();
     }
   });
+
+  // Une case à cocher cliquée dans le rendu coche la tâche dans le texte.
+  apercu.addEventListener("change", (evenement) => {
+    const case_ = evenement.target;
+    if (!case_.matches('input[type="checkbox"][data-ligne]')) return;
+    contenu.value = Markdown.basculerTache(contenu.value, Number(case_.dataset.ligne));
+    contenu.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  // Barre d'outils : les boutons ne volent pas le focus (la sélection reste dans le texte).
+  const barre = document.querySelector(".note-barre");
+  barre.addEventListener("mousedown", (evenement) => {
+    if (evenement.target.closest(".outil-note")) evenement.preventDefault();
+  });
+  barre.addEventListener("click", (evenement) => {
+    const outil = evenement.target.closest(".outil-note");
+    if (outil) {
+      if (zones.dataset.mode === "apercu") changerMode("duo");
+      appliquerOutilNote(contenu, outil.dataset.outil);
+    }
+  });
+
+  function changerMode(mode) {
+    zones.dataset.mode = mode;
+    barre.querySelectorAll(".note-modes button").forEach((b) => b.classList.toggle("actif", b.dataset.mode === mode));
+    memoriserPreferenceNote("mode", mode);
+    if (mode !== "apercu") contenu.focus({ preventScroll: true });
+  }
+  barre.querySelectorAll(".note-modes button").forEach((b) => b.addEventListener("click", () => changerMode(b.dataset.mode)));
+  barre.querySelectorAll(".note-modes button").forEach((b) => b.classList.toggle("actif", b.dataset.mode === zones.dataset.mode));
+
+  const editeur = document.querySelector(".editeur-note");
+  const boutonContexte = document.getElementById("btn-contexte");
+  const majBoutonContexte = () => {
+    boutonContexte.textContent = editeur.classList.contains("sans-contexte")
+      ? t("entretiens.contexte_afficher") : t("entretiens.contexte_masquer");
+  };
+  majBoutonContexte();
+  boutonContexte.addEventListener("click", () => {
+    editeur.classList.toggle("sans-contexte");
+    memoriserPreferenceNote("contexte", editeur.classList.contains("sans-contexte") ? "ferme" : "ouvert");
+    majBoutonContexte();
+  });
+
   titre.addEventListener("change", async () => {
     if (!titre.value.trim()) {
       titre.value = titreConnu;
@@ -1022,25 +1403,25 @@ function activerEditeurNote(id) {
     }
   });
   document.getElementById("btn-changer-cible").addEventListener("click", () => ouvrirChangerCibleNote(id, enregistrer));
-  if (!contenu.value) contenu.focus();
+  if (!contenu.value && zones.dataset.mode !== "apercu") contenu.focus();
 }
 
 async function ouvrirChangerCibleNote(id, apresEnregistrement) {
   await apresEnregistrement();
   const note = await api(`/api/notes/${id}`);
-  ouvrirModale(
+  const zone = ouvrirModale(
     t("entretiens.changer_cible_titre"),
     `<div id="note-selecteur"></div>`,
     `<button class="btn" onclick="fermerModale()">${t("commun.annuler")}</button>
      <button class="btn btn-accent" id="btn-valider-cible" disabled>${t("commun.enregistrer")}</button>`,
     false, true
   );
-  const selecteur = await creerSelecteurCible(document.getElementById("note-selecteur"), {
+  const selecteur = await creerSelecteurCible(zone.racine.querySelector("#note-selecteur"), {
     mode: "note",
     entrepriseId: note.entreprise_id,
     offreIds: note.candidature_id ? [note.candidature_id] : [],
   });
-  const bouton = document.getElementById("btn-valider-cible");
+  const bouton = zone.racine.querySelector("#btn-valider-cible");
   selecteur.surChangement((choix) => { bouton.disabled = !(choix.entrepriseId !== null || choix.entrepriseNom); });
   bouton.addEventListener("click", async () => {
     const choix = selecteur.lire();
@@ -1052,7 +1433,7 @@ async function ouvrirChangerCibleNote(id, apresEnregistrement) {
           : { entreprise: choix.entrepriseNom },
       });
       toast(t("entretiens.cible_changee"));
-      fermerModale();
+      fermerModale(zone);
       rendre();
     } catch (erreur) {
       toast(erreur.message, true);

@@ -19,8 +19,8 @@ const etat = {
   propositionEntreprise: null,  // infos entreprise proposées par l'IA, écrites après validation
   selectionComparaison: new Set(),  // ids cochés en vue liste, pour le comparateur
   versionDb: null,        // dernier mtime de la base connu, pour détecter les écritures externes
-  filtresPieces: { lettres: { recherche: "" }, fiches: { recherche: "" } },
-  filtresNotes: { recherche: "", candidature: null, entreprise: null },
+  filtresPieces: { lettres: { recherche: "" }, fiches: { recherche: "" }, documents: { recherche: "" } },
+  filtresNotes: { recherche: "" },
   noteEnCours: null,      // éditeur de note ouvert : { enregistrer } pour vider l'enregistrement en attente
 };
 
@@ -30,6 +30,7 @@ const COULEURS_TYPE = {
   candidature: "var(--accent)",
   entreprise: "var(--st-reponse)",
   note: "var(--violet)",
+  document: "var(--encre-2)",
   lettre: "var(--st-entretien)",
   fiche: "var(--st-accepte)",
 };
@@ -48,6 +49,10 @@ const ICONES = {
     '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14 8 3 3"/></svg>',
   lettres:
     '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
+  documents:
+    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>',
+  cv:
+    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="2.5"/><path d="M7.5 17c.8-2 2.4-3 4.5-3s3.7 1 4.5 3"/></svg>',
 };
 
 const COULEURS_STATUT = {
@@ -169,12 +174,13 @@ const VUES = {
   bord: vueBord,
   candidatures: vueCandidatures,
   entreprises: vueEntreprises,
-  documents: vueDocuments,
+  documents: () => vuePieces("documents"),
   lettres: () => vuePieces("lettres"),
   fiches: () => vuePieces("fiches"),
   entretiens: vueNotes,
   statistiques: vueStats,
   recherche: vueRecherche,
+  cv: vueCv,
   comparer: vueComparateur,
   reglages: vueReglages,
 };
@@ -185,9 +191,11 @@ const ACTIVATIONS = {
   comparer: activerComparateur,
   statistiques: activerStats,
   reglages: activerReglages,
+  documents: () => activerPieces("documents"),
   lettres: () => activerPieces("lettres"),
   fiches: () => activerPieces("fiches"),
   entretiens: activerNotes,
+  cv: activerCv,
 };
 
 async function rendre() {
@@ -232,9 +240,8 @@ window.addEventListener("hashchange", rendre);
 
 function saisieEnCours() {
   const panneau = document.getElementById("panneau");
-  const modale = document.getElementById("modale");
   if (panneau && panneau.classList.contains("ouvert")) return true;
-  if (modale && modale.classList.contains("visible")) return true;
+  if (pileModales.length) return true;
   const actif = document.activeElement;
   return !!actif && ["INPUT", "TEXTAREA", "SELECT"].includes(actif.tagName);
 }
@@ -802,207 +809,147 @@ function lireFormulaire(conteneur) {
   return donnees;
 }
 
-async function ouvrirFormCandidature(cand = null) {
+/* ------------------------------------------------------------------------
+   Nouvelle candidature : une fenêtre centrée (avec, si une clé API est
+   configurée, le pré-remplissage à partir du texte d'une offre)
+   ------------------------------------------------------------------------ */
+
+async function ouvrirFormCandidature() {
   const v = etat.valeurs;
-  const creation = cand === null;
-  cand = cand || {};
-  let champEntreprise;
-  if (creation) {
-    const listeEntreprises = await api("/api/entreprises");
-    champEntreprise = `
-      <div class="champ">
-        <label for="champ-entreprise">${t("formulaire.entreprise_requis")}</label>
-        <input type="text" id="champ-entreprise" name="entreprise" list="liste-entreprises" required>
-        <datalist id="liste-entreprises">
-          ${listeEntreprises.map((ent) => `<option value="${echapper(ent.nom)}">`).join("")}
-        </datalist>
-      </div>`;
-  } else {
-    champEntreprise = `
-      <div class="champ">
-        <label>${t("formulaire.entreprise")}</label>
-        <input type="text" value="${echapper(cand.entreprise)}" disabled>
-      </div>`;
-  }
+  const listeEntreprises = await api("/api/entreprises");
+  const champEntreprise = `
+    <div class="champ">
+      <label for="champ-entreprise">${t("formulaire.entreprise_requis")}</label>
+      <input type="text" id="champ-entreprise" name="entreprise" list="liste-entreprises" required>
+      <datalist id="liste-entreprises">
+        ${listeEntreprises.map((ent) => `<option value="${echapper(ent.nom)}">`).join("")}
+      </datalist>
+    </div>`;
 
   const corps = `
     <form id="form-candidature" class="grille-form" onsubmit="return false;">
       ${champEntreprise}
-      ${champTexte("poste", t("formulaire.poste_requis"), cand.poste)}
-      ${champSelect("statut", t("candidatures.col_statut"), v.statuts, cand.statut || "À préparer", false)}
-      ${champSelect("sous_domaine", t("comparateur.sous_domaine"), v.sous_domaines, cand.sous_domaine)}
-      ${champSelect("type_candidature", t("formulaire.type_candidature"), v.types_candidature, cand.type_candidature)}
-      ${champSelect("source", t("comparateur.source"), v.sources_candidature, cand.source)}
-      ${champTexte("date_envoi", t("formulaire.date_envoi"), cand.date_envoi, "date")}
-      ${champTexte("date_reponse", t("formulaire.reponse_recue_le"), cand.date_reponse, "date")}
-      ${champTexte("date_entretien", t("comparateur.entretien_le"), cand.date_entretien, "date")}
-      ${champTexte("date_debut_souhaitee", t("comparateur.debut_souhaite"), cand.date_debut_souhaitee, "date")}
-      ${champTexte("duree", t("comparateur.duree"), cand.duree)}
-      ${champTexte("gratification", t("comparateur.gratification"), cand.gratification, "number")}
-      ${champTexte("ville", t("candidatures.col_ville"), cand.ville)}
-      ${champSelect("mode_travail", t("comparateur.mode_travail"), v.modes_travail, cand.mode_travail)}
-      ${champSelect("convention_envoyee", t("comparateur.convention_envoyee"), v.conventions, cand.convention_envoyee || "Non", false)}
-      ${champTexte("lien_offre", t("formulaire.lien_offre"), cand.lien_offre, "url", true)}
-      ${champTexte("portail_url", t("formulaire.portail_url"), cand.portail_url, "url", true)}
-      ${champTexte("portail_identifiant", t("formulaire.portail_identifiant"), cand.portail_identifiant)}
-      ${champMotDePasse("portail_mdp", t("formulaire.portail_mdp"), cand.portail_mdp)}
-      ${champZone("texte_offre", t("formulaire.texte_offre"), cand.texte_offre)}
-      ${champZone("notes", t("formulaire.notes"), cand.notes)}
+      ${champTexte("poste", t("formulaire.poste_requis"), "")}
+      ${champSelect("statut", t("candidatures.col_statut"), v.statuts, "À préparer", false)}
+      ${champSelect("sous_domaine", t("comparateur.sous_domaine"), v.sous_domaines, null)}
+      ${champSelect("type_candidature", t("formulaire.type_candidature"), v.types_candidature, null)}
+      ${champSelect("source", t("comparateur.source"), v.sources_candidature, null)}
+      ${champTexte("date_envoi", t("formulaire.date_envoi"), "", "date")}
+      ${champTexte("date_reponse", t("formulaire.reponse_recue_le"), "", "date")}
+      ${champTexte("date_entretien", t("comparateur.entretien_le"), "", "date")}
+      ${champTexte("date_debut_souhaitee", t("comparateur.debut_souhaite"), "", "date")}
+      ${champTexte("duree", t("comparateur.duree"), "")}
+      ${champTexte("gratification", t("comparateur.gratification"), "", "number")}
+      ${champTexte("ville", t("candidatures.col_ville"), "")}
+      ${champSelect("mode_travail", t("comparateur.mode_travail"), v.modes_travail, null)}
+      ${champSelect("convention_envoyee", t("comparateur.convention_envoyee"), v.conventions, "Non", false)}
+      ${champTexte("lien_offre", t("formulaire.lien_offre"), "", "url", true)}
+      ${champTexte("portail_url", t("formulaire.portail_url"), "", "url", true)}
+      ${champTexte("portail_identifiant", t("formulaire.portail_identifiant"), "")}
+      ${champMotDePasse("portail_mdp", t("formulaire.portail_mdp"), "")}
+      ${champZone("texte_offre", t("formulaire.texte_offre"), "")}
+      ${champZone("notes", t("formulaire.notes"), "")}
     </form>`;
 
-  // À la création : zone d'analyse IA (si une clé API est configurée dans Réglages).
-  let zoneIA = "";
-  if (creation) {
-    zoneIA = etat.ia && etat.ia.cle_api_definie
-      ? `
-      <div class="zone-ia">
-        <label for="ia-texte">${t("formulaire.ia_prerempli_label")}</label>
-        <textarea id="ia-texte" placeholder="${t("formulaire.ia_placeholder")}"></textarea>
-        <div class="zone-ia-actions">
-          <input type="url" id="ia-lien" placeholder="${t("formulaire.lien_offre_optionnel")}">
-          <button type="button" class="btn btn-accent" id="btn-analyser">${t("formulaire.analyser")}</button>
-        </div>
-      </div>`
-      : `
-      <p class="astuce-ia">${t("formulaire.astuce_ia_debut")}
-        <a class="lien-detail" href="#/reglages" onclick="fermerPanneau()">${t("nav.reglages")}</a>
-        ${t("formulaire.astuce_ia_fin")}</p>`;
-  }
+  // Zone d'analyse IA (si une clé API est configurée dans Réglages).
+  const zoneIA = etat.ia && etat.ia.cle_api_definie
+    ? `
+    <div class="zone-ia">
+      <label for="ia-texte">${t("formulaire.ia_prerempli_label")}</label>
+      <textarea id="ia-texte" placeholder="${t("formulaire.ia_placeholder")}"></textarea>
+      <div class="zone-ia-actions">
+        <input type="url" id="ia-lien" placeholder="${t("formulaire.lien_offre_optionnel")}">
+        <button type="button" class="btn btn-accent" id="btn-analyser">${t("formulaire.analyser")}</button>
+      </div>
+    </div>`
+    : `
+    <p class="astuce-ia">${t("formulaire.astuce_ia_debut")}
+      <a class="lien-detail" href="#/reglages" onclick="fermerModale()">${t("nav.reglages")}</a>
+      ${t("formulaire.astuce_ia_fin")}</p>`;
 
-  // À la création : joindre tout de suite un ou plusieurs fichiers (offre en
-  // PDF, CV, lettre…) - envoyés juste après la création de la candidature.
-  let zoneDocuments = "";
-  if (creation) {
-    zoneDocuments = `
-      <div class="zone-ia">
-        <label for="fichiers-a-joindre">${t("formulaire.joindre_fichiers")}</label>
-        <div class="zone-ia-actions">
-          <select id="fichiers-type" style="max-width:220px;">${optionsSelect(v.types_document, "Offre (PDF)", false)}</select>
-          <input type="file" id="fichiers-a-joindre" multiple style="flex:1;">
-        </div>
-      </div>`;
-  }
+  // Joindre tout de suite un ou plusieurs fichiers (offre en PDF, CV, lettre…) :
+  // envoyés juste après la création de la candidature.
+  const zoneDocuments = `
+    <div class="zone-ia">
+      <label for="fichiers-a-joindre">${t("formulaire.joindre_fichiers")}</label>
+      <div class="zone-ia-actions">
+        <select id="fichiers-type" style="max-width:220px;">${optionsSelect(v.types_document, "Offre (PDF)", false)}</select>
+        <input type="file" id="fichiers-a-joindre" multiple style="flex:1;">
+      </div>
+    </div>`;
 
-  // En édition : documents et journal de la candidature.
-  let sectionsSupplementaires = "";
-  if (!creation) {
-    const [journal, docs] = await Promise.all([
-      api(`/api/candidatures/${cand.id}/evenements`),
-      api(`/api/documents?candidature=${cand.id}`),
-    ]);
-    sectionsSupplementaires = sectionsCandidature(cand.id, journal, docs);
-  }
-
-  const pied = creation
-    ? `<button class="btn" onclick="fermerPanneau()">${t("commun.annuler")}</button>
-       <button class="btn btn-accent" id="btn-enregistrer">${t("formulaire.ajouter_candidature")}</button>`
-    : `<button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-       <button class="btn" id="btn-recap">${t("formulaire.recapitulatif")}</button>
-       <button class="btn btn-accent" id="btn-enregistrer">${t("commun.enregistrer")}</button>`;
-
-  ouvrirPanneau(
-    creation ? t("formulaire.nouvelle_candidature") : t("commun.titre_modifier", { nom: cand.entreprise }),
-    zoneIA + corps + zoneDocuments + sectionsSupplementaires,
-    pied
+  ouvrirModale(
+    t("formulaire.nouvelle_candidature"),
+    zoneIA + corps + zoneDocuments,
+    `<button class="btn" onclick="fermerModale()">${t("commun.annuler")}</button>
+     <button class="btn btn-accent" id="btn-enregistrer">${t("formulaire.ajouter_candidature")}</button>`,
+    false, true
   );
 
-  if (creation) {
-    etat.propositionEntreprise = null;
-    const boutonAnalyser = document.getElementById("btn-analyser");
-    if (boutonAnalyser) {
-      boutonAnalyser.addEventListener("click", async () => {
-        const texte = document.getElementById("ia-texte").value;
-        if (!texte.trim()) { toast(t("formulaire.coller_texte_offre_erreur"), true); return; }
-        boutonAnalyser.disabled = true;
-        boutonAnalyser.textContent = t("formulaire.analyse_en_cours");
-        try {
-          const proposition = await api("/api/agent/analyser", {
-            methode: "POST",
-            corps: { texte, lien: document.getElementById("ia-lien").value || null },
-          });
-          remplirDepuisProposition(proposition);
-          etat.propositionEntreprise = proposition.entreprise && proposition.entreprise.nom
-            ? proposition.entreprise : null;
-          toast(t("formulaire.pre_rempli"));
-          if (proposition.avertissement) toast(proposition.avertissement, true);
-        } catch (erreur) {
-          toast(erreur.message, true);
-        } finally {
-          boutonAnalyser.disabled = false;
-          boutonAnalyser.textContent = t("formulaire.analyser");
-        }
-      });
-    }
+  etat.propositionEntreprise = null;
+  const boutonAnalyser = document.getElementById("btn-analyser");
+  if (boutonAnalyser) {
+    boutonAnalyser.addEventListener("click", async () => {
+      const texte = document.getElementById("ia-texte").value;
+      if (!texte.trim()) { toast(t("formulaire.coller_texte_offre_erreur"), true); return; }
+      boutonAnalyser.disabled = true;
+      boutonAnalyser.textContent = t("formulaire.analyse_en_cours");
+      try {
+        const proposition = await api("/api/agent/analyser", {
+          methode: "POST",
+          corps: { texte, lien: document.getElementById("ia-lien").value || null },
+        });
+        remplirDepuisProposition(proposition);
+        etat.propositionEntreprise = proposition.entreprise && proposition.entreprise.nom
+          ? proposition.entreprise : null;
+        toast(t("formulaire.pre_rempli"));
+        if (proposition.avertissement) toast(proposition.avertissement, true);
+      } catch (erreur) {
+        toast(erreur.message, true);
+      } finally {
+        boutonAnalyser.disabled = false;
+        boutonAnalyser.textContent = t("formulaire.analyser");
+      }
+    });
   }
 
   document.getElementById("btn-enregistrer").addEventListener("click", async () => {
     const donnees = lireFormulaire(document.getElementById("form-candidature"));
     try {
-      if (creation) {
-        // Avertissement (non bloquant) : intitulé proche ou même lien d'offre
-        // qu'une candidature déjà enregistrée. Le vrai doublon (entreprise +
-        // poste identiques) reste, lui, refusé net par le serveur.
-        const parametres = new URLSearchParams({
-          entreprise: donnees.entreprise || "",
-          poste: donnees.poste || "",
-          lien_offre: donnees.lien_offre || "",
-        });
-        const similaires = await api(`/api/candidatures/similaires?${parametres}`);
-        if (similaires.length && !(await confirmerSimilaires(similaires))) {
-          return;
-        }
-        const creee = await api("/api/candidatures", { methode: "POST", corps: donnees });
-        toast(t("formulaire.candidature_ajoutee", { poste: creee.poste, entreprise: creee.entreprise }));
-        // Fichiers joints (offre en PDF, CV…) : envoyés maintenant que la
-        // candidature existe.
-        const fichiersAJoindre = document.getElementById("fichiers-a-joindre")?.files;
-        if (fichiersAJoindre && fichiersAJoindre.length) {
-          await televerserDocument(
-            creee.id, fichiersAJoindre, document.getElementById("fichiers-type").value, null
-          );
-        }
-        // Infos entreprise proposées par l'IA : écrites seulement maintenant,
-        // après validation (les champs déjà remplis ne sont jamais écrasés).
-        const proposition = etat.propositionEntreprise;
-        etat.propositionEntreprise = null;
-        if (proposition && (proposition.site_web || proposition.contexte_actus)) {
-          try {
-            await api("/api/entreprises", { methode: "POST", corps: proposition });
-          } catch (erreurEntreprise) {
-            toast(erreurEntreprise.message, true);
-          }
-        }
-      } else {
-        await api(`/api/candidatures/${cand.id}`, { methode: "PATCH", corps: donnees });
-        toast(t("formulaire.candidature_enregistree"));
+      // Avertissement (non bloquant) : intitulé proche ou même lien d'offre
+      // qu'une candidature déjà enregistrée. Le vrai doublon (entreprise +
+      // poste identiques) reste, lui, refusé net par le serveur.
+      const parametres = new URLSearchParams({
+        entreprise: donnees.entreprise || "",
+        poste: donnees.poste || "",
+        lien_offre: donnees.lien_offre || "",
+      });
+      const similaires = await api(`/api/candidatures/similaires?${parametres}`);
+      if (similaires.length && !(await confirmerSimilaires(similaires))) return;
+      const creee = await api("/api/candidatures", { methode: "POST", corps: donnees });
+      toast(t("formulaire.candidature_ajoutee", { poste: creee.poste, entreprise: creee.entreprise }));
+      // Fichiers joints : envoyés maintenant que la candidature existe.
+      const fichiersAJoindre = document.getElementById("fichiers-a-joindre")?.files;
+      if (fichiersAJoindre && fichiersAJoindre.length) {
+        await televerserDocument(creee.id, fichiersAJoindre, document.getElementById("fichiers-type").value, null);
       }
-      fermerPanneau();
+      // Infos entreprise proposées par l'IA : écrites seulement maintenant,
+      // après validation (les champs déjà remplis ne sont jamais écrasés).
+      const proposition = etat.propositionEntreprise;
+      etat.propositionEntreprise = null;
+      if (proposition && (proposition.site_web || proposition.contexte_actus)) {
+        try {
+          await api("/api/entreprises", { methode: "POST", corps: proposition });
+        } catch (erreurEntreprise) {
+          toast(erreurEntreprise.message, true);
+        }
+      }
+      fermerModale();
       rendre();
     } catch (erreur) {
       toast(erreur.message, true);
     }
   });
-
-  if (!creation) {
-    document.getElementById("btn-supprimer").addEventListener("click", async () => {
-      const accord = await confirmer(
-        t("formulaire.supprimer_candidature_titre"),
-        t("formulaire.supprimer_candidature_texte", { poste: cand.poste, entreprise: cand.entreprise })
-      );
-      if (!accord) return;
-      try {
-        await api(`/api/candidatures/${cand.id}`, { methode: "DELETE" });
-        toast(t("formulaire.candidature_supprimee"));
-        fermerPanneau();
-        rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
-    document.getElementById("btn-recap").addEventListener("click", () => {
-      ouvrirRecapitulatif(cand.id);
-    });
-  }
 }
 
 function remplirDepuisProposition(proposition) {
@@ -1020,120 +967,276 @@ function remplirDepuisProposition(proposition) {
   ].forEach((nom) => fixer(nom, cand[nom]));
 }
 
-function sectionsCandidature(numero, journal, docs) {
-  const lignesDocs = docs
-    .map(
-      (doc) => `
-    <div class="ligne-document">
+/* ------------------------------------------------------------------------
+   Détail d'une candidature : une fenêtre centrée dont chaque champ se modifie
+   directement - pas de bouton « Modifier » à presser d'abord : chaque
+   changement est enregistré tout de suite (les textes, un instant après la
+   dernière frappe).
+   ------------------------------------------------------------------------ */
+
+/* Champs de la fenêtre de détail. `sauv` = enregistrés à la volée. */
+function champDetail(nom, libelle, valeur, type = "text", pleineLargeur = false) {
+  return `
+    <div class="champ${pleineLargeur ? " pleine-largeur" : ""}">
+      <label for="detail-${nom}">${libelle}</label>
+      <input type="${type}" id="detail-${nom}" data-champ="${nom}" value="${echapperAttribut(valeur ?? "")}"${type === "number" ? ' min="0" step="1"' : ""}>
+    </div>`;
+}
+
+function selectDetail(nom, libelle, liste, valeur, avecVide = true) {
+  return `
+    <div class="champ">
+      <label for="detail-${nom}">${libelle}</label>
+      <select id="detail-${nom}" data-champ="${nom}">${optionsSelect(liste, valeur, avecVide)}</select>
+    </div>`;
+}
+
+function zoneDetail(nom, libelle, valeur) {
+  return `
+    <div class="champ pleine-largeur">
+      <label for="detail-${nom}">${libelle}</label>
+      <textarea id="detail-${nom}" data-champ="${nom}" class="zone-longue">${echapper(valeur ?? "")}</textarea>
+    </div>`;
+}
+
+function pastilleStatutDetail(statut) {
+  return `
+    <span class="selecteur-statut puce puce-statut grande" style="--couleur-statut:${COULEURS_STATUT[statut]}">
+      <span class="point"></span>${echapper(tv(statut))}
+      <svg class="chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      <select data-champ="statut" aria-label="${echapperAttribut(t("candidatures.changer_statut"))}">
+        ${optionsSelect(etat.valeurs.statuts, statut, false)}
+      </select>
+    </span>`;
+}
+
+function annexesCandidature(numero, lettresLiees, fichesLiees, notesLiees, docs, journal) {
+  const lignesDocs = docs.map((doc) => `
+    <div class="ligne-liee" onclick="ouvrirApercuPiece('documents', ${doc.id})">
       <span class="puce">${echapper(tv(doc.type_document || "Autre"))}</span>
-      <a class="lien-detail" href="/api/documents/${doc.id}/telecharger">${echapper(doc.nom_fichier)}</a>
-      <span class="cellule-secondaire">${dateFr(doc.date_ajout)}</span>
-      <button type="button" class="btn btn-danger btn-mini" onclick="supprimerDocument(${doc.id}, ${numero})">${t("commun.supprimer")}</button>
-    </div>`
-    )
-    .join("");
-  const lignesJournal = journal
-    .map(
-      (evenement) => `
+      <span class="cellule-principale">${echapper(doc.titre)}</span>
+      <span class="cellule-secondaire">${dateFr(doc.date_creation)}</span>
+    </div>`).join("");
+  const lignesJournal = journal.map((evenement) => `
     <div class="ligne-journal">
       <span class="journal-date">${dateFr(evenement.horodatage.slice(0, 10))} ${echapper(evenement.horodatage.slice(11, 16))}</span>
       <span>${echapper(evenement.description)}</span>
-    </div>`
-    )
-    .join("");
+    </div>`).join("");
   return `
+    ${sectionPreparation(lettresLiees, fichesLiees, notesLiees, [], `nouvelleNotePourOffre(${numero})`)}
     <h3 class="section-panneau">${t("formulaire.documents_envoyes")}</h3>
-    ${lignesDocs || `<p class="sous-titre">${t("formulaire.aucun_document")}</p>`}
-    <div class="ajout-document">
-      <select id="doc-type-panneau">${optionsSelect(etat.valeurs.types_document, null, false)}</select>
-      <input type="file" id="doc-fichier-panneau" multiple>
-      <button type="button" class="btn" id="btn-doc-panneau"
-        onclick="televerserDocument(${numero}, document.getElementById('doc-fichier-panneau').files, document.getElementById('doc-type-panneau').value, () => ouvrirDetailCandidature(${numero}))">
-        ${t("commun.ajouter_simple")}</button>
-    </div>
+    ${lignesDocs ? `<div class="liste-liee">${lignesDocs}</div>` : `<p class="sous-titre">${t("formulaire.aucun_document")}</p>`}
+    <div class="actions-reglages"><button type="button" class="btn" id="btn-ajouter-document">${t("formulaire.ajouter_document")}</button></div>
     <h3 class="section-panneau">${t("formulaire.historique")}</h3>
     <div class="journal">${lignesJournal || `<p class="sous-titre">${t("formulaire.aucun_evenement")}</p>`}</div>`;
 }
 
-function contenuFicheCandidature(cand) {
-  const lienOffre = cand.lien_offre
-    ? `<a class="lien-detail" href="${echapper(cand.lien_offre)}" target="_blank" rel="noopener">${echapper(cand.lien_offre)}</a>` +
-      (cand.lien_dernier_etat === "mort" ? ` <span class="puce puce-lien-mort">${t("candidatures.lien_mort")}</span>` : "")
-    : null;
-  const portailUrl = cand.portail_url
-    ? `<a class="lien-detail" href="${echapper(cand.portail_url)}" target="_blank" rel="noopener">${echapper(cand.portail_url)}</a>`
-    : null;
-
-  return `
-    <div class="fiche-entete-detail">
-      <div>
-        <h2>${echapper(cand.poste)}</h2>
-        <p class="fiche-soustitre">${echapper(cand.entreprise)}${cand.ville ? " · " + echapper(cand.ville) : ""}</p>
-      </div>
-      ${cand.statut ? `<span class="puce puce-statut" style="--couleur-statut:${COULEURS_STATUT[cand.statut]}"><span class="point"></span>${echapper(tv(cand.statut))}</span>` : ""}
-    </div>
-    <div class="grille-form">
-      ${champAffiche(t("comparateur.sous_domaine"), cand.sous_domaine ? echapper(tv(cand.sous_domaine)) : null)}
-      ${champAffiche(t("formulaire.type_candidature"), cand.type_candidature ? echapper(tv(cand.type_candidature)) : null)}
-      ${champAffiche(t("comparateur.source"), cand.source ? echapper(tv(cand.source)) : null)}
-      ${champAffiche(t("formulaire.date_envoi"), dateFr(cand.date_envoi))}
-      ${champAffiche(t("formulaire.reponse_recue_le"), dateFr(cand.date_reponse))}
-      ${champAffiche(t("comparateur.entretien_le"), dateFr(cand.date_entretien))}
-      ${champAffiche(t("comparateur.debut_souhaite"), dateFr(cand.date_debut_souhaitee))}
-      ${champAffiche(t("comparateur.duree"), cand.duree ? echapper(cand.duree) : null)}
-      ${champAffiche(t("formulaire.gratification_label"), cand.gratification ? `${echapper(cand.gratification)} €/mois` : null)}
-      ${champAffiche(t("comparateur.mode_travail"), cand.mode_travail ? echapper(tv(cand.mode_travail)) : null)}
-      ${champAffiche(t("comparateur.convention_envoyee"), cand.convention_envoyee ? echapper(tv(cand.convention_envoyee)) : null)}
-      ${champAffiche(t("formulaire.lien_offre"), lienOffre, true)}
-      ${portailUrl ? champAffiche(t("formulaire.portail_candidature"), portailUrl, true) : ""}
-      ${cand.portail_identifiant ? champAffiche(t("formulaire.portail_identifiant"), echapper(cand.portail_identifiant)) : ""}
-    </div>
-    ${cand.portail_mdp ? champAfficheMotDePasse("mdp-portail-affiche", t("formulaire.portail_mdp"), cand.portail_mdp) : ""}
-    ${cand.texte_offre ? `<h3 class="section-panneau">${t("formulaire.texte_offre")}</h3><div class="texte-long">${echapper(cand.texte_offre)}</div>` : ""}
-    ${cand.notes ? `<h3 class="section-panneau">${t("formulaire.notes")}</h3><div class="texte-long">${echapper(cand.notes)}</div>` : ""}`;
-}
-
 async function ouvrirDetailCandidature(numero) {
+  let cand;
   try {
-    const cand = await api(`/api/candidatures/${numero}`);
-    const [journal, docs, lettresLiees, fichesLiees, notesLiees] = await Promise.all([
-      api(`/api/candidatures/${numero}/evenements`),
-      api(`/api/documents?candidature=${numero}`),
-      api(`/api/lettres?candidature=${numero}`),
-      api(`/api/fiches?candidature=${numero}`),
-      api(`/api/notes?candidature=${numero}`),
-    ]);
-    const corps = contenuFicheCandidature(cand)
-      + sectionPreparation(lettresLiees, fichesLiees, notesLiees)
-      + sectionsCandidature(numero, journal, docs);
-    const pied = `
-      <button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-      <button class="btn" id="btn-recap">${t("formulaire.recapitulatif")}</button>
-      <button class="btn" id="btn-notes">${t("formulaire.notes_entretien")}</button>
-      <button class="btn btn-accent" id="btn-modifier">${t("commun.modifier")}</button>`;
-    ouvrirPanneau(`${cand.poste} - ${cand.entreprise}`, corps, pied);
-
-    document.getElementById("btn-modifier").addEventListener("click", () => ouvrirFormCandidature(cand));
-    document.getElementById("btn-recap").addEventListener("click", () => ouvrirRecapitulatif(cand.id));
-    document.getElementById("btn-notes").addEventListener("click", () => ouvrirNotesDeLOffre(cand.id));
-    document.getElementById("btn-supprimer").addEventListener("click", async () => {
-      const accord = await confirmer(
-        t("formulaire.supprimer_candidature_titre"),
-        t("formulaire.supprimer_candidature_texte", { poste: cand.poste, entreprise: cand.entreprise })
-      );
-      if (!accord) return;
-      try {
-        await api(`/api/candidatures/${numero}`, { methode: "DELETE" });
-        toast(t("formulaire.candidature_supprimee"));
-        fermerPanneau();
-        rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
+    cand = await api(`/api/candidatures/${numero}`);
   } catch (erreur) {
     toast(erreur.message, true);
+    return;
   }
+  const v = etat.valeurs;
+  const chargerAnnexes = () => Promise.all([
+    api(`/api/lettres?candidature=${numero}`),
+    api(`/api/fiches?candidature=${numero}`),
+    api(`/api/notes?candidature=${numero}`),
+    api(`/api/documents?candidature=${numero}`),
+    api(`/api/candidatures/${numero}/evenements`),
+  ]);
+  const annexes = await chargerAnnexes();
+
+  const lienOffre = () => (cand.lien_offre
+    ? `<a class="btn btn-mini" id="detail-ouvrir-offre" href="${echapperAttribut(cand.lien_offre)}" target="_blank" rel="noopener">${t("candidatures.voir_offre")}</a>${cand.lien_dernier_etat === "mort" ? ` <span class="puce puce-lien-mort">${t("candidatures.lien_mort")}</span>` : ""}`
+    : "");
+
+  const corps = `
+    <div class="detail-candidature">
+      <div class="detail-tete">
+        <div class="detail-titre">
+          <input type="text" class="detail-poste" id="detail-poste" data-champ="poste" value="${echapperAttribut(cand.poste)}" aria-label="${echapperAttribut(t("formulaire.poste_requis"))}">
+          <p class="fiche-soustitre"><a class="lien-detail" href="#" id="detail-entreprise">${echapper(cand.entreprise)}</a></p>
+        </div>
+        <span id="detail-statut">${pastilleStatutDetail(cand.statut)}</span>
+      </div>
+
+      <h3 class="section-panneau">${t("formulaire.section_suivi")}</h3>
+      <div class="grille-detail">
+        ${champDetail("date_envoi", t("formulaire.date_envoi"), cand.date_envoi, "date")}
+        ${champDetail("date_reponse", t("formulaire.reponse_recue_le"), cand.date_reponse, "date")}
+        ${champDetail("date_entretien", t("comparateur.entretien_le"), cand.date_entretien, "date")}
+        ${champDetail("date_debut_souhaitee", t("comparateur.debut_souhaite"), cand.date_debut_souhaitee, "date")}
+        ${selectDetail("source", t("comparateur.source"), v.sources_candidature, cand.source)}
+        ${selectDetail("type_candidature", t("formulaire.type_candidature"), v.types_candidature, cand.type_candidature)}
+        ${selectDetail("convention_envoyee", t("comparateur.convention_envoyee"), v.conventions, cand.convention_envoyee || "Non", false)}
+      </div>
+
+      <h3 class="section-panneau">${t("formulaire.section_poste")}</h3>
+      <div class="grille-detail">
+        ${selectDetail("sous_domaine", t("comparateur.sous_domaine"), v.sous_domaines, cand.sous_domaine)}
+        ${champDetail("duree", t("comparateur.duree"), cand.duree)}
+        ${champDetail("gratification", t("formulaire.gratification_label"), cand.gratification, "number")}
+        ${champDetail("ville", t("candidatures.col_ville"), cand.ville)}
+        ${selectDetail("mode_travail", t("comparateur.mode_travail"), v.modes_travail, cand.mode_travail)}
+      </div>
+
+      <h3 class="section-panneau">${t("formulaire.section_liens")}</h3>
+      <div class="grille-detail">
+        <div class="champ pleine-largeur">
+          <label for="detail-lien_offre">${t("formulaire.lien_offre")}</label>
+          <div class="champ-avec-action">
+            <input type="url" id="detail-lien_offre" data-champ="lien_offre" value="${echapperAttribut(cand.lien_offre ?? "")}">
+            <span id="detail-lien-actions">${lienOffre()}</span>
+          </div>
+        </div>
+        ${champDetail("portail_url", t("formulaire.portail_url"), cand.portail_url, "url", true)}
+        ${champDetail("portail_identifiant", t("formulaire.portail_identifiant"), cand.portail_identifiant)}
+        <div class="champ">
+          <label for="detail-portail_mdp">${t("formulaire.portail_mdp")}</label>
+          <div class="champ-mdp">
+            <input type="password" id="detail-portail_mdp" data-champ="portail_mdp" value="${echapperAttribut(cand.portail_mdp ?? "")}" autocomplete="off">
+            <button type="button" class="btn btn-discret btn-oeil" data-cible="detail-portail_mdp">${t("commun.afficher")}</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 class="section-panneau">${t("formulaire.texte_offre")}</h3>
+      <div class="grille-detail">${zoneDetail("texte_offre", "", cand.texte_offre)}</div>
+      <h3 class="section-panneau">${t("formulaire.notes")}</h3>
+      <div class="grille-detail">${zoneDetail("notes", "", cand.notes)}</div>
+
+      <div id="detail-annexes">${annexesCandidature(numero, ...annexes)}</div>
+    </div>`;
+
+  let modifie = false;
+  const enAttente = new Map(); // champ -> minuteur d'un texte en cours de frappe
+  const zone = ouvrirModale(
+    cand.entreprise,
+    corps,
+    `<button class="btn btn-danger" id="btn-supprimer" style="margin-right:auto;">${t("commun.supprimer")}</button>
+     <button class="btn" id="btn-recap">${t("formulaire.recapitulatif")}</button>
+     <button class="btn btn-accent" onclick="fermerModale()">${t("commun.fermer")}</button>`,
+    false, true,
+    {
+      avecEtat: true,
+      surFermeture: async () => {
+        await envoyerEnAttente();
+        if (modifie) rendre();
+      },
+    }
+  );
+  const indicateur = zone.racine.querySelector(".modale-etat");
+  let minuteurIndicateur = null;
+  const signaler = (texte) => {
+    indicateur.textContent = texte;
+    indicateur.classList.toggle("visible", !!texte);
+    clearTimeout(minuteurIndicateur);
+    if (texte) minuteurIndicateur = setTimeout(() => { indicateur.classList.remove("visible"); }, 2400);
+  };
+
+  async function enregistrerChamp(nom, brut) {
+    const champ = zone.racine.querySelector(`[data-champ="${nom}"]`);
+    const valeur = brut === "" ? null : brut;
+    const actuelle = cand[nom] === undefined ? null : cand[nom];
+    if (String(valeur ?? "") === String(actuelle ?? "")) return;
+    if (nom === "poste" && !valeur) {
+      champ.value = cand.poste;
+      toast(t("formulaire.poste_obligatoire"), true);
+      return;
+    }
+    signaler(t("formulaire.enregistrement_en_cours"));
+    try {
+      const misAJour = await api(`/api/candidatures/${numero}`, { methode: "PATCH", corps: { [nom]: valeur } });
+      cand = { ...cand, ...misAJour };
+      modifie = true;
+      signaler(t("formulaire.enregistre"));
+      if (nom === "statut") {
+        zone.racine.querySelector("#detail-statut").innerHTML = pastilleStatutDetail(cand.statut);
+        await rafraichirAnnexes();
+      }
+      if (nom === "lien_offre") zone.racine.querySelector("#detail-lien-actions").innerHTML = lienOffre();
+    } catch (erreur) {
+      signaler("");
+      champ.value = actuelle ?? "";
+      toast(erreur.message, true);
+    }
+  }
+
+  function annulerEnAttente() {
+    enAttente.forEach((minuteur) => clearTimeout(minuteur));
+    enAttente.clear();
+  }
+
+  async function envoyerEnAttente() {
+    const noms = [...enAttente.keys()];
+    annulerEnAttente();
+    for (const nom of noms) {
+      const champ = zone.racine.querySelector(`[data-champ="${nom}"]`);
+      if (champ) await enregistrerChamp(nom, champ.value);
+    }
+  }
+
+  async function rafraichirAnnexes() {
+    const conteneur = zone.racine.querySelector("#detail-annexes");
+    if (!conteneur) return;
+    conteneur.innerHTML = annexesCandidature(numero, ...(await chargerAnnexes()));
+    brancherAnnexes();
+  }
+
+  function brancherAnnexes() {
+    const ajouter = zone.racine.querySelector("#btn-ajouter-document");
+    if (ajouter) {
+      ajouter.addEventListener("click", () => ouvrirImportPiece("documents", {
+        entrepriseFixe: cand.entreprise_id, offreIds: [cand.id], apres: rafraichirAnnexes,
+      }));
+    }
+  }
+
+  // Un seul écouteur pour tous les champs : les listes et les dates s'enregistrent
+  // au changement, les champs de texte un instant après la dernière frappe.
+  zone.corps.addEventListener("change", (evenement) => {
+    const nom = evenement.target.dataset && evenement.target.dataset.champ;
+    if (!nom) return;
+    clearTimeout(enAttente.get(nom));
+    enAttente.delete(nom);
+    enregistrerChamp(nom, evenement.target.value);
+  });
+  zone.corps.addEventListener("input", (evenement) => {
+    const cible = evenement.target;
+    const nom = cible.dataset && cible.dataset.champ;
+    if (!nom || !(cible.tagName === "TEXTAREA" || cible.type === "text" || cible.type === "url")) return;
+    clearTimeout(enAttente.get(nom));
+    enAttente.set(nom, setTimeout(() => { enAttente.delete(nom); enregistrerChamp(nom, cible.value); }, 900));
+  });
+  zone.corps.addEventListener("keydown", (evenement) => {
+    if (evenement.key === "Enter" && evenement.target.tagName === "INPUT") evenement.target.blur();
+  });
+  zone.racine.querySelector("#detail-entreprise").addEventListener("click", (evenement) => {
+    evenement.preventDefault();
+    ouvrirDetailEntreprise(cand.entreprise_id);
+  });
+  brancherAnnexes();
+
+  zone.racine.querySelector("#btn-recap").addEventListener("click", () => ouvrirRecapitulatif(numero));
+  zone.racine.querySelector("#btn-supprimer").addEventListener("click", async () => {
+    const accord = await confirmer(
+      t("formulaire.supprimer_candidature_titre"),
+      t("formulaire.supprimer_candidature_texte", { poste: cand.poste, entreprise: cand.entreprise })
+    );
+    if (!accord) return;
+    try {
+      await api(`/api/candidatures/${numero}`, { methode: "DELETE" });
+      toast(t("formulaire.candidature_supprimee"));
+      modifie = true;
+      annulerEnAttente(); // plus rien à enregistrer : la candidature n'existe plus
+      fermerModale(zone);
+    } catch (erreur) {
+      toast(erreur.message, true);
+    }
+  });
 }
 
 /* ========================================================================
@@ -1154,6 +1257,7 @@ async function vueEntreprises() {
       <div class="contexte">${echapper(ent.contexte_actus || t("entreprises.pas_de_contexte"))}</div>
       <div class="compteurs">
         <span class="puce">${pluriel("entreprises.nb_candidatures", ent.nb_candidatures)}</span>
+        ${ent.nb_documents ? `<span class="puce">${pluriel("entreprises.nb_documents", ent.nb_documents)}</span>` : ""}
         ${ent.nb_lettres ? `<span class="puce">${pluriel("entreprises.nb_lettres", ent.nb_lettres)}</span>` : ""}
         ${ent.nb_fiches ? `<span class="puce">${pluriel("entreprises.nb_fiches", ent.nb_fiches)}</span>` : ""}
         ${ent.nb_notes ? `<span class="puce">${pluriel("entreprises.nb_notes", ent.nb_notes)}</span>` : ""}
@@ -1197,7 +1301,7 @@ async function ouvrirFusionEntreprises() {
     const bouton = (garder, fusionner) => `
       <button type="button" class="btn btn-fusion" data-conserver="${garder.id}" data-supprimer="${fusionner.id}">
         ${t("entreprises.garder", { nom: echapper(garder.nom) })}
-        <span class="cellule-secondaire">${t("entreprises.fusionner_dedans", { cand: garder.nb_candidatures ?? 0, prep: (garder.nb_lettres ?? 0) + (garder.nb_fiches ?? 0) + (garder.nb_notes ?? 0), nom: echapper(fusionner.nom) })}</span>
+        <span class="cellule-secondaire">${t("entreprises.fusionner_dedans", { cand: garder.nb_candidatures ?? 0, prep: (garder.nb_documents ?? 0) + (garder.nb_lettres ?? 0) + (garder.nb_fiches ?? 0) + (garder.nb_notes ?? 0), nom: echapper(fusionner.nom) })}</span>
       </button>`;
     return `
       <div class="paire-fusion">
@@ -1232,7 +1336,7 @@ async function ouvrirFusionEntreprises() {
         toast(
           t("entreprises.fusion_effectuee", {
             cand: resultat.candidatures_deplacees,
-            prep: resultat.lettres_deplacees + resultat.fiches_deplacees + resultat.notes_deplacees,
+            prep: resultat.documents_deplaces + resultat.lettres_deplacees + resultat.fiches_deplacees + resultat.notes_deplacees,
             nom: resultat.nom,
           })
         );
@@ -1302,12 +1406,13 @@ async function ouvrirFormEntreprise(numero = null) {
 
 async function ouvrirDetailEntreprise(numero) {
   try {
-    const [listeEntreprises, listeCandidatures, lettresEnt, fichesEnt, notesEnt] = await Promise.all([
+    const [listeEntreprises, listeCandidatures, lettresEnt, fichesEnt, notesEnt, docsEnt] = await Promise.all([
       api("/api/entreprises"),
       api("/api/candidatures"),
       api(`/api/lettres?entreprise=${numero}`),
       api(`/api/fiches?entreprise=${numero}`),
       api(`/api/notes?entreprise=${numero}`),
+      api(`/api/documents?entreprise=${numero}`),
     ]);
     const ent = listeEntreprises.find((e) => e.id === numero);
     if (!ent) { toast(t("entreprises.introuvable"), true); return; }
@@ -1334,7 +1439,7 @@ async function ouvrirDetailEntreprise(numero) {
 
       <h3 class="section-panneau">${t("entreprises.candidatures_titre", { n: candidaturesEnt.length })}</h3>
       ${candidaturesEnt.length ? `<div class="liste-liee">${candidaturesEnt.map(ligneCandidature).join("")}</div>` : `<p class="sous-titre">${t("entreprises.aucune_candidature")}</p>`}
-      ${sectionPreparation(lettresEnt, fichesEnt, notesEnt)}`;
+      ${sectionPreparation(lettresEnt, fichesEnt, notesEnt, docsEnt)}`;
 
     const pied = `
       <button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
@@ -1363,85 +1468,11 @@ async function ouvrirDetailEntreprise(numero) {
 }
 
 /* ========================================================================
-   Documents : CV / lettres envoyés, par candidature
+   Documents : les fichiers joints à une candidature (voir preparation.js pour la liste)
    ======================================================================== */
 
-async function vueDocuments() {
-  const liste = await api("/api/documents");
-  const lignes = liste
-    .map(
-      (doc) => `
-    <tr>
-      <td class="cellule-principale">${echapper(doc.nom_fichier)}</td>
-      <td><span class="puce">${echapper(tv(doc.type_document || "Autre"))}</span></td>
-      <td>${echapper(doc.entreprise)} <span class="cellule-secondaire">${echapper(doc.poste)}</span></td>
-      <td class="cellule-date">${dateFr(doc.date_ajout)}</td>
-      <td>
-        <a class="btn btn-discret" href="/api/documents/${doc.id}/telecharger">${t("documents.telecharger")}</a>
-        <button class="btn btn-danger" onclick="supprimerDocument(${doc.id}, null)">${t("commun.supprimer")}</button>
-      </td>
-    </tr>`
-    )
-    .join("");
-  return `
-    <div class="entete-vue">
-      <h1>${t("nav.documents")}</h1>
-      <button class="btn btn-accent" onclick="ouvrirFormDocument()">${t("commun.ajouter")}</button>
-    </div>
-    ${liste.length ? `
-      <div class="enveloppe-tableau"><table class="tableau">
-        <thead><tr><th>${t("documents.col_fichier")}</th><th>${t("documents.col_type")}</th><th>${t("nav.candidatures")}</th><th>${t("documents.col_ajoute_le")}</th><th></th></tr></thead>
-        <tbody>${lignes}</tbody>
-      </table></div>` : `
-      <div class="etat-vide">
-        <div class="icone">${ICONES.candidatures}</div>
-        <div class="titre">${t("documents.vide_titre")}</div>
-        <p>${t("documents.vide_texte")}</p>
-        <button class="btn btn-accent" onclick="ouvrirFormDocument()">${t("documents.ajouter_bouton")}</button>
-      </div>`}`;
-}
-
-async function ouvrirFormDocument() {
-  const candidaturesListe = await api("/api/candidatures");
-  if (!candidaturesListe.length) {
-    toast(t("documents.ajoute_candidature_dabord"), true);
-    return;
-  }
-  ouvrirModale(
-    t("documents.ajouter_titre"),
-    `<div class="grille-form">
-      <div class="champ pleine-largeur">
-        <label for="doc-candidature">${t("nav.candidatures")}</label>
-        <select id="doc-candidature">
-          ${candidaturesListe.map((c) => `<option value="${c.id}">${echapper(c.entreprise)} - ${echapper(c.poste)}</option>`).join("")}
-        </select>
-      </div>
-      <div class="champ">
-        <label for="doc-type">${t("documents.col_type")}</label>
-        <select id="doc-type">${optionsSelect(etat.valeurs.types_document, null, false)}</select>
-      </div>
-      <div class="champ">
-        <label for="doc-fichier">${t("documents.fichiers_label")}</label>
-        <input type="file" id="doc-fichier" multiple>
-      </div>
-    </div>`,
-    `<button class="btn" onclick="fermerModale()">${t("commun.annuler")}</button>
-     <button class="btn btn-accent" id="btn-doc-ajouter">${t("commun.ajouter_simple")}</button>`,
-    true
-  );
-  document.getElementById("btn-doc-ajouter").addEventListener("click", async () => {
-    const fichiers = document.getElementById("doc-fichier").files;
-    await televerserDocument(
-      Number(document.getElementById("doc-candidature").value),
-      fichiers,
-      document.getElementById("doc-type").value,
-      () => { fermerModale(); rendre(); }
-    );
-  });
-}
-
-/* Téléverse un ou plusieurs fichiers (offre en PDF, CV, lettre…) liés à une
-   candidature. Accepte un seul File ou une FileList/tableau de plusieurs. */
+/* Téléverse un ou plusieurs fichiers (offre en PDF, CV, lettre…) liés à UNE
+   candidature (à sa création). Accepte un seul File ou une FileList/tableau. */
 async function televerserDocument(candidatureId, fichiers, type, apres) {
   const liste = fichiers instanceof FileList || Array.isArray(fichiers)
     ? Array.from(fichiers)
@@ -1468,26 +1499,10 @@ async function televerserDocument(candidatureId, fichiers, type, apres) {
     }
   }
   if (reussis) {
-    toast(reussis === 1 ? t("documents.document_ajoute") : t("documents.documents_ajoutes", { n: reussis }));
+    toast(reussis === 1 ? t("documents.ajoutee") : t("documents.documents_ajoutes", { n: reussis }));
   }
   erreurs.forEach((message) => toast(message, true));
   if (reussis && apres) apres();
-}
-
-async function supprimerDocument(idDocument, idCandidature) {
-  const accord = await confirmer(
-    t("documents.supprimer_titre"),
-    t("documents.supprimer_texte")
-  );
-  if (!accord) return;
-  try {
-    await api(`/api/documents/${idDocument}`, { methode: "DELETE" });
-    toast(t("documents.document_supprime"));
-    if (idCandidature) ouvrirDetailCandidature(idCandidature);
-    else rendre();
-  } catch (erreur) {
-    toast(erreur.message, true);
-  }
 }
 
 /* ========================================================================
@@ -1693,6 +1708,9 @@ async function vueRecherche() {
       ...resultats.notes.map((n) =>
         resultatRecherche("note", t("recherche.badge_note"), `location.hash='#/entretiens/${n.id}'`,
           n.titre, `${n.entreprise}${n.poste ? " · " + n.poste : ""}`, n)),
+      ...resultats.documents.map((d) =>
+        resultatRecherche("document", t("recherche.badge_document"), `ouvrirApercuPiece('documents', ${d.id})`,
+          d.titre, d.entreprise, d)),
       ...resultats.lettres.map((l) =>
         resultatRecherche("lettre", t("recherche.badge_lettre"), `ouvrirApercuPiece('lettres', ${l.id})`,
           l.titre, l.entreprise, l)),
@@ -1704,7 +1722,8 @@ async function vueRecherche() {
       ? `<div class="liste-resultats">${rendus.join("")}</div>
          <p class="sous-titre">${t("recherche.resultats_compte", {
            n: rendus.length, cand: resultats.candidatures.length, ent: resultats.entreprises.length,
-           notes: resultats.notes.length, lettres: resultats.lettres.length, fiches: resultats.fiches.length,
+           notes: resultats.notes.length, docs: resultats.documents.length,
+           lettres: resultats.lettres.length, fiches: resultats.fiches.length,
          })}</p>`
       : `<div class="etat-vide"><div class="titre">${t("recherche.aucun_resultat", { requete: echapper(requete) })}</div><p>${t("recherche.aucun_resultat_texte")}</p></div>`;
   }
@@ -1741,44 +1760,17 @@ function activerRecherche() {
    Réglages : clé API, modèle, sauvegardes
    ======================================================================== */
 
-function carteProfilCv(cv) {
-  const sourceLabel = cv.defini ? t(`profil.source_${cv.source}`) : null;
-  let details = "";
-  if (cv.defini) {
-    if (cv.source === "fichier" && cv.nom_fichier) {
-      details += `<p class="sous-titre">${t("profil.fichier_nom", { nom: echapper(cv.nom_fichier) })}</p>`;
-    }
-    if (cv.source === "dossier_latex" && cv.chemin) {
-      details += `<p class="sous-titre">${t("profil.dossier_chemin", { chemin: echapper(cv.chemin) })}</p>`;
-    }
-    if (cv.erreur) {
-      details += `<p class="sous-titre" style="color:var(--danger);">${t("profil.erreur_lecture", { erreur: echapper(cv.erreur) })}</p>`;
-    } else if (cv.apercu) {
-      details += `<div class="champ pleine-largeur" style="margin-top:8px;"><label>${t("profil.apercu")}</label>
-        <textarea readonly style="min-height:80px;">${echapper(cv.apercu)}${cv.apercu.length >= 300 ? "…" : ""}</textarea></div>`;
-    }
-  }
+function carteReglagesCv() {
   return `
     <div class="carte">
-      <h2>${t("profil.titre")}</h2>
-      <p class="sous-titre">${t("profil.texte")}</p>
-      <div class="champ" style="margin-top:12px;">
-        <label>${t("profil.cv_actuel")}</label>
-        <input type="text" readonly value="${cv.defini ? echapper(sourceLabel) : echapper(t("profil.aucun_cv"))}">
-      </div>
-      ${details}
-      <div class="actions-reglages" style="flex-wrap:wrap;">
-        <button class="btn" id="profil-cv-fichier-btn">${t("profil.televerser_fichier")}</button>
-        <input type="file" id="profil-cv-fichier" accept=".pdf,.docx,.txt,.md" hidden>
-        <button class="btn" id="profil-cv-dossier-latex">${t("profil.indiquer_dossier_latex")}</button>
-        <button class="btn" id="profil-cv-texte">${t("profil.coller_texte")}</button>
-        ${cv.defini ? `<button class="btn btn-danger" id="profil-cv-supprimer">${t("commun.supprimer")}</button>` : ""}
-      </div>
+      <h2>${t("reglages.cv_titre")}</h2>
+      <p class="sous-titre">${t("reglages.cv_texte")}</p>
+      <div class="actions-reglages"><a class="btn" href="#/cv">${t("reglages.cv_ouvrir")}</a></div>
     </div>`;
 }
 
 async function vueReglages() {
-  const [r, cv] = await Promise.all([api("/api/reglages"), api("/api/profil/cv")]);
+  const r = await api("/api/reglages");
   etat.ia = r;
   const modelesAnthropic = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"];
   const estAnthropic = r.fournisseur_ia !== "openai_compatible";
@@ -1855,7 +1847,7 @@ async function vueReglages() {
         </div>
       </div>
 
-      ${carteProfilCv(cv)}
+      ${carteReglagesCv()}
 
       <div class="carte">
         <h2>${t("reglages.dossier_titre")}</h2>
@@ -2004,79 +1996,6 @@ function activerReglages() {
     });
   }
 
-  // Profil - CV (voir profil.py) : trois façons de le fournir, une seule active à la fois.
-  document.getElementById("profil-cv-fichier-btn").addEventListener("click", () => {
-    document.getElementById("profil-cv-fichier").click();
-  });
-  document.getElementById("profil-cv-fichier").addEventListener("change", async (evenement) => {
-    const fichier = evenement.target.files[0];
-    if (!fichier) return;
-    const formulaire = new FormData();
-    formulaire.append("fichier", fichier);
-    try {
-      const reponse = await fetch("/api/profil/cv/fichier", { method: "POST", body: formulaire });
-      const donnees = await reponse.json();
-      if (!reponse.ok) throw new Error(donnees.erreur || t("documents.envoi_impossible"));
-      toast(t("profil.cv_enregistre"));
-      rendre();
-    } catch (erreur) {
-      toast(erreur.message, true);
-    }
-  });
-
-  document.getElementById("profil-cv-dossier-latex").addEventListener("click", async () => {
-    const chemin = await demanderTexte(
-      t("profil.indiquer_dossier_latex"), t("profil.dossier_latex_placeholder"), ""
-    );
-    if (chemin === null || !chemin.trim()) return;
-    try {
-      await api("/api/profil/cv/dossier_latex", { methode: "POST", corps: { chemin: chemin.trim() } });
-      toast(t("profil.cv_enregistre"));
-      rendre();
-    } catch (erreur) {
-      toast(erreur.message, true);
-    }
-  });
-
-  document.getElementById("profil-cv-texte").addEventListener("click", () => {
-    ouvrirModale(
-      t("profil.coller_texte"),
-      `<div class="champ pleine-largeur">
-        <textarea id="profil-cv-texte-zone" style="min-height:220px;" placeholder="${t("profil.texte_placeholder")}"></textarea>
-      </div>`,
-      `<button class="btn" id="profil-cv-texte-annuler">${t("commun.annuler")}</button>
-       <button class="btn btn-accent" id="profil-cv-texte-valider">${t("commun.enregistrer")}</button>`,
-      true
-    );
-    document.getElementById("profil-cv-texte-annuler").addEventListener("click", fermerModale);
-    document.getElementById("profil-cv-texte-valider").addEventListener("click", async () => {
-      const texte = document.getElementById("profil-cv-texte-zone").value;
-      try {
-        await api("/api/profil/cv/texte", { methode: "POST", corps: { texte } });
-        toast(t("profil.cv_enregistre"));
-        fermerModale();
-        rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
-  });
-
-  const supprimerCv = document.getElementById("profil-cv-supprimer");
-  if (supprimerCv) {
-    supprimerCv.addEventListener("click", async () => {
-      const accord = await confirmer(t("profil.supprimer_cv_titre"), t("profil.supprimer_cv_texte"));
-      if (!accord) return;
-      try {
-        await api("/api/profil/cv", { methode: "DELETE" });
-        toast(t("profil.cv_supprime"));
-        rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
-  }
-
   document.getElementById("reg-sauvegarder").addEventListener("click", async () => {
     try {
       const resultat = await api("/api/sauvegarde", { methode: "POST" });
@@ -2196,17 +2115,68 @@ function activerReglages() {
    Modales : confirmations, saisies, récapitulatif
    ======================================================================== */
 
-function ouvrirModale(titre, corpsHTML, piedHTML, etroite = false, large = false) {
-  document.getElementById("modale-titre").textContent = titre;
-  document.getElementById("modale-corps").innerHTML = corpsHTML;
-  document.getElementById("modale-pied").innerHTML = piedHTML;
-  document.getElementById("modale-boite").classList.toggle("etroite", etroite);
-  document.getElementById("modale-boite").classList.toggle("large", large);
-  document.getElementById("modale").classList.add("visible");
+/* Les fenêtres centrées sont EMPILÉES : un aperçu ouvert depuis le détail d'une
+   candidature s'affiche par-dessus, et sa fermeture ramène au détail. Chacune
+   est créée à la demande ; `options.surFermeture` s'exécute à sa fermeture,
+   `options.avecEtat` ajoute un petit indicateur (« Enregistré ») dans l'en-tête. */
+const pileModales = [];
+
+function ouvrirModale(titre, corpsHTML, piedHTML, etroite = false, large = false, options = {}) {
+  const racine = document.createElement("div");
+  racine.className = "modale visible";
+  racine.setAttribute("role", "dialog");
+  racine.setAttribute("aria-modal", "true");
+  racine.innerHTML = `
+    <div class="modale-boite${etroite ? " etroite" : ""}${large ? " large" : ""}">
+      <div class="modale-entete">
+        <h2 class="modale-titre"></h2>
+        ${options.avecEtat ? '<span class="modale-etat" aria-live="polite"></span>' : ""}
+        <button class="btn btn-discret modale-fermer" aria-label="${echapperAttribut(t("commun.fermer"))}">✕</button>
+      </div>
+      <div class="modale-corps"></div>
+      <div class="modale-pied"></div>
+    </div>`;
+  racine.querySelector(".modale-titre").textContent = titre;
+  const corps = racine.querySelector(".modale-corps");
+  const pied = racine.querySelector(".modale-pied");
+  corps.innerHTML = corpsHTML;
+  pied.innerHTML = piedHTML;
+  pied.hidden = !piedHTML;
+  const controleur = {
+    racine, corps, pied,
+    surFermeture: options.surFermeture || null,
+    precedentFocus: document.activeElement,
+  };
+  racine.querySelector(".modale-fermer").addEventListener("click", () => fermerModale(controleur));
+  // mousedown (et non click) : sélectionner du texte dans un champ puis relâcher sur le
+  // fond ne doit pas fermer la fenêtre.
+  racine.addEventListener("mousedown", (evenement) => {
+    if (evenement.target === racine) fermerModale(controleur);
+  });
+  document.body.appendChild(racine);
+  pileModales.push(controleur);
+  return controleur;
 }
 
-function fermerModale() {
-  document.getElementById("modale").classList.remove("visible");
+/* Ferme la fenêtre indiquée, sinon celle du dessus. */
+function fermerModale(controleur) {
+  const cible = controleur || pileModales[pileModales.length - 1];
+  if (!cible) return;
+  const rang = pileModales.indexOf(cible);
+  if (rang === -1) return;
+  pileModales.splice(rang, 1);
+  cible.racine.remove();
+  if (cible.precedentFocus && document.contains(cible.precedentFocus)) {
+    try { cible.precedentFocus.focus({ preventScroll: true }); } catch { /* sans importance */ }
+  }
+  if (cible.surFermeture) {
+    try {
+      const suite = cible.surFermeture();
+      if (suite && suite.catch) suite.catch((erreur) => toast(erreur.message, true));
+    } catch (erreur) {
+      toast(erreur.message, true);
+    }
+  }
 }
 
 function confirmer(titre, message) {
@@ -2294,37 +2264,9 @@ function confirmerSimilaires(liste) {
   });
 }
 
-/* Mini-rendu Markdown (structure connue de la fiche : titres, listes, gras, italique) */
+/* Markdown -> HTML : voir markdown.js (échappement complet, listes, tâches, tableaux…). */
 function rendreMarkdown(texte) {
-  const lignes = echapper(texte).split("\n");
-  const sortie = [];
-  let dansListe = false;
-  const fermerListe = () => {
-    if (dansListe) { sortie.push("</ul>"); dansListe = false; }
-  };
-  const enrichir = (ligne) =>
-    ligne
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/\*(.+?)\*/g, "<em>$1</em>");
-  for (const ligne of lignes) {
-    if (ligne.startsWith("# ")) {
-      fermerListe();
-      sortie.push(`<h1>${enrichir(ligne.slice(2))}</h1>`);
-    } else if (ligne.startsWith("## ")) {
-      fermerListe();
-      sortie.push(`<h2>${enrichir(ligne.slice(3))}</h2>`);
-    } else if (ligne.startsWith("- ")) {
-      if (!dansListe) { sortie.push("<ul>"); dansListe = true; }
-      sortie.push(`<li>${enrichir(ligne.slice(2))}</li>`);
-    } else if (ligne.trim() === "") {
-      fermerListe();
-    } else {
-      fermerListe();
-      sortie.push(`<p>${enrichir(ligne)}</p>`);
-    }
-  }
-  fermerListe();
-  return sortie.join("\n");
+  return window.Markdown.rendre(texte);
 }
 
 async function ouvrirRecapitulatif(numero) {
@@ -2333,7 +2275,7 @@ async function ouvrirRecapitulatif(numero) {
     ouvrirModale(
       t("entretien.recap_titre"),
       `<div class="fiche">${rendreMarkdown(fiche.markdown)}</div>`,
-      `<a class="btn" href="/api/entretien/${numero}/telecharger">${t("entretien.telecharger_md")}</a>
+      `<a class="btn" href="/api/entretien/${numero}/telecharger" data-telechargement="entretien-${echapperAttribut(fiche.entreprise)}.md">${t("entretien.telecharger_md")}</a>
        <button class="btn btn-accent" onclick="fermerModale()">${t("commun.fermer")}</button>`
     );
   } catch (erreur) {
@@ -2348,12 +2290,12 @@ async function ouvrirRecapitulatif(numero) {
 document.getElementById("btn-nouvelle").addEventListener("click", () => ouvrirFormCandidature());
 document.getElementById("panneau-fermer").addEventListener("click", fermerPanneau);
 document.getElementById("voile").addEventListener("click", fermerPanneau);
-document.getElementById("modale-fermer").addEventListener("click", fermerModale);
-document.getElementById("modale").addEventListener("click", (evenement) => {
-  if (evenement.target === document.getElementById("modale")) fermerModale();
-});
 document.addEventListener("keydown", (evenement) => {
-  if (evenement.key === "Escape") { fermerPanneau(); fermerModale(); }
+  if (evenement.key === "Escape") {
+    // Échap ferme d'abord la fenêtre du dessus, puis (seulement s'il n'y en a plus) le panneau.
+    if (pileModales.length) fermerModale();
+    else fermerPanneau();
+  }
   if ((evenement.metaKey || evenement.ctrlKey) && evenement.key.toLowerCase() === "k") {
     evenement.preventDefault();
     etat.focusRecherche = true;
@@ -2544,6 +2486,36 @@ function ouvrirCorrespondanceCsv(apercu) {
     }
   });
 }
+
+/* Télécharger un fichier SANS quitter la page. Dans la fenêtre de bureau, un lien vers un
+   PDF ou un texte ferait naviguer la fenêtre vers le fichier (et il faudrait fermer
+   Azimut pour revenir) : on passe par la boîte « Enregistrer sous » native. Dans un
+   navigateur, un lien de téléchargement classique suffit. */
+async function telechargerFichier(url, nomSuggere) {
+  const pont = window.pywebview && window.pywebview.api;
+  if (pont && pont.enregistrer_fichier) {
+    try {
+      const chemin = await pont.enregistrer_fichier(url, nomSuggere || "");
+      if (chemin) toast(t("commun.enregistre_sous", { chemin }));
+    } catch (erreur) {
+      toast(erreur.message || t("commun.erreur_inattendue"), true);
+    }
+    return;
+  }
+  const lien = document.createElement("a");
+  lien.href = url;
+  lien.download = nomSuggere || "";
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+}
+
+document.addEventListener("click", (evenement) => {
+  const lien = evenement.target.closest("a[data-telechargement]");
+  if (!lien) return;
+  evenement.preventDefault();
+  telechargerFichier(lien.getAttribute("href"), lien.dataset.telechargement);
+});
 
 // Afficher / masquer les mots de passe (délégation : les formulaires sont re-rendus).
 document.addEventListener("click", (evenement) => {
