@@ -114,6 +114,11 @@ class TestCreation(BaseSauvegarde):
         self.assertEqual(lire_base(extrait, "SELECT valeur FROM reglages WHERE cle = 'cle_api'"), [])
         self.assertEqual(lire_base(extrait, "SELECT valeur FROM reglages WHERE cle = 'langue'"), [("en",)])
         self.assertEqual(lire_base(extrait, "SELECT portail_mdp FROM candidatures"), [(None,)])
+        # Retirés pour de bon : pas seulement « supprimés » mais absents des octets de l'archive
+        # (SQLite garde une ligne supprimée dans ses pages libres tant qu'on ne recompacte pas).
+        octets = extrait.read_bytes()
+        self.assertNotIn(b"sk-ant-tres-secret", octets)
+        self.assertNotIn(b"secret-portail", octets)
         # La base d'origine, elle, n'a pas bougé.
         self.assertEqual(reglages.obtenir_reglage("cle_api", chemin_db=self.a), "sk-ant-tres-secret")
 

@@ -98,14 +98,20 @@ def _compteurs(conn):
 
 
 def _retirer_les_secrets(chemin_copie):
+    """Retire la clé API et les mots de passe de la COPIE. Supprimer une ligne ne l'efface pas du
+    fichier SQLite (les octets restent dans les pages libres) : secure_delete écrase ce qui est
+    supprimé, et VACUUM réécrit la base sans aucune page libre - sinon la clé resterait lisible
+    dans l'archive."""
     conn = sqlite3.connect(chemin_copie)
     try:
+        conn.execute("PRAGMA secure_delete = ON")
         conn.execute(
             "DELETE FROM reglages WHERE cle IN ({})".format(",".join("?" * len(REGLAGES_SECRETS))),
             REGLAGES_SECRETS,
         )
         conn.execute("UPDATE candidatures SET portail_mdp = NULL")
         conn.commit()
+        conn.execute("VACUUM")
     finally:
         conn.close()
 
