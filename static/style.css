@@ -249,6 +249,8 @@ button, input, select, textarea {
 
 .btn:hover { background: var(--surface-2); }
 
+a.btn { text-decoration: none; }
+
 .btn-accent {
   background: var(--accent);
   border-color: var(--accent);
@@ -802,7 +804,7 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 
 .champ { display: flex; flex-direction: column; gap: 4px; }
 
-/* Modale centrée (fiche entretien, confirmation) */
+/* Modale centrée (récapitulatif, aperçu, formulaires, confirmation) */
 .modale {
   position: fixed;
   inset: 0;
@@ -826,6 +828,7 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 }
 
 .modale-boite.etroite { width: min(420px, 100%); }
+.modale-boite.large { width: min(980px, 100%); }
 
 .modale-entete {
   display: flex;
@@ -848,7 +851,7 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
   border-top: 1px solid var(--hairline);
 }
 
-/* Fiche d'entretien rendue */
+/* Récapitulatif d'une candidature (Markdown rendu) */
 .fiche h1 { font-size: 19px; margin: 0 0 12px; letter-spacing: -0.02em; }
 .fiche h2 {
   font-size: 13px;
@@ -1071,135 +1074,6 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 .ligne-liee .cellule-principale { flex: 1; min-width: 0; }
 
 /* ==========================================================================
-   Agenda
-   ========================================================================== */
-
-.legende-agenda { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
-
-.agenda-nav {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.agenda-mois {
-  font-weight: 650;
-  font-size: 15px;
-  min-width: 150px;
-  text-align: center;
-  text-transform: capitalize;
-}
-
-.grille-agenda-entete {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-  font-size: 11.5px;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--encre-3);
-  padding: 0 2px 6px;
-}
-
-.grille-agenda {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-}
-
-.cellule-jour {
-  min-height: 92px;
-  background: var(--surface);
-  border: 1px solid var(--hairline);
-  border-radius: var(--rayon);
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow: hidden;
-}
-
-.cellule-jour.hors-mois { background: transparent; border-color: transparent; }
-
-.cellule-jour.aujourdhui { border-color: var(--accent); }
-
-.cellule-jour.aujourdhui .jour-numero { color: var(--accent); font-weight: 700; }
-
-.jour-numero { font-size: 12px; color: var(--encre-3); font-variant-numeric: tabular-nums; }
-
-.chip-echeance-groupe {
-  display: flex;
-  align-items: stretch;
-  gap: 3px;
-  max-width: 100%;
-}
-
-.chip-echeance {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  border: none;
-  background: var(--surface-2);
-  color: var(--couleur-statut, var(--encre-2));
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-size: 11.5px;
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1;
-}
-
-.chip-echeance .point {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: currentColor; flex-shrink: 0;
-}
-
-.chip-echeance:hover { filter: brightness(1.08); }
-
-.chip-echeance-ajout {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  border-radius: 6px;
-  background: var(--surface-2);
-  color: var(--couleur-statut, var(--encre-2));
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 12px;
-  line-height: 1;
-}
-
-.chip-echeance-ajout:hover { filter: brightness(1.15); background: var(--accent-doux); }
-
-.jour-semaine { padding: 10px 0; border-bottom: 1px solid var(--hairline); }
-
-.jour-semaine:last-child { border-bottom: none; }
-
-.jour-semaine-titre {
-  font-weight: 650;
-  margin-bottom: 6px;
-  text-transform: capitalize;
-}
-
-.jour-semaine .chip-echeance-groupe {
-  display: inline-flex;
-  margin: 2px 6px 2px 0;
-}
-
-.jour-semaine .chip-echeance {
-  font-size: 12.5px;
-  padding: 4px 9px;
-}
-
-/* ==========================================================================
    Recherche globale
    ========================================================================== */
 
@@ -1259,7 +1133,7 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 }
 
 /* ==========================================================================
-   Statistiques, réglages, mode entretien
+   Statistiques et réglages
    ========================================================================== */
 
 .taux-detail { color: var(--encre-3); font-weight: 500; font-size: 12px; }
@@ -1290,33 +1164,6 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
   padding: 1px 5px;
   font-size: 12px;
 }
-
-.mode-entretien {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  align-items: stretch;
-  min-height: calc(100vh - 140px);
-}
-
-@media (max-width: 980px) { .mode-entretien { grid-template-columns: 1fr; } }
-
-.mode-entretien .fiche { overflow-y: auto; max-height: calc(100vh - 140px); }
-
-.colonne-notes { display: flex; flex-direction: column; }
-
-.colonne-notes textarea {
-  flex: 1;
-  min-height: 320px;
-  border: none;
-  padding: 4px 2px;
-  background: transparent;
-  resize: none;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.colonne-notes textarea:focus { outline: none; }
 
 /* ==========================================================================
    Comparateur, liens morts
@@ -1390,7 +1237,7 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
 }
 
 /* ==========================================================================
-   Quasi-doublons, fusion d'entreprises, connexion calendrier
+   Quasi-doublons et fusion d'entreprises
    ========================================================================== */
 
 .liste-similaires { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
@@ -1437,22 +1284,232 @@ label { font-size: 12.5px; font-weight: 550; color: var(--encre-2); }
   white-space: normal;
 }
 
-.bloc-calendrier {
-  padding: 14px 0;
-  border-top: 1px solid var(--hairline);
+/* ==========================================================================
+   Préparation : lettres, fiches d'entretien, notes d'entretien
+   ========================================================================== */
+
+/* --- Sélecteur d'entreprise et d'offres (recherche + cases) --- */
+
+.selecteur-cible { display: flex; flex-direction: column; gap: 10px; }
+
+.sel-resume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--accent-doux);
+  color: var(--encre);
+  font-size: 13px;
 }
 
-.bloc-calendrier:first-child { border-top: none; padding-top: 0; }
+.sel-resume.vide { background: var(--surface-2); color: var(--encre-3); }
 
-.bloc-calendrier h3 {
-  margin: 0 0 6px;
+.sel-resume .sel-effacer { margin-left: auto; }
+
+.sel-liste {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid var(--hairline-fort);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.sel-groupe { border-bottom: 1px solid var(--hairline); }
+.sel-groupe:last-child { border-bottom: none; }
+
+.sel-entreprise {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  background: var(--surface-2);
+  cursor: pointer;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.sel-entreprise:hover { background: var(--accent-doux); }
+.sel-entreprise.actif { background: var(--accent-doux); color: var(--accent); }
+.sel-entreprise .sel-compte { margin-left: auto; color: var(--encre-3); font-weight: 400; font-size: 12px; }
+
+.sel-offre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 26px;
+  cursor: pointer;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--encre);
+}
+
+.sel-offre:hover { background: var(--surface-2); }
+.sel-offre input { width: auto; margin: 0; flex-shrink: 0; }
+.sel-offre .sel-offre-texte { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sel-vide { padding: 14px; text-align: center; color: var(--encre-3); font-size: 13px; }
+
+.sel-nouvelle { width: 100%; justify-content: flex-start; border-radius: 0; border: none; border-top: 1px solid var(--hairline); }
+
+.sel-generale { margin-top: 0; }
+.sel-generale.inactive { opacity: 0.6; cursor: default; }
+
+/* --- Zone de dépôt de fichier (glisser-déposer ou parcourir) --- */
+
+.zone-depot {
+  border: 2px dashed var(--hairline-fort);
+  border-radius: var(--rayon-grand);
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface-2);
+  color: var(--encre-2);
+  transition: border-color var(--transition), background var(--transition), color var(--transition);
+}
+
+.zone-depot:hover, .zone-depot:focus-visible, .zone-depot.survol {
+  border-color: var(--accent);
+  background: var(--accent-doux);
+  color: var(--accent);
+  outline: none;
+}
+
+.zone-depot .icone { margin-bottom: 6px; }
+.zone-depot-titre { font-weight: 600; }
+.zone-depot-sous { font-size: 12.5px; color: var(--encre-3); margin-top: 2px; }
+
+.zone-depot.rempli {
+  border-style: solid;
+  border-color: var(--st-accepte);
+  background: var(--surface);
+  color: var(--encre);
+  cursor: default;
+}
+
+.zone-depot-fichier { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.zone-depot-fichier .nom { font-weight: 600; word-break: break-all; }
+.zone-depot-fichier .taille { color: var(--encre-3); font-size: 12.5px; }
+
+/* --- Listes de lettres / fiches --- */
+
+.offres-liees { display: flex; flex-wrap: wrap; gap: 4px; }
+.offres-liees .puce { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+
+.actions-ligne { display: flex; gap: 2px; justify-content: flex-end; flex-wrap: nowrap; white-space: nowrap; }
+
+/* Titres longs (ex. « Entreprise - intitulé de poste interminable ») : une ligne, avec des points de suspension. */
+.tableau td.cellule-titre { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.filtres input[type="text"].champ-filtre-large { min-width: 430px; }
+
+.apercu-cadre {
+  width: 100%;
+  height: 68vh;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.apercu-texte {
+  white-space: pre-wrap;
   font-size: 13.5px;
-  font-weight: 650;
+  line-height: 1.6;
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 14px 16px;
+  max-height: 68vh;
+  overflow-y: auto;
 }
 
-.bloc-calendrier ul { margin: 8px 0; padding-left: 20px; }
+.apercu-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 
-.bloc-calendrier li { margin: 4px 0; font-size: 13px; color: var(--encre-2); }
+.bloc-methode { margin-top: 14px; }
+.bloc-methode h2 { margin-bottom: 8px; }
+
+/* --- Notes d'entretien --- */
+
+.puce-cible { gap: 5px; }
+.puce-cible.offre { color: var(--st-entretien); }
+.puce-cible.entreprise { color: var(--st-reponse); }
+
+.ligne-extrait {
+  color: var(--encre-3);
+  font-size: 12.5px;
+  max-width: 460px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filtre-actif { display: inline-flex; align-items: center; gap: 6px; }
+
+.editeur-note {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) { .editeur-note { grid-template-columns: 1fr; } }
+
+.note-titre {
+  font-size: 21px !important;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  padding: 2px 6px !important;
+  margin-left: -6px;
+}
+
+.note-titre:hover { border-color: var(--hairline) !important; }
+.note-titre:focus { border-color: var(--accent) !important; }
+
+.note-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--encre-3);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.note-meta input[type="date"] { width: auto; padding: 3px 8px; }
+
+.zone-notes { display: flex; flex-direction: column; }
+
+.zone-notes textarea {
+  flex: 1;
+  min-height: calc(100vh - 290px);
+  border: none;
+  padding: 4px 2px;
+  background: transparent;
+  resize: none;
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+.zone-notes textarea:focus { outline: none; }
+
+.contexte-note h3 {
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--encre-3);
+}
+
+.contexte-note h3:first-child { margin-top: 0; }
+.contexte-note .texte-long { max-height: 160px; overflow-y: auto; font-size: 12.5px; }
+.contexte-note .ligne-liee { font-size: 13px; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb {

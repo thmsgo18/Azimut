@@ -9,9 +9,13 @@ venv/
 __pycache__/
 *.pyc
 
-# Dossiers de données personnelles (documents joints, sauvegardes de la base)
+# Dossiers de données personnelles (documents joints, sauvegardes de la base,
+# lettres de motivation, fiches d'entretien, CV du profil)
 /documents/
 /sauvegardes/
+/lettres/
+/fiches/
+/profil/
 
 # Exports Excel (données personnelles, régénérables depuis la base)
 *.xlsx

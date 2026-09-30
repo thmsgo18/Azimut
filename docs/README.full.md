@@ -4,7 +4,7 @@
 
 This is the complete reference. For the quick pitch, screenshots, and install steps, see the [main README](../README.md).
 
-Azimut centralizes an entire internship search - applications, companies, contacts, documents, interviews - in a real local database, behind a polished interface that opens like any other desktop app, on macOS, Windows, or Linux. Built for an AI/ML master's student, it makes no assumption about the field: it fits any internship or apprenticeship search.
+Azimut centralizes an entire internship search - applications, companies, cover letters, interview sheets and notes, documents - in a real local database, behind a polished interface that opens like any other desktop app, on macOS, Windows, or Linux. Built for an AI/ML master's student, it makes no assumption about the field: it fits any internship or apprenticeship search.
 
 **Guiding principle: the database (`suivi_candidatures.db`) is the single source of truth.** Every write - from the interface, the command line, or an AI - goes through Python functions that validate values and catch duplicates. Never hand-written SQL. Excel exports are just projections of that database, regenerable at any time.
 
@@ -22,7 +22,7 @@ Azimut runs on macOS, Windows, and Linux - the exact same codebase everywhere. O
 
 Closing the window quits the app. Everything lives in a single local file: `suivi_candidatures.db`, created at the project root on first launch. There's no build step: after any code change, just relaunch the app (or reload the page) to see it.
 
-A handful of extras only exist on macOS - the Reminders app integration (see [macOS automations](#macos-automations)) - because it leans on macOS-only APIs with no real equivalent elsewhere. The interface hides it automatically outside macOS; everything else (applications, companies, contacts, documents, agenda, AI assistant, Excel import/export, search...) behaves identically on all three OSes, and is covered by the same test suite run in CI on macOS, Windows, and Linux on every change.
+Nothing essential is tied to one system: applications, companies, cover letters, interview sheets and notes, documents, AI assistant, Excel import/export, search... everything behaves identically on all three OSes, and is covered by the same test suite run in CI on macOS, Windows, and Linux on every change. Only quick capture from Safari (a macOS Shortcut) relies on a macOS-only tool.
 
 ### Sharing a clean copy with a friend
 
@@ -30,17 +30,16 @@ Double-click `Créer un zip à partager.command`: a zip is placed on your Deskto
 
 ## Why not a spreadsheet
 
-A spreadsheet can track a handful of applications for a while. It stops working the moment you need history, reminders, or more than one linked table (companies, contacts, documents).
+A spreadsheet can track a handful of applications for a while. It stops working the moment you need history, reminders, or more than one linked table (companies, letters, sheets, notes, documents).
 
 | | Spreadsheet (Excel/Sheets) | Azimut |
 | :--- | :---: | :---: |
 | List applications, sort, filter | ✓ | ✓ |
-| Track a company and its contacts | 🟡 | ✓ |
+| Find, per company and per job, my letters, interview sheets and notes | 🟡 | ✓ |
 | Duplicate detection (same company, similar title, same job link) | ✗ | ✓ |
 | Automatic timeline per application (sent, status, reply, interview) | ✗ | ✓ |
 | Dead job-link detection | ✗ | ✓ |
 | Attach files (CV, cover letter, the offer as a PDF) per application | 🟡 | ✓ |
-| Calendar & Reminders.app integration | ✗ | ✓ |
 | Side-by-side comparison of open offers | 🟡 | ✓ |
 | Global search across everything (titles, notes, pasted job text) | ✗ | ✓ |
 | Opens with no software, one double-click | ✗ | ✓ |
@@ -55,7 +54,7 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 - A **filterable list** by default - change a status by clicking its pill, an "Open posting" button on each row - or a **kanban** pipeline (drag and drop to change status), with a side panel to inspect, add, or delete.
 - **Automatic timeline** per application: creation, status change, reply, interview scheduled - timestamped without lifting a finger.
 - **Attached documents**: CV, cover letter, the offer as a PDF, or any other file - attachable at creation or from the detail view, several at once.
-- **Interview prep sheet** and **interview mode** (the sheet on the left, a notes area on the right, auto-saved into the application).
+- **Cover letters, interview sheets and interview notes** attached to a job or to a company: see [Preparing your applications](#preparing-your-applications).
 - **Recruitment portal access**: URL, username and password per application (masked in the interface, never exported).
 - **Comparator**: check several applications in list view to line them up side by side (stipend, duration, work mode, dates…) to decide between multiple ongoing offers.
 - **Dead job-link detection**: a conservative HTTP check (run automatically every 6h while Azimut is open, or on demand) flags withdrawn postings (404/410) - often a sign a role has been filled - with no false positives on a mere network hiccup.
@@ -64,23 +63,21 @@ A spreadsheet can track a handful of applications for a while. It stops working 
 
 **Organization**
 - **Companies** with context and news notes; detects probable duplicates ("Mistral" / "Mistral AI") and **merges them in one click**.
-- **Contacts** with dedicated email, phone, and LinkedIn fields (never a single catch-all field) and an outreach status. Opening a company shows its contacts and its applications right there.
-- **Global search** (shortcut <kbd>⌘K</kbd>) across everything - titles, notes, job text, contacts - color-coded by result type.
+- **Global search** (shortcut <kbd>⌘K</kbd>) across everything - titles, notes, job text, interview notes, letters and sheets - color-coded by result type.
 - **Near-duplicate detection** when creating an application (a similar title, or the same job link once tracking params are stripped): a simple warning, never a block.
-- **Read-only detail views**: clicking an application, a company, or a contact opens a clean, read-only sheet - links (the job posting, the portal, a company's website) are just clickable, nothing gets edited by accident. An explicit **Modify** button switches to the edit form.
+- **Read-only detail views**: clicking an application or a company opens a clean, read-only sheet - links (the job posting, the portal, a company's website) are just clickable, nothing gets edited by accident. An explicit **Modify** button switches to the edit form.
 - **Bilingual interface** (French / English): switch it in Réglages, applies immediately across the whole interface. Values stored in the database (status, source…) stay French internally - only the display changes.
 
 **Insights**
 - **Dashboard**: counts, breakdown by status and sub-domain, upcoming interviews.
 - **Advanced statistics**: sent → replies → interviews → accepted funnel, average delays, response rate by source, and a **weekly chart** (applications sent per week, last 12 weeks) instead of numbers alone.
 - **Weekly goal**: set a target number of applications per week in Réglages, see the progress bar in Statistiques.
-- **Calendar** (month or 2-week view) connectable to a real calendar: a live `webcal://` subscription for Calendar (Mac), a "Add to Google Calendar" button per deadline, a universal `.ics` file, and every deadline can also become a dated reminder in the **Reminders** app (macOS), one at a time or all at once.
-- **Companion view for iPhone/iPad**: an opt-in, read-only mobile page (upcoming interviews, the full list) reachable from your phone on the same Wi-Fi as the Mac, protected by a locally-generated access code - see [macOS automations](#macos-automations).
+- **Companion view for iPhone/iPad**: an opt-in, read-only mobile page (upcoming interviews, the full list) reachable from your phone on the same Wi-Fi as the Mac, protected by a locally-generated access code - see [Automations and extras](#automations-and-extras).
 
 **Data & privacy**
 - **Excel export / import**: a readable backup and restore, duplicates ignored and never overwritten, a detailed report after import.
-- **Automatic backup** of the database on every launch, and also every 4 applications added (rotated over the last 5).
-- **Configurable data folder**: choose where documents and backups live (handy to have them synced by iCloud Drive or Dropbox) - visible and updated live in Finder, like any other folder.
+- **Automatic backup** of the database on every launch, and also every 4 applications added (rotated over the last 5) - a consistent copy even if a write happens at the same moment. An older database (or an old restored backup) is upgraded by itself, after a safety copy `…-avant-migration-….db`.
+- **Configurable data folder**: choose where documents, letters, interview sheets, resume and backups live (handy to have them synced by iCloud Drive or Dropbox) - visible and updated live in Finder, like any other folder.
 - **Optional AI assistant**, with the key of any provider - see below.
 
 ## Getting started
@@ -89,11 +86,11 @@ A short walkthrough of the everyday flow:
 
 1. **Add an application** - click **+ Ajouter** from Candidatures (or **Nouvelle candidature** in the sidebar). Paste the job posting text into the AI box if you've configured a key, or just fill the form. The company is created automatically if it's new.
 2. **Move it through the pipeline** - drag a card between columns in the Kanban view to update its status, or edit it from its sheet.
-3. **Click anything to look, not to edit** - an application, a company, or a contact opens a clean read-only sheet: click the job link or the portal URL freely, nothing changes. Hit **Modifier** only when you actually want to edit.
-4. **Open a company to see who you know there** - its sheet lists its contacts and its applications, each one click away.
+3. **Click anything to look, not to edit** - an application or a company opens a clean read-only sheet: click the job link or the portal URL freely, nothing changes. Hit **Modifier** only when you actually want to edit.
+4. **Open a company to find everything there** - its sheet lists its applications, letters, interview sheets and notes, each one click away.
 5. **Change a status without opening the sheet** - in the list view, click a row's status pill and pick the new one; the "Open posting" button opens the job ad directly.
-6. **Search anything with ⌘K** - a title, a note, a phrase from a pasted job posting, a contact's name.
-7. **Prep for an interview** - open an application's sheet, click **Fiche entretien** for a printable Markdown summary, or **Mode entretien** for a split view with live notes.
+6. **Search anything with ⌘K** - a title, a note, a phrase from a pasted job posting, a word from a letter or an interview note.
+7. **Prepare an interview** - in **Interview sheets**, generate a sheet (or add your own); on the day, open **Interviews**, create a note on the job or the company and write: everything is saved as you type.
 
 ## Improvement ideas
 
@@ -145,15 +142,22 @@ python cli.py entreprises fusionner 2 5               # keeps #2, merges #5 into
 
 `ajouter` never creates a duplicate: if the name already exists (case- and accent-insensitive comparison), the existing company is found and only its empty fields are filled in. If an existing value differs, nothing is overwritten: a `ConflitMiseAJour` error explains why - `modifier` is what overwrites, explicitly.
 
-`doublons` lists close-name pairs without changing anything; `fusionner <keep> <remove>` moves applications and contacts to the first, fills its empty fields from the second, then deletes it - irreversible, use it after checking the pair.
+`doublons` lists close-name pairs without changing anything; `fusionner <keep> <remove>` moves applications, letters, sheets and notes to the first, fills its empty fields from the second, then deletes it - irreversible, use it after checking the pair.
 
-### Contacts
+### Letters, interview sheets and notes
 
 ```bash
-python cli.py contacts ajouter --entreprise "AgentikCo" --nom "Marie Petit" --poste "Lead AI" --type Email --valeur marie@agentik.co
-python cli.py contacts lister --entreprise "AgentikCo"
-python cli.py contacts modifier 5 --statut Contacté --date-contact 27/08/2026
+python cli.py lettres importer --entreprise "CEA" --poste "Stage - Évaluation d'agents IA" --fichier my-letter.pdf
+python cli.py lettres ajouter --entreprise "AgentikCo" --fichier letter.md --candidature-id 12 --candidature-id 14 --generale
+python cli.py lettres lister --recherche orchestration
+python cli.py fiches importer --entreprise "Takima" --fichier my-sheet.pdf
+python cli.py fiches ajouter --entreprise "Takima" --json sheet.json --candidature-id 50   # Azimut builds the PDF
+python cli.py notes ajouter --candidature-id 12 --titre "Technical interview" --contenu "Questions about evals."
+python cli.py notes lister --entreprise "AgentikCo"
+python cli.py notes voir 3
 ```
+
+`importer` keeps the file **exactly as it is** (PDF, Word, text); `ajouter` builds a PDF from text (letter) or JSON data (sheet). An item is linked to one company and to one or more of its jobs (`--candidature-id` repeatable, or `--poste` to find the job by its title); `--generale` also marks it as being about the company in general. `lister` and `supprimer` exist for letters and sheets; a note targets either a company (`--entreprise`) or one specific job (`--candidature-id`).
 
 ### CSV import (LinkedIn, Indeed, or anything else)
 
@@ -172,20 +176,20 @@ python cli.py export excel --sortie suivi_candidatures.xlsx
 python cli.py import excel --fichier suivi_candidatures.xlsx
 ```
 
-The export regenerates the full file from the database: 4 sheets ("Suivi candidatures", "Entreprises", "Contacts", "Tableau de bord"), dropdowns on columns with allowed values, conditional colors on Status, `HYPERLINK` + `MATCH` links between sheets, formula-driven counters (`COUNTIF`/`COUNTA`, no hard-coded value). Rerun it anytime with no data loss.
+The export regenerates the full file from the database: 4 sheets ("Suivi candidatures", "Entreprises", "Notes d'entretien", "Tableau de bord"), dropdowns on columns with allowed values, conditional colors on Status, `HYPERLINK` + `MATCH` links between sheets, formula-driven counters (`COUNTIF`/`COUNTA`, no hard-coded value). Rerun it anytime with no data loss.
 
 The import re-reads such a file and re-injects the data: duplicates are skipped and reported, invalid rows are reported with their row number without blocking the rest - handy as a readable backup, or to merge two databases.
 
-**The full backup** is simply a copy of the `suivi_candidatures.db` file - the Excel export contains neither portal passwords nor the API key: those stay in cleartext only in the local database, which never leaves the machine.
+**The full backup** is a copy of the `suivi_candidatures.db` file (the text data: applications, companies, notes, the text of letters and sheets) **plus the data folder** (documents, letters, sheets, resume: those are files). The Excel export contains neither portal passwords nor the API key - those stay in cleartext only in the local database, which never leaves the machine - nor the files.
 
-### Interview prep sheet
+### Application summary
 
 ```bash
 python cli.py entretien preparer 12                    # prints to the terminal
 python cli.py entretien preparer 12 --sortie fiche.md  # saves as Markdown
 ```
 
-Compiles a sheet: header (company, role, date, location/mode), company context, the posting's text or link, identified contacts, full history (sent date, follow-ups, notes, complete timeline).
+Compiles a summary: header (company, role, date, location/mode), company context, the posting's text or link, preparation already done (linked letters, sheets and interview notes), history (sent date, notes, complete timeline).
 
 </details>
 
@@ -206,11 +210,10 @@ This layer only proposes - never a direct database write, never a made-up value 
 
 **With no key at all**, Azimut stays fully functional: a Claude-Code-style AI can drive the database directly through the command line or the Python functions documented in [`CLAUDE.md`](../CLAUDE.md), on your existing subscription, with no separate API key. [`AGENT.md`](../AGENT.md) documents the exact procedure an AI should follow to enter an application from a job posting.
 
-## macOS automations
+## Automations and extras
 
-Everything below is macOS-only (it leans on AppleScript/`osascript` or macOS-only libraries) and the interface hides the corresponding buttons automatically on Windows/Linux - except dead-link checking and the companion view, which already work identically on every OS and are just documented here alongside the rest.
+This section gathers the extras around the app: quick capture is macOS-only (it relies on the Shortcuts app); dead-link checking and the companion view work identically on every OS.
 
-**Reminders app.** Besides the calendar, the **R** button next to any deadline (Agenda) creates a dated reminder in the Reminders app; a button in "Connect a calendar" sends them all at once. The very first time, macOS asks to authorize Azimut to automate Reminders (System Settings → Privacy & Security → Automation) - grant it once.
 
 **Dead job links.** A conservative HTTP check (HEAD, then GET if needed) runs every 6h in the background while Azimut is open, and on demand from **Statistiques** ("Check now"). Only an unambiguous 404/410 marks a link "dead"; a timeout, a 5xx error, or an anti-bot block (403) stay "unknown" - never a false positive. Nothing is inferred from page content, only the HTTP status.
 
@@ -230,11 +233,9 @@ Any out-of-list value is rejected with a clear message listing what's allowed (s
 | `mode_travail` | Présentiel, Hybride, Full remote |
 | `convention_envoyee` | Oui, Non, N/A |
 | `source` (application) | LinkedIn, Indeed, Site entreprise, Welcome to the Jungle, Réseau, Forum / Salon, Autre |
-| `statut_contact` | À contacter, Contacté, Répondu, Pas de réponse |
-| `source` (contact) | Site entreprise, Article / Presse, LinkedIn (recherche publique), Réseau, Autre |
 | `type_document` | CV, Lettre de motivation, Offre (PDF), Portfolio, Autre |
 
-- **Exact duplicates**: an application = unique (company, role); a contact = unique (company, name); a company = unique name - always compared case- and accent-insensitively. Rejected outright, with the existing row's number.
+- **Exact duplicates**: an application = unique (company, role); a company = unique name - always compared case- and accent-insensitively. Rejected outright, with the existing row's number.
 - **Near-duplicates** (similar title, same job link): flagged, never blocked - see `doublons.py`.
 - **Dates**: validated (February 31st is rejected) and stored as ISO `YYYY-MM-DD`, displayed `DD/MM/YYYY`.
 
@@ -257,15 +258,20 @@ modifier_candidature(id, **champs)
 lister_candidatures(statut=None, sous_domaine=None) -> list of dicts
 recuperer_candidature(id) -> dict
 
-# contacts.py
-verifier_doublon_contact(entreprise_nom, nom_contact) -> id or None
-ajouter_contact(entreprise_nom, nom, **champs) -> id           # DoublonContact if duplicate
-modifier_contact(id, **champs)
-lister_contacts(entreprise_nom=None) -> list of dicts
-
 # doublons.py - near-duplicates (a warning, never a block)
 candidatures_similaires(entreprise, poste, lien_offre=None) -> [{id, score, raisons}, ...]
 paires_entreprises_suspectes() -> [{a, b, score}, ...]
+
+# lettres.py / fiches.py - same model: linked to ONE company and to ONE OR MORE of its jobs
+ajouter_lettre(entreprise_nom, contenu, candidature_ids=None, titre=None, generale=None, source="manuelle") -> id
+importer_lettre(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None, generale=None) -> id
+lister_lettres(entreprise_id=None, candidature_id=None, recherche=None) / recuperer_lettre(id)
+modifier_lettre(id, titre=, generale=, candidature_ids=) / supprimer_lettre(id)
+ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiches(...) / supprimer_fiche(id)
+
+# notes_entretien.py - linked to a company OR one specific job
+ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
+lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
 
 # documents.py - attached files (CV, cover letters, offers as PDF…)
 ajouter_document(candidature_id, nom_fichier, contenu_bytes, type_document=None) -> id
@@ -275,12 +281,12 @@ lister_documents(candidature_id=None) / supprimer_document(id)
 exporter_excel(chemin_sortie) -> path of the generated file
 importer_excel(chemin_fichier) -> report (added, duplicates skipped, errors)
 
-# entretien.py / recherche.py / statistiques.py / agenda.py
-generer_fiche_entretien(candidature_id) -> Markdown text
-rechercher(texte) / stats_avancees() / lister_echeances()
+# entretien.py / recherche.py / statistiques.py
+generer_fiche_entretien(candidature_id) -> Markdown summary
+rechercher(texte) / stats_avancees()
 ```
 
-Exceptions (see `exceptions.py`): `ValeurNonAutorisee`, `ChampInconnu`, `DoublonCandidature`, `DoublonContact`, `DoublonEntreprise`, `ConflitMiseAJour`, `EntiteIntrouvable` - all inherit from `ErreurSuivi` and carry a French message.
+Exceptions (see `exceptions.py`): `ValeurNonAutorisee`, `ChampInconnu`, `DoublonCandidature`, `DoublonEntreprise`, `ConflitMiseAJour`, `EntiteIntrouvable` - all inherit from `ErreurSuivi` and carry a French message.
 
 ## Project structure
 
@@ -292,35 +298,40 @@ azimut/
   app_bureau.py     # native window (pywebview) wrapping the internal server
   compagnon.py      # read-only companion server for iPhone/iPad (local network, opt-in)
   serveur.py        # internal server (Flask): JSON API + interface
-  static/           # interface (index.html, style.css, app.js)
+  static/           # interface (index.html, style.css, app.js, preparation.js)
   db.py             # SQLite connection, table creation, migrations
   valeurs.py        # allowed values + field validation
   exceptions.py     # business exceptions (French messages)
   entreprises.py    # company CRUD (anti-duplicate, conflicts, merge)
   candidatures.py   # application CRUD (anti-duplicate)
-  contacts.py       # contact CRUD (anti-duplicate)
   doublons.py       # near-duplicates: close titles, job link, merge
   verification_liens.py  # dead job-link detection (conservative check)
-  rappels_macos.py  # pushes deadlines to the Reminders app (AppleScript)
   rapide.py         # quick capture (draft from a macOS Shortcut)
   export_excel.py   # .xlsx export (4 sheets, matches the original file's style)
   import_excel.py   # import of such an export (backup / restore)
   import_csv.py     # generic CSV import (LinkedIn, Indeed…), column mapping by hand
   evenements.py     # automatic application timeline
   documents.py      # attached files (configurable folder)
+  pieces_liees.py   # shared core of letters / sheets: one company, several jobs, imported or generated file
+  lettres.py        # cover letters (text -> PDF, or an imported file kept as is)
+  fiches.py         # interview sheets (data -> PDF, or an imported file kept as is)
+  fiches_pdf.py     # PDF rendering of a sheet (reportlab, same PDF on all 3 OSes)
+  notes_entretien.py # interview notes: one company OR one specific job
+  generation.py     # AI generation: checks everything BEFORE calling the AI, then saves
+  extraction.py     # text of a PDF / Word / text file (resume, indexing of imported items)
+  profil.py         # the resume used by the AI
   recherche.py      # multi-type global search
   statistiques.py   # funnel, delays, sources, weekly chart, weekly goal
-  agenda.py         # deadlines + iCalendar export (.ics)
   reglages.py       # local settings (masked API key, AI provider, data folder, companion code)
   sauvegarde.py      # dated copies of the database, rotation
-  agent.py          # posting analysis + company context - Anthropic or any OpenAI-compatible provider
-  entretien.py      # interview prep sheet (Markdown)
+  agent.py          # posting analysis, letters, sheets - Anthropic or any OpenAI-compatible provider
+  entretien.py      # application summary (Markdown)
   cli.py            # command-line interface
   CLAUDE.md         # how the project works, for AIs (Claude Code…)
   AGENT.md          # procedure for an AI to enter an application from a job posting
   suivi             # terminal executable (equivalent of python cli.py)
   .github/workflows/tests.yml  # CI: runs the test suite on every push
-  tests/            # 247 tests - python -m unittest discover -s tests
+  tests/            # a hermetic suite (never the real database) - python -m unittest discover -s tests
   suivi_candidatures.db   # the database - sole source of truth (not versioned)
 ```
 

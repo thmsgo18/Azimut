@@ -37,16 +37,6 @@ SOURCES_CANDIDATURE = [
     "Autre",
 ]
 
-STATUTS_CONTACT = ["À contacter", "Contacté", "Répondu", "Pas de réponse"]
-
-SOURCES_CONTACT = [
-    "Site entreprise",
-    "Article / Presse",
-    "LinkedIn (recherche publique)",
-    "Réseau",
-    "Autre",
-]
-
 TYPES_DOCUMENT = ["CV", "Lettre de motivation", "Offre (PDF)", "Portfolio", "Autre"]
 
 # Listes autorisées par table et par champ.
@@ -58,10 +48,6 @@ LISTES_AUTORISEES = {
         "mode_travail": MODES_TRAVAIL,
         "convention_envoyee": CONVENTIONS,
         "source": SOURCES_CANDIDATURE,
-    },
-    "contacts": {
-        "statut_contact": STATUTS_CONTACT,
-        "source": SOURCES_CONTACT,
     },
     "entreprises": {},
 }
@@ -91,19 +77,6 @@ CHAMPS_MODIFIABLES = {
         "portail_url",
         "portail_identifiant",
         "portail_mdp",
-        "notes_entretien",
-    ],
-    "contacts": [
-        "nom",
-        "poste",
-        "equipe",
-        "email",
-        "telephone",
-        "linkedin",
-        "statut_contact",
-        "date_contact",
-        "source",
-        "notes",
     ],
 }
 
@@ -115,13 +88,11 @@ CHAMPS_DATE = {
         "date_entretien",
         "date_debut_souhaitee",
     ],
-    "contacts": ["date_contact"],
 }
 
 CHAMPS_ENTIER = {
     "entreprises": [],
     "candidatures": ["gratification"],
-    "contacts": [],
 }
 
 

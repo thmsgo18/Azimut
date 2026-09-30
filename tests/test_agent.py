@@ -81,7 +81,6 @@ class TestAgentMultiFournisseur(unittest.TestCase):
         agent._analyser_openai_compatible = lambda config, contenu: {
             "entreprise": {"nom": "AgentikCo", "site_web": None},
             "candidature": {"poste": "Stage agents IA", "sous_domaine": None},
-            "contacts": [],
         }
         try:
             proposition = agent.analyser_offre(
@@ -118,27 +117,24 @@ class TestNormaliserProposition(unittest.TestCase):
         brute = {
             "entreprise": {"nom": "AgentikCo", "site_web": "https://agentik.co"},
             "candidature": {"poste": "Stage", "gratification": 1400},
-            "contacts": [{"nom": "Marie Petit", "poste": "Lead AI", "email": None}],
         }
         proposition = agent._normaliser_proposition(brute)
         self.assertEqual(proposition["entreprise"]["nom"], "AgentikCo")
         self.assertEqual(proposition["candidature"]["gratification"], 1400)
-        self.assertEqual(len(proposition["contacts"]), 1)
+        self.assertNotIn("contacts", proposition)
 
     def test_proposition_partielle_ne_plante_pas(self):
         # Un fournisseur générique peu discipliné peut omettre des clés entières.
         proposition = agent._normaliser_proposition({"candidature": {"poste": "Stage"}})
         self.assertEqual(proposition["entreprise"], {"nom": None, "site_web": None})
         self.assertEqual(proposition["candidature"]["poste"], "Stage")
-        self.assertEqual(proposition["contacts"], [])
 
     def test_proposition_champs_de_mauvais_type_ignores(self):
         proposition = agent._normaliser_proposition(
-            {"entreprise": "AgentikCo", "candidature": None, "contacts": "aucun"}
+            {"entreprise": "AgentikCo", "candidature": None}
         )
         self.assertEqual(proposition["entreprise"], {"nom": None, "site_web": None})
         self.assertEqual(proposition["candidature"], {})
-        self.assertEqual(proposition["contacts"], [])
 
     def test_proposition_non_dict_refusee(self):
         with self.assertRaises(ErreurSuivi):

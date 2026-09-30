@@ -1,9 +1,14 @@
-"""Fiche de préparation d'entretien : compile tout ce qu'il faut savoir
-sur une candidature dans un texte Markdown (section 7 du cahier des charges)."""
+"""Récapitulatif d'une candidature en Markdown : tout ce que l'application sait
+d'elle (entreprise, offre, préparation déjà faite, historique) - un point de
+départ à relire avant un entretien (section 7 du cahier des charges). Les fiches
+de préparation en PDF, elles, se gèrent dans la section « Fiches d'entretien »
+(voir fiches.py)."""
 
 from candidatures import recuperer_candidature
-from contacts import lister_contacts
 from evenements import lister_evenements
+from fiches import lister_fiches
+from lettres import lister_lettres
+from notes_entretien import lister_notes
 
 
 def _date_fr(iso):
@@ -17,9 +22,8 @@ def _date_fr(iso):
 
 
 def generer_fiche_entretien(candidature_id, chemin_db=None):
-    """Retourne la fiche de préparation d'entretien (texte Markdown)."""
+    """Retourne le récapitulatif de la candidature (texte Markdown)."""
     cand = recuperer_candidature(candidature_id, chemin_db=chemin_db)
-    liste_contacts = lister_contacts(entreprise_nom=cand["entreprise"], chemin_db=chemin_db)
 
     lignes = []
 
@@ -68,33 +72,26 @@ def generer_fiche_entretien(candidature_id, chemin_db=None):
         lignes.append("Ni texte ni lien d'offre enregistrés (candidature spontanée ?).")
     lignes.append("")
 
-    # 4. Contacts liés
-    lignes.append("## Contacts liés")
+    # 4. Préparation déjà faite : lettres, fiches et notes liées à cette offre.
+    lettres_liees = lister_lettres(candidature_id=candidature_id, chemin_db=chemin_db)
+    fiches_liees = lister_fiches(candidature_id=candidature_id, chemin_db=chemin_db)
+    notes_liees = lister_notes(candidature_id=candidature_id, chemin_db=chemin_db)
+    lignes.append("## Préparation")
     lignes.append("")
-    if liste_contacts:
-        for contact in liste_contacts:
-            morceaux = [f"**{contact['nom']}**"]
-            if contact["poste"]:
-                morceaux.append(contact["poste"])
-            if contact["equipe"]:
-                morceaux.append(f"équipe {contact['equipe']}")
-            ligne = ", ".join(morceaux)
-            coordonnees = []
-            if contact["email"]:
-                coordonnees.append(f"Email : {contact['email']}")
-            if contact["telephone"]:
-                coordonnees.append(f"Téléphone : {contact['telephone']}")
-            if contact["linkedin"]:
-                coordonnees.append(f"LinkedIn : {contact['linkedin']}")
-            if coordonnees:
-                ligne += " (" + ", ".join(coordonnees) + ")"
-            if contact["statut_contact"]:
-                ligne += f", {contact['statut_contact']}"
-            lignes.append(f"- {ligne}")
-            if contact["notes"]:
-                lignes.append(f"  - Notes : {contact['notes']}")
+    if lettres_liees or fiches_liees or notes_liees:
+        for lettre in lettres_liees:
+            lignes.append(f"- Lettre de motivation : {lettre['titre']}")
+        for fiche in fiches_liees:
+            lignes.append(f"- Fiche d'entretien : {fiche['titre']}")
+        for note in notes_liees:
+            jour = _date_fr(note["date_entretien"] or note["date_creation"][:10])
+            lignes.append(f"- Notes d'entretien ({jour}) : {note['titre']}")
+            if note["contenu"].strip():
+                lignes.append("")
+                lignes.append(note["contenu"].strip())
+                lignes.append("")
     else:
-        lignes.append("Aucun contact identifié pour cette entreprise.")
+        lignes.append("Aucune lettre, fiche ni note d'entretien liée à cette offre pour l'instant.")
     lignes.append("")
 
     # 5. Historique
@@ -119,8 +116,6 @@ def generer_fiche_entretien(candidature_id, chemin_db=None):
         lignes.append(f"- Conditions : {', '.join(details)}")
     if cand["notes"]:
         lignes.append(f"- Notes : {cand['notes']}")
-    if cand.get("notes_entretien"):
-        lignes.append(f"- Notes d'entretien : {cand['notes_entretien']}")
     lignes.append("")
 
     # Journal des événements (alimenté automatiquement à chaque changement).

@@ -1,5 +1,6 @@
-"""Tests du dossier de données configurable (documents/ et sauvegardes/ dans
-un dossier choisi par l'utilisateur, avec repli sur l'emplacement par défaut)."""
+"""Tests du dossier de données configurable (documents/, sauvegardes/, lettres/,
+fiches/ et profil/ dans un dossier choisi par l'utilisateur, avec repli sur un
+emplacement par défaut à côté de la base)."""
 
 import sys
 import tempfile
@@ -25,10 +26,26 @@ class TestDossierDonnees(unittest.TestCase):
     def tearDown(self):
         self.dossier.cleanup()
 
-    def test_par_defaut_dossier_projet(self):
-        self.assertEqual(
-            dossier_documents(chemin_db=self.chemin_db), documents_defaut_attendu()
-        )
+    def test_par_defaut_a_cote_de_la_base(self):
+        """Sans dossier choisi, chaque type de fichier va à côté de la base elle-même
+        (pour la vraie base : le dossier du projet ; pour une base de test : son
+        dossier temporaire - jamais le vrai dossier du projet)."""
+        from fiches import dossier_fiches
+        from lettres import dossier_lettres
+        from profil import dossier_profil
+
+        racine = Path(self.chemin_db).parent
+        self.assertEqual(dossier_documents(chemin_db=self.chemin_db), racine / "documents")
+        self.assertEqual(dossier_sauvegardes(chemin_db=self.chemin_db), racine / "sauvegardes")
+        self.assertEqual(dossier_lettres(chemin_db=self.chemin_db), racine / "lettres")
+        self.assertEqual(dossier_fiches(chemin_db=self.chemin_db), racine / "fiches")
+        self.assertEqual(dossier_profil(chemin_db=self.chemin_db), racine / "profil")
+
+    def test_la_base_par_defaut_vit_a_cote_du_code(self):
+        """La vraie base est à côté du code : c'est donc là que vont, par défaut, les
+        dossiers - l'emplacement historique, inchangé. (Le test ne lit pas la vraie
+        base : il vérifie seulement où elle se trouve.)"""
+        self.assertEqual(Path(db.CHEMIN_DB).resolve().parent, Path(reglages.__file__).resolve().parent)
 
     def test_definir_dossier_donnees_cree_les_sous_dossiers(self):
         cible = Path(self.dossier.name) / "mes-donnees-azimut"
@@ -50,6 +67,22 @@ class TestDossierDonnees(unittest.TestCase):
         self.assertTrue(document["chemin_absolu"].startswith(str(cible.resolve())))
         self.assertTrue(Path(document["chemin_absolu"]).exists())
 
+    def test_lettres_et_fiches_ecrites_dans_le_dossier_choisi(self):
+        from fiches import importer_fiche
+        from lettres import importer_lettre, recuperer_lettre
+
+        cible = Path(self.dossier.name) / "perso"
+        reglages.definir_dossier_donnees(str(cible), chemin_db=self.chemin_db)
+        id_lettre = importer_lettre("AgentikCo", "ma-lettre.txt", b"Madame, Monsieur.",
+                                    chemin_db=self.chemin_db)
+        id_fiche = importer_fiche("AgentikCo", "ma-fiche.txt", b"Fiche perso.", chemin_db=self.chemin_db)
+        lettre = recuperer_lettre(id_lettre, chemin_db=self.chemin_db)
+        self.assertTrue(lettre["chemin_fichier"].startswith(str((cible / "lettres").resolve())))
+        self.assertTrue(Path(lettre["chemin_fichier"]).exists())
+        self.assertTrue((cible / "fiches").is_dir())
+        self.assertEqual(len(list((cible / "fiches").iterdir())), 1)
+        self.assertIsNotNone(id_fiche)
+
     def test_sauvegarde_ecrite_dans_le_dossier_choisi(self):
         cible = Path(self.dossier.name) / "perso"
         reglages.definir_dossier_donnees(str(cible), chemin_db=self.chemin_db)
@@ -63,15 +96,13 @@ class TestDossierDonnees(unittest.TestCase):
         reglages.definir_dossier_donnees("", chemin_db=self.chemin_db)
         self.assertIsNone(reglages.obtenir_reglage("dossier_donnees", chemin_db=self.chemin_db))
         self.assertEqual(
-            dossier_documents(chemin_db=self.chemin_db), documents_defaut_attendu()
+            dossier_documents(chemin_db=self.chemin_db), Path(self.dossier.name) / "documents"
         )
 
     def test_ancien_chemin_relatif_reste_lisible(self):
         """Un document enregistré avant l'introduction du dossier configurable
         (chemin relatif en base) doit continuer à se résoudre correctement."""
-        from documents import _chemin_reel
-
-        chemin = _chemin_reel("documents/abc123-vieux.pdf")
+        chemin = reglages.chemin_reel("documents/abc123-vieux.pdf")
         self.assertTrue(chemin.is_absolute())
         self.assertEqual(chemin.parts[-2:], ("documents", "abc123-vieux.pdf"))
 
@@ -81,12 +112,6 @@ class TestDossierDonnees(unittest.TestCase):
         obstacle.write_text("je suis un fichier, pas un dossier")
         with self.assertRaises(ValeurNonAutorisee):
             reglages.definir_dossier_donnees(str(obstacle), chemin_db=self.chemin_db)
-
-
-def documents_defaut_attendu():
-    from documents import DOSSIER_DOCUMENTS_DEFAUT
-
-    return DOSSIER_DOCUMENTS_DEFAUT
 
 
 class TestApiDossierDonnees(unittest.TestCase):

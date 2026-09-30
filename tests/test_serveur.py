@@ -86,16 +86,17 @@ class TestServeur(unittest.TestCase):
         self.assertEqual(stats["taux_reponse"], 50)
         self.assertEqual(stats["par_domaine"]["RAG / Agents de recherche"], 1)
 
-    def test_contacts_et_entreprises(self):
+    def test_entreprises_avec_compteurs(self):
         self._ajouter()
-        contact = self.client.post(
-            "/api/contacts",
-            json={"entreprise": "AgentikCo", "nom": "Marie Petit", "email": "marie@agentik.co"},
+        note = self.client.post(
+            "/api/notes", json={"entreprise": "AgentikCo", "titre": "Appel RH", "contenu": "RAS"},
         )
-        self.assertEqual(contact.status_code, 201)
+        self.assertEqual(note.status_code, 201)
         entreprises_liste = self.client.get("/api/entreprises").get_json()
         self.assertEqual(entreprises_liste[0]["nb_candidatures"], 1)
-        self.assertEqual(entreprises_liste[0]["nb_contacts"], 1)
+        self.assertEqual(entreprises_liste[0]["nb_notes"], 1)
+        self.assertEqual(entreprises_liste[0]["nb_lettres"], 0)
+        self.assertEqual(entreprises_liste[0]["nb_fiches"], 0)
         # Suppression refusée tant que des lignes y sont rattachées.
         refus = self.client.delete(f"/api/entreprises/{entreprises_liste[0]['id']}")
         self.assertEqual(refus.status_code, 400)
@@ -118,6 +119,7 @@ class TestServeur(unittest.TestCase):
 
     def test_page_accueil(self):
         reponse = self.client.get("/")
+        self.addCleanup(reponse.close)  # libère le fichier statique servi (sinon ResourceWarning)
         self.assertEqual(reponse.status_code, 200)
         self.assertIn("Azimut", reponse.get_data(as_text=True))
 

@@ -1,12 +1,15 @@
-"""Recherche globale : candidatures, entreprises et contacts, en une requête.
+"""Recherche globale : candidatures, entreprises, notes d'entretien, lettres de
+motivation et fiches d'entretien, en une requête.
 
 Correspondance insensible à la casse et aux accents ; chaque résultat indique
 les champs où le texte a été trouvé et un court extrait.
 """
 
 from candidatures import lister_candidatures
-from contacts import lister_contacts
 from entreprises import lister_entreprises
+from fiches import lister_fiches
+from lettres import lister_lettres
+from notes_entretien import lister_notes
 from valeurs import normaliser
 
 CHAMPS_RECHERCHE = {
@@ -19,7 +22,6 @@ CHAMPS_RECHERCHE = {
         ("source", "Source"),
         ("duree", "Durée"),
         ("notes", "Notes"),
-        ("notes_entretien", "Notes d'entretien"),
         ("texte_offre", "Texte de l'offre"),
         ("lien_offre", "Lien de l'offre"),
     ],
@@ -28,16 +30,21 @@ CHAMPS_RECHERCHE = {
         ("site_web", "Site web"),
         ("contexte_actus", "Contexte / actus"),
     ],
-    "contact": [
-        ("nom", "Nom"),
+    "note": [
+        ("titre", "Titre"),
+        ("contenu", "Contenu"),
         ("entreprise", "Entreprise"),
         ("poste", "Poste"),
-        ("equipe", "Équipe"),
-        ("email", "Email"),
-        ("telephone", "Téléphone"),
-        ("linkedin", "LinkedIn"),
-        ("source", "Source"),
-        ("notes", "Notes"),
+    ],
+    "lettre": [
+        ("titre", "Titre"),
+        ("contenu", "Contenu"),
+        ("entreprise", "Entreprise"),
+    ],
+    "fiche": [
+        ("titre", "Titre"),
+        ("contenu", "Contenu"),
+        ("entreprise", "Entreprise"),
     ],
 }
 
@@ -76,11 +83,12 @@ def _chercher_dans(objets, champs, requete_normalisee, requete):
 
 
 def rechercher(texte, chemin_db=None):
-    """Retourne {"candidatures": [...], "entreprises": [...], "contacts": [...]}."""
+    """Retourne {"candidatures", "entreprises", "notes", "lettres", "fiches"} :
+    pour chacun, la liste des éléments qui contiennent le texte."""
     requete = str(texte or "").strip()
     requete_normalisee = normaliser(requete)
     if not requete_normalisee:
-        return {"candidatures": [], "entreprises": [], "contacts": []}
+        return {"candidatures": [], "entreprises": [], "notes": [], "lettres": [], "fiches": []}
     return {
         "candidatures": _chercher_dans(
             lister_candidatures(chemin_db=chemin_db),
@@ -90,8 +98,16 @@ def rechercher(texte, chemin_db=None):
             lister_entreprises(chemin_db=chemin_db),
             CHAMPS_RECHERCHE["entreprise"], requete_normalisee, requete,
         ),
-        "contacts": _chercher_dans(
-            lister_contacts(chemin_db=chemin_db),
-            CHAMPS_RECHERCHE["contact"], requete_normalisee, requete,
+        "notes": _chercher_dans(
+            lister_notes(chemin_db=chemin_db),
+            CHAMPS_RECHERCHE["note"], requete_normalisee, requete,
+        ),
+        "lettres": _chercher_dans(
+            lister_lettres(chemin_db=chemin_db),
+            CHAMPS_RECHERCHE["lettre"], requete_normalisee, requete,
+        ),
+        "fiches": _chercher_dans(
+            lister_fiches(chemin_db=chemin_db),
+            CHAMPS_RECHERCHE["fiche"], requete_normalisee, requete,
         ),
     }

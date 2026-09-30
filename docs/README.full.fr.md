@@ -4,7 +4,7 @@
 
 Ceci est la référence complète. Pour le pitch rapide, les captures d'écran et l'installation, voir le [README principal](../README.fr.md).
 
-Azimut centralise toute une recherche de stage - candidatures, entreprises, contacts, documents, entretiens - dans une vraie base de données locale, derrière une interface soignée qui s'ouvre comme n'importe quelle application de bureau, sur macOS, Windows ou Linux. Pensé au départ pour un M2 en systèmes agentiques, il ne fait aucune hypothèse sur le domaine : il convient à n'importe quelle recherche de stage ou d'alternance.
+Azimut centralise toute une recherche de stage - candidatures, entreprises, lettres de motivation, fiches et notes d'entretien, documents - dans une vraie base de données locale, derrière une interface soignée qui s'ouvre comme n'importe quelle application de bureau, sur macOS, Windows ou Linux. Pensé au départ pour un M2 en systèmes agentiques, il ne fait aucune hypothèse sur le domaine : il convient à n'importe quelle recherche de stage ou d'alternance.
 
 **Principe directeur : la base de données (`suivi_candidatures.db`) est la seule source de vérité.** Toute écriture - depuis l'interface, la ligne de commande, ou une IA - passe par des fonctions Python qui valident les valeurs et détectent les doublons. Jamais de SQL écrit à la main. Les exports Excel ne sont que des projections de cette base, régénérables à tout moment.
 
@@ -22,25 +22,24 @@ Azimut tourne sur macOS, Windows et Linux - exactement le même code partout. Se
 
 Fermer la fenêtre quitte l'appli. Tout tourne en local dans un seul fichier : `suivi_candidatures.db`, créé à la racine du projet au premier lancement. Le code n'a pas d'étape de compilation : après toute modification, il suffit de relancer l'appli (ou de recharger la page) pour voir les changements.
 
-Une poignée d'extras n'existent que sur macOS - l'intégration à l'app Rappels (voir [Automatisations macOS](#automatisations-macos)) - car elle s'appuie sur des API propres à macOS, sans réel équivalent ailleurs. L'interface la masque automatiquement en dehors de macOS ; tout le reste (candidatures, entreprises, contacts, documents, agenda, assistant IA, import/export Excel, recherche...) se comporte à l'identique sur les 3 OS, et est couvert par la même suite de tests exécutée en CI sur macOS, Windows et Linux à chaque modification.
+Rien d'essentiel n'est propre à un système : candidatures, entreprises, lettres, fiches et notes d'entretien, documents, assistant IA, import/export Excel, recherche... tout se comporte à l'identique sur les 3 OS, et est couvert par la même suite de tests exécutée en CI sur macOS, Windows et Linux à chaque modification. Seule la capture rapide depuis Safari (un Raccourci macOS) s'appuie sur un outil propre à macOS.
 
 ### Partager une copie propre à un ami
 
-Double-cliquer sur `Créer un zip à partager.command` : un zip est déposé sur le Bureau, **sans données personnelles** (ni base, ni exports, ni environnement Python). La personne dézippe, double-clique `Azimut.app`, et démarre avec sa propre base vierge, entièrement en local chez elle.
+Double-cliquer sur `Créer un zip à partager.command` : un zip est déposé sur le Bureau, **sans données personnelles** (ni base, ni exports, ni documents, lettres, fiches ou CV, ni environnement Python). La personne dézippe, double-clique `Azimut.app`, et démarre avec sa propre base vierge, entièrement en local chez elle.
 
 ## Pourquoi pas un tableur
 
-Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu'il faut un historique, des rappels, ou plus d'une table liée (entreprises, contacts, documents).
+Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu'il faut un historique, des rappels, ou plus d'une table liée (entreprises, lettres, fiches, notes, documents).
 
 | | Tableur (Excel/Sheets) | Azimut |
 | :--- | :---: | :---: |
 | Lister les candidatures, trier, filtrer | ✓ | ✓ |
-| Suivre une entreprise et ses contacts | 🟡 | ✓ |
+| Retrouver, par entreprise et par offre, mes lettres, fiches et notes d'entretien | 🟡 | ✓ |
 | Détection des doublons (même entreprise, intitulé proche, même lien d'offre) | ✗ | ✓ |
 | Historique automatique par candidature (envoi, statut, réponse, entretien) | ✗ | ✓ |
 | Détection des liens d'offres morts | ✗ | ✓ |
 | Fichiers joints (CV, lettre, offre en PDF) par candidature | 🟡 | ✓ |
-| Intégration Calendrier & Rappels (macOS) | ✗ | ✓ |
 | Comparateur côte à côte des offres en cours | 🟡 | ✓ |
 | Recherche globale (intitulés, notes, texte d'offre collé) | ✗ | ✓ |
 | S'ouvre sans logiciel, en un double-clic | ✗ | ✓ |
@@ -55,7 +54,7 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 - **Liste filtrable** par défaut - statut modifiable d'un clic sur sa puce, bouton « Voir l'offre » par ligne - ou pipeline **kanban** (glisser-déposer pour changer le statut), avec panneau latéral d'ajout/consultation/suppression.
 - **Journal automatique** par candidature : création, changement de statut, réponse, entretien planifié - horodaté sans rien faire.
 - **Documents joints** : CV, lettre de motivation, offre en PDF ou tout autre fichier, attachables dès la création ou depuis la fiche, plusieurs à la fois.
-- **Fiche d'entretien** et **mode entretien** (la fiche à gauche, une zone de notes à droite, sauvegardée automatiquement dans la candidature).
+- **Lettres, fiches et notes d'entretien** rattachées à l'offre ou à l'entreprise : voir la section [Préparer ses candidatures](#préparer-ses-candidatures).
 - **Accès aux portails de recrutement** : URL, identifiant et mot de passe par candidature (masqué dans l'interface, jamais exporté).
 - **Comparateur** : coche plusieurs candidatures en vue liste pour les mettre côte à côte (gratification, durée, mode de travail, dates…) et arbitrer entre plusieurs propositions en cours.
 - **Détection des liens d'offres morts** : un ping HTTP conservateur (relancé automatiquement toutes les 6h pendant qu'Azimut tourne, ou à la demande) signale les offres retirées (404/410) - souvent le signe qu'un poste est pourvu - sans jamais de faux positif sur une simple panne réseau.
@@ -64,23 +63,21 @@ Un tableur peut suivre une poignée de candidatures un moment. Il craque dès qu
 
 **Organisation**
 - **Entreprises** avec contexte et actualités ; détection des doublons probables (« Mistral » / « Mistral AI ») et **fusion en un clic**.
-- **Contacts** avec des champs dédiés email, téléphone et LinkedIn (jamais un seul champ fourre-tout) et un statut de prise de contact. Ouvrir une entreprise affiche directement ses contacts et ses candidatures.
-- **Recherche globale** (raccourci <kbd>⌘K</kbd>) qui fouille tout - postes, notes, textes d'offres, contacts - avec un code couleur par type de résultat.
+- **Recherche globale** (raccourci <kbd>⌘K</kbd>) qui fouille tout - postes, notes, textes d'offres, notes d'entretien, lettres et fiches - avec un code couleur par type de résultat.
 - **Détection de quasi-doublons** à la création d'une candidature (intitulé proche, ou même lien d'offre une fois débarrassé du tracking) : un simple avertissement, jamais un blocage.
-- **Fiches en lecture seule** : cliquer sur une candidature, une entreprise ou un contact ouvre une fiche propre, en lecture seule - les liens (l'offre, le portail, le site d'une entreprise) sont juste cliquables, rien ne se modifie par accident. Un bouton **Modifier** explicite bascule vers le formulaire d'édition.
+- **Fiches en lecture seule** : cliquer sur une candidature ou une entreprise ouvre une fiche propre, en lecture seule - les liens (l'offre, le portail, le site d'une entreprise) sont juste cliquables, rien ne se modifie par accident. Un bouton **Modifier** explicite bascule vers le formulaire d'édition.
 - **Interface bilingue** (français / anglais) : se change dans Réglages, s'applique immédiatement à toute l'interface. Les valeurs stockées en base (statut, source…) restent en français en interne - seul l'affichage change.
 
 **Pilotage**
-- **Tableau de bord** : compteurs, répartition par statut et sous-domaine, entretiens à venir.
+- **Tableau de bord** : compteurs, répartition par statut et sous-domaine, entretiens à venir, lettres/fiches/notes.
 - **Statistiques avancées** : entonnoir envoyées → réponses → entretiens → acceptées, délais moyens, taux de réponse par source, et une **courbe hebdomadaire** (candidatures envoyées par semaine, 12 dernières semaines) plutôt que des chiffres seuls.
 - **Objectif hebdomadaire** : règle un nombre de candidatures visé par semaine dans Réglages, suis la progression dans Statistiques.
-- **Agenda** (vue mois ou 2 semaines) connectable à un vrai calendrier : abonnement `webcal://` en direct pour Calendrier (Mac), bouton « Ajouter à Google Agenda » par échéance, fichier `.ics` universel, et chaque échéance peut aussi devenir un rappel daté dans l'app **Rappels** (macOS), une par une ou toutes d'un coup.
-- **Vue compagnon iPhone/iPad** : une page mobile en lecture seule (entretiens à venir, liste complète), optionnelle, accessible depuis ton téléphone sur le même Wi-Fi que le Mac, protégée par un code d'accès généré localement - voir [Automatisations macOS](#automatisations-macos).
+- **Vue compagnon iPhone/iPad** : une page mobile en lecture seule (entretiens à venir, liste complète), optionnelle, accessible depuis ton téléphone sur le même Wi-Fi que le Mac, protégée par un code d'accès généré localement - voir [Automatisations et extras](#automatisations-et-extras).
 
 **Données et vie privée**
 - **Export / import Excel** : sauvegarde lisible et restauration, doublons ignorés et jamais écrasés, rapport détaillé après import.
-- **Sauvegarde automatique** de la base à chaque lancement, et aussi tous les 4 candidatures ajoutées (rotation sur les 5 dernières).
-- **Dossier de données configurable** : choisis où ranger documents et sauvegardes (utile pour les faire suivre par iCloud Drive ou Dropbox) - visible et mis à jour dans le Finder en temps réel, comme n'importe quel autre dossier.
+- **Sauvegarde automatique** de la base à chaque lancement, et aussi tous les 4 candidatures ajoutées (rotation sur les 5 dernières) - une copie cohérente même si une écriture a lieu au même moment. Une base ancienne (ou une ancienne sauvegarde restaurée) est mise à jour toute seule, après une copie de sécurité `…-avant-migration-….db`.
+- **Dossier de données configurable** : choisis où ranger documents, lettres, fiches, CV et sauvegardes (utile pour les faire suivre par iCloud Drive ou Dropbox) - visible et mis à jour dans le Finder en temps réel, comme n'importe quel autre dossier.
 - **Assistant IA optionnel**, avec la clé de n'importe quel fournisseur - voir plus bas.
 
 ## Prise en main
@@ -89,11 +86,25 @@ Le déroulé du quotidien, en bref :
 
 1. **Ajouter une candidature** - clique sur **+ Ajouter** depuis Candidatures (ou **Nouvelle candidature** dans la barre latérale). Colle le texte de l'offre dans la zone IA si une clé est configurée, ou remplis simplement le formulaire. L'entreprise est créée automatiquement si elle est nouvelle.
 2. **La faire avancer dans le pipeline** - glisse une carte d'une colonne à l'autre en vue kanban pour changer son statut, ou modifie-la depuis sa fiche.
-3. **Cliquer pour regarder, pas pour modifier** - une candidature, une entreprise ou un contact ouvre une fiche propre en lecture seule : clique librement sur le lien de l'offre ou du portail, rien ne change. N'appuie sur **Modifier** que quand tu veux vraiment éditer.
-4. **Ouvrir une entreprise pour voir qui tu y connais** - sa fiche liste ses contacts et ses candidatures, chacun à un clic de distance.
+3. **Cliquer pour regarder, pas pour modifier** - une candidature ou une entreprise ouvre une fiche propre en lecture seule : clique librement sur le lien de l'offre ou du portail, rien ne change. N'appuie sur **Modifier** que quand tu veux vraiment éditer.
+4. **Ouvrir une entreprise pour tout y retrouver** - sa fiche liste ses candidatures, ses lettres, ses fiches et ses notes d'entretien, chacune à un clic de distance.
 5. **Changer un statut sans ouvrir la fiche** - en vue liste, clique sur la puce de statut d'une ligne et choisis le nouveau ; le bouton « Voir l'offre » ouvre l'annonce directement.
-6. **Chercher n'importe quoi avec ⌘K** - un intitulé, une note, une phrase d'une offre collée, le nom d'un contact.
-7. **Préparer un entretien** - ouvre la fiche d'une candidature, clique sur **Fiche entretien** pour un résumé Markdown imprimable, ou **Mode entretien** pour une vue partagée avec prise de notes en direct.
+6. **Chercher n'importe quoi avec ⌘K** - un intitulé, une note, une phrase d'une offre collée, un mot d'une lettre ou d'une note d'entretien.
+7. **Préparer un entretien** - dans **Fiches d'entretien**, génère une fiche (ou ajoute la tienne) ; le jour J, ouvre **Entretiens**, crée une note sur l'offre ou l'entreprise et écris : tout est enregistré au fil de la frappe.
+
+## Préparer ses candidatures
+
+Trois sections, sous les candidatures, servent à préparer et à garder trace de tout ce qui entoure une offre.
+
+**Lettres** et **Fiches d'entretien** fonctionnent de la même façon. Chacune est liée à **une seule entreprise** et à **une ou plusieurs de ses offres** - ou à l'entreprise en général : cocher « Aussi sur l'entreprise en général » permet de viser à la fois des offres précises et l'entreprise. Un champ de recherche filtre les entreprises et les offres pendant la sélection.
+
+- **Créer avec l'IA** : une lettre se génère avec la clé API d'Azimut (fournisseur Anthropic, recherche web incluse) ou se rédige avec Claude Code grâce au skill téléchargeable. Une fiche se génère avec l'IA (présentation de l'entreprise, détail de chaque poste avec le lien de l'offre *seulement s'il répond encore*, questions à poser adaptées à ton CV) ; Azimut fabrique lui-même le PDF. Tout est vérifié (mêmes offres, CV présent, au moins une offre pour une fiche) **avant** d'appeler l'IA, et rien n'est enregistré si l'appel échoue.
+- **Ajouter la tienne** : le bouton « Ajouter ma lettre » / « Ajouter ma fiche » ouvre une zone où **glisser-déposer** un fichier (PDF, Word `.docx`, `.txt` ou `.md`, 15 Mo max) ou le chercher sur l'ordinateur. Le fichier est conservé **tel quel** ; son texte est extrait pour la recherche. Le nom du fichier suggère l'entreprise (« lettre-motivation-CEA.pdf » propose CEA).
+- Cliquer une ligne ouvre l'**aperçu** (le PDF s'affiche dans la fenêtre), avec téléchargement, modification du titre ou des offres liées, suppression. Supprimer une offre ne supprime jamais ses lettres, fiches ni notes : seul le lien est retiré.
+
+**Entretiens** est une prise de notes classique : une note par entretien, sur **une entreprise ou une offre précise** (au choix, jamais les deux), avec un titre, une date et un grand champ de texte **enregistré au fil de la frappe** (et à la sortie de la page). Le panneau de droite rappelle le contexte : l'entreprise, l'offre, les lettres et fiches prêtes.
+
+Les fichiers vivent dans le dossier de données (`lettres/`, `fiches/`, `documents/`, `profil/`), la base ne garde que les textes et les chemins : pour tout sauvegarder, copie **la base et ce dossier**.
 
 ## Idées d'améliorations
 
@@ -145,15 +156,22 @@ python cli.py entreprises fusionner 2 5               # garde n°2, fusionne n°
 
 `ajouter` ne crée jamais de doublon : si le nom existe déjà (comparaison insensible à la casse et aux accents), l'entreprise existante est retrouvée et seuls ses champs vides sont complétés. Si une valeur existante diffère, rien n'est écrasé : une erreur `ConflitMiseAJour` l'explique - c'est `modifier` qui écrase, explicitement.
 
-`doublons` liste les paires au nom proche sans rien modifier ; `fusionner <conserver> <supprimer>` déplace candidatures et contacts vers la première, complète ses champs vides depuis la seconde, puis la supprime - irréversible, à utiliser après avoir vérifié la paire.
+`doublons` liste les paires au nom proche sans rien modifier ; `fusionner <conserver> <supprimer>` déplace candidatures, lettres, fiches et notes vers la première, complète ses champs vides depuis la seconde, puis la supprime - irréversible, à utiliser après avoir vérifié la paire.
 
-### Contacts
+### Lettres, fiches et notes d'entretien
 
 ```bash
-python cli.py contacts ajouter --entreprise "AgentikCo" --nom "Marie Petit" --poste "Lead AI" --type Email --valeur marie@agentik.co
-python cli.py contacts lister --entreprise "AgentikCo"
-python cli.py contacts modifier 5 --statut Contacté --date-contact 27/08/2026
+python cli.py lettres importer --entreprise "CEA" --poste "Stage - Évaluation d'agents IA" --fichier ma-lettre.pdf
+python cli.py lettres ajouter --entreprise "AgentikCo" --fichier lettre.md --candidature-id 12 --candidature-id 14 --generale
+python cli.py lettres lister --recherche orchestration
+python cli.py fiches importer --entreprise "Takima" --fichier ma-fiche.pdf
+python cli.py fiches ajouter --entreprise "Takima" --json fiche.json --candidature-id 50   # Azimut fabrique le PDF
+python cli.py notes ajouter --candidature-id 12 --titre "Entretien technique" --contenu "Questions sur les évals."
+python cli.py notes lister --entreprise "AgentikCo"
+python cli.py notes voir 3
 ```
+
+`importer` conserve le fichier **tel quel** (PDF, Word, texte) ; `ajouter` fabrique un PDF depuis un texte (lettre) ou des données JSON (fiche). Une pièce est liée à une entreprise et à une ou plusieurs de ses offres (`--candidature-id` répétable, ou `--poste` pour retrouver l'offre par son intitulé) ; `--generale` la marque aussi comme portant sur l'entreprise en général. `lister`, `supprimer` existent pour lettres et fiches ; une note vise soit une entreprise (`--entreprise`), soit une offre précise (`--candidature-id`).
 
 ### Import CSV (LinkedIn, Indeed, ou autre)
 
@@ -172,20 +190,20 @@ python cli.py export excel --sortie suivi_candidatures.xlsx
 python cli.py import excel --fichier suivi_candidatures.xlsx
 ```
 
-L'export régénère le fichier complet depuis la base : 4 onglets (« Suivi candidatures », « Entreprises », « Contacts », « Tableau de bord »), listes déroulantes sur les colonnes à valeurs autorisées, couleurs conditionnelles sur le statut, liens `HYPERLINK` + `MATCH` entre onglets, compteurs par formules (`COUNTIF`/`COUNTA`, aucune valeur codée en dur). Relançable à tout moment sans perte.
+L'export régénère le fichier complet depuis la base : 4 onglets (« Suivi candidatures », « Entreprises », « Notes d'entretien », « Tableau de bord »), listes déroulantes sur les colonnes à valeurs autorisées, couleurs conditionnelles sur le statut, liens `HYPERLINK` + `MATCH` entre onglets, compteurs par formules (`COUNTIF`/`COUNTA`, aucune valeur codée en dur). Relançable à tout moment sans perte.
 
 L'import relit un tel fichier et réinjecte les données : les doublons sont ignorés et signalés, les lignes invalides sont rapportées avec leur numéro sans bloquer le reste - pratique comme sauvegarde lisible ou pour fusionner deux bases.
 
-**La sauvegarde intégrale**, c'est une copie du fichier `suivi_candidatures.db` - l'Excel ne contient ni les mots de passe de portail, ni la clé API : ceux-ci restent en clair dans la base locale, qui ne quitte jamais la machine.
+**La sauvegarde intégrale**, c'est une copie du fichier `suivi_candidatures.db` (les textes : candidatures, entreprises, notes, contenu des lettres et fiches) **plus le dossier de données** (documents, lettres, fiches, CV : ce sont des fichiers). L'Excel ne contient ni les mots de passe de portail, ni la clé API - ceux-ci restent en clair dans la base locale, qui ne quitte jamais la machine - ni les fichiers.
 
-### Fiche de préparation d'entretien
+### Récapitulatif d'une candidature
 
 ```bash
 python cli.py entretien preparer 12                    # affiche dans le terminal
 python cli.py entretien preparer 12 --sortie fiche.md  # enregistre en Markdown
 ```
 
-Compile en une fiche : en-tête (entreprise, poste, date, lieu/mode), contexte entreprise, texte ou lien de l'offre, contacts identifiés, historique (envoi, relances, notes, journal complet).
+Compile un récapitulatif : en-tête (entreprise, poste, date, lieu/mode), contexte entreprise, texte ou lien de l'offre, préparation déjà faite (lettres, fiches et notes d'entretien liées), historique (envoi, notes, journal complet).
 
 </details>
 
@@ -206,11 +224,10 @@ Cette couche ne fait que proposer - jamais d'écriture directe en base, jamais d
 
 **Sans clé du tout**, Azimut reste entièrement fonctionnel : une IA de type Claude Code peut piloter la base directement via la ligne de commande ou les fonctions Python documentées dans [`CLAUDE.md`](../CLAUDE.md), sur ton abonnement existant, sans clé API séparée. [`AGENT.md`](../AGENT.md) documente la procédure exacte qu'une IA doit suivre pour saisir une candidature à partir d'une offre.
 
-## Automatisations macOS
+## Automatisations et extras
 
-Tout ce qui suit est propre à macOS (ça s'appuie sur AppleScript/`osascript` ou des bibliothèques macOS uniquement) et l'interface masque automatiquement les boutons correspondants sur Windows/Linux - sauf la vérification des liens morts et la vue compagnon, qui fonctionnent déjà à l'identique sur tous les OS et sont juste documentées ici avec le reste.
+Cette section regroupe les extras en plus de l'appli : la capture rapide est propre à macOS (elle s'appuie sur l'app Raccourcis), la vérification des liens morts et la vue compagnon fonctionnent à l'identique sur tous les OS.
 
-**App Rappels.** En plus du calendrier, le bouton **R** à côté de chaque échéance (agenda) crée un rappel daté dans l'app Rappels ; un bouton dans « Connecter un calendrier » les envoie toutes d'un coup. La toute première fois, macOS demande d'autoriser Azimut à automatiser Rappels (Réglages Système → Confidentialité et sécurité → Automatisation) - à accorder une fois.
 
 **Liens d'offres morts.** Un ping HTTP conservateur (HEAD, puis GET si nécessaire) tourne toutes les 6h en arrière-plan pendant qu'Azimut est ouvert, et à la demande depuis **Statistiques** (bouton « Vérifier maintenant »). Seul un code 404/410 sans ambiguïté marque un lien « mort » ; un délai dépassé, une erreur 5xx ou un blocage anti-robot (403) restent « inconnu » - jamais de faux positif. Rien n'est déduit du contenu de la page, seulement du code HTTP.
 
@@ -230,11 +247,9 @@ Toute valeur hors liste est refusée avec un message clair listant les valeurs p
 | `mode_travail` | Présentiel, Hybride, Full remote |
 | `convention_envoyee` | Oui, Non, N/A |
 | `source` (candidature) | LinkedIn, Indeed, Site entreprise, Welcome to the Jungle, Réseau, Forum / Salon, Autre |
-| `statut_contact` | À contacter, Contacté, Répondu, Pas de réponse |
-| `source` (contact) | Site entreprise, Article / Presse, LinkedIn (recherche publique), Réseau, Autre |
 | `type_document` | CV, Lettre de motivation, Offre (PDF), Portfolio, Autre |
 
-- **Doublons exacts** : une candidature = (entreprise, poste) unique ; un contact = (entreprise, nom) unique ; une entreprise = nom unique - toujours en comparaison insensible à la casse et aux accents. Refusés net, avec le numéro de la ligne existante.
+- **Doublons exacts** : une candidature = (entreprise, poste) unique ; une entreprise = nom unique - toujours en comparaison insensible à la casse et aux accents. Refusés net, avec le numéro de la ligne existante.
 - **Quasi-doublons** (intitulé proche, même lien d'offre) : signalés, jamais bloqués - voir `doublons.py`.
 - **Dates** : validées (le 31 février est refusé) et stockées en ISO `AAAA-MM-JJ`, affichées `JJ/MM/AAAA`.
 
@@ -257,15 +272,20 @@ modifier_candidature(id, **champs)
 lister_candidatures(statut=None, sous_domaine=None) -> liste de dicts
 recuperer_candidature(id) -> dict
 
-# contacts.py
-verifier_doublon_contact(entreprise_nom, nom_contact) -> id ou None
-ajouter_contact(entreprise_nom, nom, **champs) -> id           # DoublonContact si doublon
-modifier_contact(id, **champs)
-lister_contacts(entreprise_nom=None) -> liste de dicts
-
 # doublons.py - quasi-doublons (avertissement, jamais un blocage)
 candidatures_similaires(entreprise, poste, lien_offre=None) -> [{id, score, raisons}, ...]
 paires_entreprises_suspectes() -> [{a, b, score}, ...]
+
+# lettres.py / fiches.py - même modèle : liées à UNE entreprise et à UNE OU PLUSIEURS de ses offres
+ajouter_lettre(entreprise_nom, contenu, candidature_ids=None, titre=None, generale=None, source="manuelle") -> id
+importer_lettre(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None, generale=None) -> id
+lister_lettres(entreprise_id=None, candidature_id=None, recherche=None) / recuperer_lettre(id)
+modifier_lettre(id, titre=, generale=, candidature_ids=) / supprimer_lettre(id)
+ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiches(...) / supprimer_fiche(id)
+
+# notes_entretien.py - liées à une entreprise OU à une offre précise
+ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
+lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
 
 # documents.py - fichiers joints (CV, lettres, offres en PDF…)
 ajouter_document(candidature_id, nom_fichier, contenu_bytes, type_document=None) -> id
@@ -275,12 +295,12 @@ lister_documents(candidature_id=None) / supprimer_document(id)
 exporter_excel(chemin_sortie) -> chemin du fichier généré
 importer_excel(chemin_fichier) -> rapport (ajouts, doublons ignorés, erreurs)
 
-# entretien.py / recherche.py / statistiques.py / agenda.py
-generer_fiche_entretien(candidature_id) -> texte Markdown
-rechercher(texte) / stats_avancees() / lister_echeances()
+# entretien.py / recherche.py / statistiques.py
+generer_fiche_entretien(candidature_id) -> récapitulatif Markdown
+rechercher(texte) / stats_avancees()
 ```
 
-Exceptions (voir `exceptions.py`) : `ValeurNonAutorisee`, `ChampInconnu`, `DoublonCandidature`, `DoublonContact`, `DoublonEntreprise`, `ConflitMiseAJour`, `EntiteIntrouvable` - toutes héritent de `ErreurSuivi` et portent un message en français.
+Exceptions (voir `exceptions.py`) : `ValeurNonAutorisee`, `ChampInconnu`, `DoublonCandidature`, `DoublonEntreprise`, `ConflitMiseAJour`, `EntiteIntrouvable` - toutes héritent de `ErreurSuivi` et portent un message en français.
 
 ## Structure du projet
 
@@ -292,35 +312,40 @@ azimut/
   app_bureau.py     # fenêtre native (pywebview) autour du serveur interne
   compagnon.py      # serveur compagnon en lecture seule pour iPhone/iPad (réseau local, opt-in)
   serveur.py        # serveur interne (Flask) : API JSON + interface
-  static/           # interface (index.html, style.css, app.js)
+  static/           # interface (index.html, style.css, app.js, preparation.js)
   db.py             # connexion SQLite, création des tables, migrations
   valeurs.py        # valeurs autorisées + validation des champs
   exceptions.py     # exceptions métier (messages en français)
   entreprises.py    # CRUD entreprises (anti-doublon, conflits, fusion)
   candidatures.py   # CRUD candidatures (anti-doublon)
-  contacts.py       # CRUD contacts (anti-doublon)
   doublons.py       # quasi-doublons : intitulés proches, lien d'offre, fusion
   verification_liens.py  # détection des liens d'offres morts (ping conservateur)
-  rappels_macos.py  # pousse des échéances vers l'app Rappels (AppleScript)
   rapide.py         # capture rapide (brouillon depuis un Raccourci macOS)
   export_excel.py   # export .xlsx (4 onglets, style du fichier d'origine)
   import_excel.py   # import d'un export .xlsx (sauvegarde / restauration)
   import_csv.py     # import CSV générique (LinkedIn, Indeed…), correspondance de colonnes à la main
   evenements.py     # journal automatique des candidatures (timeline)
   documents.py      # fichiers joints (dossier configurable)
+  pieces_liees.py   # noyau commun lettres / fiches : une entreprise, plusieurs offres, fichier importé ou généré
+  lettres.py        # lettres de motivation (texte -> PDF, ou fichier importé tel quel)
+  fiches.py         # fiches d'entretien (données -> PDF, ou fichier importé tel quel)
+  fiches_pdf.py     # rendu PDF d'une fiche (reportlab, mêmes PDF sur les 3 OS)
+  notes_entretien.py # notes d'entretien : une entreprise OU une offre précise
+  generation.py     # génération par IA : vérifie tout AVANT d'appeler l'IA, puis enregistre
+  extraction.py     # texte d'un PDF / Word / texte (CV, indexation des pièces importées)
+  profil.py         # le CV utilisé par l'IA
   recherche.py      # recherche globale multi-types
   statistiques.py   # entonnoir, délais, sources, courbe hebdomadaire, objectif
-  agenda.py         # échéances + export iCalendar (.ics)
   reglages.py       # réglages locaux (clé API masquée, fournisseur IA, dossier, code compagnon)
   sauvegarde.py     # copies datées de la base, rotation
-  agent.py          # analyse d'offres + contexte entreprise - Anthropic ou tout fournisseur compatible OpenAI
-  entretien.py      # fiche de préparation d'entretien (Markdown)
+  agent.py          # analyse d'offres, lettres, fiches - Anthropic ou tout fournisseur compatible OpenAI
+  entretien.py      # récapitulatif d'une candidature (Markdown)
   cli.py            # interface en ligne de commande
   CLAUDE.md         # mode d'emploi du projet pour les IA (Claude Code…)
   AGENT.md          # procédure pour qu'une IA saisisse une candidature à partir d'une offre
   suivi             # exécutable terminal (équivalent de python cli.py)
   .github/workflows/tests.yml  # CI : la suite de tests tourne à chaque push
-  tests/            # 247 tests - python -m unittest discover -s tests
+  tests/            # une suite hermétique (jamais la vraie base) - python -m unittest discover -s tests
   suivi_candidatures.db   # la base - seule source de vérité (non versionnée)
 ```
 

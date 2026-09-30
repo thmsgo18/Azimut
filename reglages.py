@@ -18,12 +18,16 @@ REGLAGES_CONNUS = {
     "modele_ia": "claude-opus-5",       # modèle utilisé par l'analyse d'offres
     "ia_base_url": None,                # URL de base, uniquement pour "openai_compatible"
     "recherche_web": "Oui",             # enrichir le contexte entreprise via recherche web
-    "dossier_donnees": None,            # dossier choisi pour documents/ et sauvegardes/
+    "dossier_donnees": None,            # dossier choisi pour documents/, sauvegardes/, lettres/, fiches/, profil/
     "dossier_donnees_choisi": "Non",    # évite de redemander à chaque lancement
     "objectif_hebdomadaire": None,      # nb de candidatures envoyées visé par semaine (None = désactivé)
     "compagnon_actif": "Non",           # vue compagnon iPhone/iPad (lecture seule, réseau local)
     "compagnon_code": None,             # code d'accès à la vue compagnon (régénérable)
     "langue": "fr",                     # langue de l'interface : "fr" ou "en"
+    "cv_source": None,                  # "fichier", "dossier_latex" ou "texte" (voir profil.py)
+    "cv_chemin": None,                  # chemin du fichier CV copié, ou du dossier latex-forge
+    "cv_nom_fichier": None,             # nom original du fichier CV (affichage uniquement)
+    "cv_texte": None,                   # texte du CV (collé, ou extrait et mis en cache pour un fichier)
 }
 
 FOURNISSEURS_IA = ["anthropic", "openai_compatible"]
@@ -71,10 +75,34 @@ def masquer_cle(cle_api):
     return cle_api[:7] + "…" + cle_api[-4:]
 
 
-def definir_dossier_donnees(chemin, chemin_db=None):
-    """Valide, crée si besoin, et enregistre le dossier de documents/sauvegardes.
+def dossier_donnees_pour(sous_dossier, chemin_db=None):
+    """Dossier où ranger les fichiers d'un type donné (« documents »,
+    « sauvegardes », « lettres », « fiches », « profil »).
 
-    `chemin` vide ou None = retour à l'emplacement par défaut (à côté du code).
+    C'est le dossier de données choisi dans Réglages, sinon un dossier à côté
+    de la base elle-même. Pour la vraie base, qui vit à côté du code, ça donne
+    l'emplacement historique ; pour une base de test dans un dossier
+    temporaire, ça garde tous les fichiers dans ce dossier temporaire au lieu
+    de polluer le projet."""
+    base = obtenir_reglage("dossier_donnees", chemin_db=chemin_db)
+    if base:
+        return Path(base) / sous_dossier
+    fichier_base = Path(chemin_db) if chemin_db else Path(db.CHEMIN_DB)
+    return fichier_base.parent / sous_dossier
+
+
+def chemin_reel(chemin_enregistre):
+    """Un chemin déjà absolu est utilisé tel quel ; un ancien chemin relatif
+    (fichiers enregistrés avant l'introduction du dossier configurable) est
+    résolu par rapport au projet, où ces fichiers ont réellement été écrits."""
+    chemin = Path(chemin_enregistre)
+    return chemin if chemin.is_absolute() else Path(__file__).parent / chemin_enregistre
+
+
+def definir_dossier_donnees(chemin, chemin_db=None):
+    """Valide, crée si besoin, et enregistre le dossier de données.
+
+    `chemin` vide ou None = retour à l'emplacement par défaut (à côté de la base).
     Les fichiers déjà présents dans l'ancien emplacement ne sont PAS déplacés
     automatiquement - seuls les futurs écrits vont dans le nouveau dossier.
     """

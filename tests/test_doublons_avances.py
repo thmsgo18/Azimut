@@ -10,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import db
 from candidatures import ajouter_candidature, lister_candidatures
-from contacts import ajouter_contact, lister_contacts
 from doublons import (
     candidatures_similaires,
     entreprises_similaires,
@@ -24,6 +23,9 @@ from entreprises import (
     lister_entreprises,
 )
 from exceptions import EntiteIntrouvable, ValeurNonAutorisee
+from fiches import ajouter_fiche, lister_fiches
+from lettres import ajouter_lettre, lister_lettres
+from notes_entretien import ajouter_note, lister_notes
 
 
 class TestScoreEtLiens(unittest.TestCase):
@@ -132,12 +134,19 @@ class TestEntreprisesSimilairesEtFusion(unittest.TestCase):
             chemin_db=self.chemin_db,
         )
         ajouter_candidature("Mistral", "Stage RAG", chemin_db=self.chemin_db)
-        ajouter_contact("Mistral", "Jean Dupont", chemin_db=self.chemin_db)
+        ajouter_lettre("Mistral", "Madame, Monsieur, ma candidature.", chemin_db=self.chemin_db)
+        ajouter_fiche(
+            "Mistral", {"meta": {"company": "Mistral"}, "postes": [{"title": "Stage RAG"}]},
+            chemin_db=self.chemin_db,
+        )
+        ajouter_note(entreprise_nom="Mistral", titre="Appel RH", chemin_db=self.chemin_db)
 
         resultat = fusionner_entreprises(id_conserver, id_supprimer, chemin_db=self.chemin_db)
 
         self.assertEqual(resultat["candidatures_deplacees"], 1)
-        self.assertEqual(resultat["contacts_deplaces"], 1)
+        self.assertEqual(resultat["lettres_deplacees"], 1)
+        self.assertEqual(resultat["fiches_deplacees"], 1)
+        self.assertEqual(resultat["notes_deplacees"], 1)
         # contexte_actus entraîne aussi derniere_recherche (voir ajouter_ou_recuperer_entreprise).
         self.assertEqual(
             set(resultat["champs_completes"]), {"site_web", "contexte_actus", "derniere_recherche"}
@@ -149,8 +158,13 @@ class TestEntreprisesSimilairesEtFusion(unittest.TestCase):
 
         cands = lister_candidatures(chemin_db=self.chemin_db)
         self.assertEqual(cands[0]["entreprise"], "Mistral AI")
-        contacts_liste = lister_contacts(chemin_db=self.chemin_db)
-        self.assertEqual(contacts_liste[0]["entreprise"], "Mistral AI")
+        # Lettres, fiches et notes suivent l'entreprise conservée.
+        for element in (
+            lister_lettres(chemin_db=self.chemin_db)
+            + lister_fiches(chemin_db=self.chemin_db)
+            + lister_notes(chemin_db=self.chemin_db)
+        ):
+            self.assertEqual(element["entreprise"], "Mistral AI")
 
     def test_fusion_ne_deplace_pas_les_champs_deja_remplis(self):
         id_conserver = ajouter_ou_recuperer_entreprise(

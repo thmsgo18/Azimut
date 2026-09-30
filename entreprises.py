@@ -114,8 +114,19 @@ def modifier_entreprise(id_entreprise, chemin_db=None, **champs):
         conn.close()
 
 
+# Ce qui peut être rattaché à une entreprise en plus de ses candidatures :
+# (table, libellé pour le message d'erreur).
+RATTACHEMENTS = (
+    ("candidatures", "candidature(s)"),
+    ("lettres_motivation", "lettre(s) de motivation"),
+    ("fiches_entretien", "fiche(s) d'entretien"),
+    ("notes_entretien", "note(s) d'entretien"),
+)
+
+
 def supprimer_entreprise(id_entreprise, chemin_db=None):
-    """Supprime une entreprise, refusé tant qu'il lui reste des candidatures ou contacts."""
+    """Supprime une entreprise, refusé tant qu'il lui reste des candidatures,
+    lettres, fiches ou notes d'entretien."""
     conn = db.ouvrir(chemin_db)
     try:
         actuelle = conn.execute(
@@ -123,16 +134,17 @@ def supprimer_entreprise(id_entreprise, chemin_db=None):
         ).fetchone()
         if actuelle is None:
             raise EntiteIntrouvable(f"Aucune entreprise avec l'id {id_entreprise}.")
-        nb_candidatures = conn.execute(
-            "SELECT COUNT(*) FROM candidatures WHERE entreprise_id = ?", (id_entreprise,)
-        ).fetchone()[0]
-        nb_contacts = conn.execute(
-            "SELECT COUNT(*) FROM contacts WHERE entreprise_id = ?", (id_entreprise,)
-        ).fetchone()[0]
-        if nb_candidatures or nb_contacts:
+        restants = []
+        for table, libelle in RATTACHEMENTS:
+            nombre = conn.execute(
+                f"SELECT COUNT(*) FROM {table} WHERE entreprise_id = ?", (id_entreprise,)
+            ).fetchone()[0]
+            if nombre:
+                restants.append(f"{nombre} {libelle}")
+        if restants:
             raise ConflitMiseAJour(
-                f"Impossible de supprimer « {actuelle['nom']} » : {nb_candidatures} candidature(s) "
-                f"et {nb_contacts} contact(s) y sont encore rattachés. Les supprimer d'abord."
+                f"Impossible de supprimer « {actuelle['nom']} » : {', '.join(restants)} "
+                "y sont encore rattaché(e)s. Les supprimer d'abord."
             )
         conn.execute("DELETE FROM entreprises WHERE id = ?", (id_entreprise,))
         conn.commit()
@@ -151,14 +163,15 @@ def lister_entreprises(chemin_db=None):
 
 
 def fusionner_entreprises(id_conserver, id_supprimer, chemin_db=None):
-    """Fusionne id_supprimer dans id_conserver : candidatures et contacts sont
-    ré-attribués à id_conserver, ses champs vides (site_web, contexte_actus,
-    derniere_recherche) sont complétés depuis id_supprimer, puis id_supprimer
-    est supprimé. Irréversible - pensé pour les doublons repérés par
-    doublons.entreprises_similaires (ex. « Mistral » / « Mistral AI »).
+    """Fusionne id_supprimer dans id_conserver : candidatures, lettres, fiches
+    et notes d'entretien sont ré-attribuées à id_conserver, ses champs vides
+    (site_web, contexte_actus, derniere_recherche) sont complétés depuis
+    id_supprimer, puis id_supprimer est supprimé. Irréversible - pensé pour
+    les doublons repérés par doublons.entreprises_similaires (ex. « Mistral » /
+    « Mistral AI »).
 
-    Retourne un résumé : {id, nom, candidatures_deplacees, contacts_deplaces,
-    champs_completes}.
+    Retourne un résumé : {id, nom, candidatures_deplacees, lettres_deplacees,
+    fiches_deplacees, notes_deplacees, champs_completes}.
     """
     if id_conserver == id_supprimer:
         raise ValeurNonAutorisee("Impossible de fusionner une entreprise avec elle-même.")
@@ -175,14 +188,17 @@ def fusionner_entreprises(id_conserver, id_supprimer, chemin_db=None):
         if supprimer is None:
             raise EntiteIntrouvable(f"Aucune entreprise avec l'id {id_supprimer}.")
 
-        nb_candidatures = conn.execute(
-            "UPDATE candidatures SET entreprise_id = ? WHERE entreprise_id = ?",
-            (id_conserver, id_supprimer),
-        ).rowcount
-        nb_contacts = conn.execute(
-            "UPDATE contacts SET entreprise_id = ? WHERE entreprise_id = ?",
-            (id_conserver, id_supprimer),
-        ).rowcount
+        deplaces = {}
+        for table, cle in (
+            ("candidatures", "candidatures_deplacees"),
+            ("lettres_motivation", "lettres_deplacees"),
+            ("fiches_entretien", "fiches_deplacees"),
+            ("notes_entretien", "notes_deplacees"),
+        ):
+            deplaces[cle] = conn.execute(
+                f"UPDATE {table} SET entreprise_id = ? WHERE entreprise_id = ?",
+                (id_conserver, id_supprimer),
+            ).rowcount
 
         maj = {}
         for champ in ("site_web", "contexte_actus", "derniere_recherche"):
@@ -199,8 +215,7 @@ def fusionner_entreprises(id_conserver, id_supprimer, chemin_db=None):
         return {
             "id": id_conserver,
             "nom": conserver["nom"],
-            "candidatures_deplacees": nb_candidatures,
-            "contacts_deplaces": nb_contacts,
+            **deplaces,
             "champs_completes": list(maj.keys()),
         }
     finally:

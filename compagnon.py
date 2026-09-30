@@ -19,7 +19,6 @@ import socket
 
 from flask import Flask, Response, jsonify, request
 
-import agenda
 import candidatures
 import reglages
 from datetime import date
@@ -79,7 +78,11 @@ def verifier_acces():
 def api_tableau():
     aujourd_hui = date.today().isoformat()
     entretiens_a_venir = sorted(
-        (e for e in agenda.lister_echeances() if e["type"] == "entretien" and e["date"] >= aujourd_hui),
+        (
+            {"date": c["date_entretien"], "entreprise": c["entreprise"], "poste": c["poste"]}
+            for c in candidatures.lister_candidatures()
+            if c["date_entretien"] and c["date_entretien"] >= aujourd_hui
+        ),
         key=lambda e: e["date"],
     )
     return jsonify(

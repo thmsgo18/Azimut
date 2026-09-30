@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import db
 import verification_liens as vl
-from candidatures import ajouter_candidature, modifier_candidature, recuperer_candidature
+from candidatures import ajouter_candidature, recuperer_candidature
 
 
 class FausseReponse:

@@ -1,7 +1,7 @@
 """Serveur web local de l'appli de suivi de candidatures.
 
 Expose une API JSON par-dessus les fonctions métier (entreprises.py,
-candidatures.py, contacts.py, export_excel.py, entretien.py) et sert
+candidatures.py, lettres.py, fiches.py, notes_entretien.py, export_excel.py...) et sert
 l'interface web du dossier static/. Jamais de SQL direct ici : la base
 reste manipulée exclusivement via les modules métier.
 
@@ -9,7 +9,7 @@ Lancement : ./venv/bin/python serveur.py  puis  http://localhost:8765
 """
 
 import io
-import platform
+import json
 import re
 import secrets
 import tempfile
@@ -20,9 +20,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request, send_file
 
-import agenda
 import candidatures
-import contacts
 import db
 import documents
 import doublons
@@ -30,8 +28,13 @@ import entreprises
 import entretien
 import evenements
 import export_excel
+import fiches
+import generation
 import import_csv
 import import_excel
+import lettres
+import notes_entretien
+import profil
 import rapide
 import recherche
 import reglages
@@ -43,10 +46,8 @@ from valeurs import (
     CONVENTIONS,
     MODES_TRAVAIL,
     SOURCES_CANDIDATURE,
-    SOURCES_CONTACT,
     SOUS_DOMAINES,
     STATUTS,
-    STATUTS_CONTACT,
     TYPES_CANDIDATURE,
     TYPES_DOCUMENT,
 )
@@ -54,6 +55,8 @@ from valeurs import (
 PORT = 8765
 
 app = Flask(__name__, static_folder="static", static_url_path="")
+# Plafond d'un envoi (fichier, import) : au-delà, refusé avant d'être lu en mémoire.
+app.config["MAX_CONTENT_LENGTH"] = 60 * 1024 * 1024
 
 
 # --- gestion d'erreurs : messages français, codes HTTP propres ---
@@ -132,13 +135,7 @@ def api_valeurs():
             "modes_travail": MODES_TRAVAIL,
             "conventions": CONVENTIONS,
             "sources_candidature": SOURCES_CANDIDATURE,
-            "statuts_contact": STATUTS_CONTACT,
-            "sources_contact": SOURCES_CONTACT,
             "types_document": TYPES_DOCUMENT,
-            # App Rappels : macOS uniquement (osascript). L'interface s'appuie là-dessus
-            # pour masquer proprement ces extras sur Windows/Linux plutôt
-            # que d'afficher des boutons qui échoueraient au clic.
-            "plateforme_macos": platform.system() == "Darwin",
         }
     )
 
@@ -202,15 +199,18 @@ def api_candidatures_similaires():
 @app.route("/api/entreprises")
 def api_entreprises_lister():
     liste = entreprises.lister_entreprises()
-    nb_candidatures = {}
-    nb_contacts = {}
-    for cand in candidatures.lister_candidatures():
-        nb_candidatures[cand["entreprise_id"]] = nb_candidatures.get(cand["entreprise_id"], 0) + 1
-    for contact in contacts.lister_contacts():
-        nb_contacts[contact["entreprise_id"]] = nb_contacts.get(contact["entreprise_id"], 0) + 1
-    for ent in liste:
-        ent["nb_candidatures"] = nb_candidatures.get(ent["id"], 0)
-        ent["nb_contacts"] = nb_contacts.get(ent["id"], 0)
+    sources = {
+        "nb_candidatures": candidatures.lister_candidatures(),
+        "nb_lettres": lettres.lister_lettres(),
+        "nb_fiches": fiches.lister_fiches(),
+        "nb_notes": notes_entretien.lister_notes(),
+    }
+    for cle, elements in sources.items():
+        compte = {}
+        for element in elements:
+            compte[element["entreprise_id"]] = compte.get(element["entreprise_id"], 0) + 1
+        for ent in liste:
+            ent[cle] = compte.get(ent["id"], 0)
     return jsonify(liste)
 
 
@@ -258,43 +258,11 @@ def api_entreprises_fusionner():
     return jsonify(resultat)
 
 
-# --- contacts ---
-
-@app.route("/api/contacts")
-def api_contacts_lister():
-    return jsonify(contacts.lister_contacts(entreprise_nom=request.args.get("entreprise")))
-
-
-@app.route("/api/contacts", methods=["POST"])
-def api_contacts_ajouter():
-    donnees = request.get_json(silent=True) or {}
-    numero = contacts.ajouter_contact(
-        donnees.get("entreprise"),
-        donnees.get("nom"),
-        **{c: v for c, v in donnees.items() if c not in ("entreprise", "nom", "id")},
-    )
-    return jsonify({"id": numero}), 201
-
-
-@app.route("/api/contacts/<int:numero>", methods=["PATCH"])
-def api_contacts_modifier(numero):
-    donnees = request.get_json(silent=True) or {}
-    contacts.modifier_contact(numero, **{c: v for c, v in donnees.items() if c != "id"})
-    return jsonify({"id": numero})
-
-
-@app.route("/api/contacts/<int:numero>", methods=["DELETE"])
-def api_contacts_supprimer(numero):
-    contacts.supprimer_contact(numero)
-    return jsonify({"message": f"Contact n°{numero} supprimé."})
-
-
 # --- tableau de bord ---
 
 @app.route("/api/stats")
 def api_stats():
     liste = candidatures.lister_candidatures()
-    liste_contacts = contacts.lister_contacts()
     aujourd_hui = date.today().isoformat()
 
     par_statut = {s: 0 for s in STATUTS}
@@ -304,11 +272,6 @@ def api_stats():
             par_statut[cand["statut"]] += 1
         if cand["sous_domaine"]:
             par_domaine[cand["sous_domaine"]] = par_domaine.get(cand["sous_domaine"], 0) + 1
-
-    contacts_par_statut = {s: 0 for s in STATUTS_CONTACT}
-    for contact in liste_contacts:
-        if contact["statut_contact"] in contacts_par_statut:
-            contacts_par_statut[contact["statut_contact"]] += 1
 
     avec_reponse = sum(
         par_statut[s] for s in ("Réponse reçue", "Entretien", "Refus", "Accepté")
@@ -322,8 +285,9 @@ def api_stats():
             "total": len(liste),
             "par_statut": par_statut,
             "par_domaine": par_domaine,
-            "contacts_par_statut": contacts_par_statut,
-            "total_contacts": len(liste_contacts),
+            "total_lettres": len(lettres.lister_lettres()),
+            "total_fiches": len(fiches.lister_fiches()),
+            "total_notes": len(notes_entretien.lister_notes()),
             "taux_reponse": round(avec_reponse / len(liste) * 100) if liste else 0,
             "en_cours": sum(par_statut[s] for s in ("Envoyée", "Réponse reçue")),
             "entretiens_a_venir": entretiens_a_venir[:5],
@@ -469,6 +433,234 @@ def api_dossier_donnees():
     return jsonify({"dossier_donnees": dossier})
 
 
+# --- profil (CV utilisé pour les lettres de motivation) ---
+
+@app.route("/api/profil/cv")
+def api_profil_cv():
+    return jsonify(profil.etat_cv())
+
+
+@app.route("/api/profil/cv/fichier", methods=["POST"])
+def api_profil_cv_fichier():
+    fichier = request.files.get("fichier")
+    if fichier is None or not fichier.filename:
+        raise ValeurNonAutorisee("Aucun fichier reçu.")
+    profil.definir_cv_fichier(fichier.filename, fichier.read())
+    return jsonify(profil.etat_cv()), 201
+
+
+@app.route("/api/profil/cv/dossier_latex", methods=["POST"])
+def api_profil_cv_dossier_latex():
+    donnees = request.get_json(silent=True) or {}
+    profil.definir_cv_dossier_latex(donnees.get("chemin"))
+    return jsonify(profil.etat_cv())
+
+
+@app.route("/api/profil/cv/texte", methods=["POST"])
+def api_profil_cv_texte():
+    donnees = request.get_json(silent=True) or {}
+    profil.definir_cv_texte(donnees.get("texte"))
+    return jsonify(profil.etat_cv())
+
+
+@app.route("/api/profil/cv", methods=["DELETE"])
+def api_profil_cv_supprimer():
+    profil.supprimer_cv()
+    return jsonify({"message": "CV supprimé."})
+
+
+# --- lettres de motivation et fiches d'entretien ---
+# Même forme pour les deux : une pièce liée à une entreprise (et à des offres),
+# créée par l'IA, par Claude Code, ou importée telle quelle depuis un fichier.
+
+def _liste_entiers(valeur):
+    """Liste d'entiers depuis du JSON déjà décodé, un texte JSON (« [1, 2] »),
+    ou une liste séparée par des virgules - selon que la requête soit du JSON
+    ou un formulaire multipart."""
+    if valeur in (None, "", []):
+        return []
+    if isinstance(valeur, str):
+        try:
+            valeur = json.loads(valeur)
+        except ValueError:
+            valeur = [morceau for morceau in valeur.split(",") if morceau.strip()]
+    if not isinstance(valeur, list):
+        valeur = [valeur]
+    try:
+        return [int(v) for v in valeur]
+    except (TypeError, ValueError):
+        raise ValeurNonAutorisee("Liste d'offres invalide.")
+
+
+def _booleen(valeur):
+    if isinstance(valeur, str):
+        return valeur.strip().lower() in ("1", "true", "on", "oui", "yes")
+    return bool(valeur)
+
+
+def _nom_entreprise_pour(candidature_ids, entreprise_nom):
+    """Le nom de l'entreprise de la requête, déduit de la première offre si absent."""
+    nom = (entreprise_nom or "").strip()
+    if nom or not candidature_ids:
+        return nom
+    return candidatures.recuperer_candidature(candidature_ids[0])["entreprise"]
+
+
+def _routes_pieces(prefixe, module, type_libelle):
+    """Déclare les routes d'un type de pièce (« lettres » ou « fiches »)."""
+
+    @app.route(f"/api/{prefixe}", endpoint=f"{prefixe}_lister")
+    def lister():
+        return jsonify(module["lister"](
+            entreprise_id=request.args.get("entreprise", type=int),
+            candidature_id=request.args.get("candidature", type=int),
+            recherche=request.args.get("recherche"),
+        ))
+
+    @app.route(f"/api/{prefixe}/<int:numero>", endpoint=f"{prefixe}_voir")
+    def voir(numero):
+        return jsonify(module["recuperer"](numero))
+
+    @app.route(f"/api/{prefixe}/<int:numero>", methods=["PATCH"], endpoint=f"{prefixe}_modifier")
+    def modifier(numero):
+        donnees = request.get_json(silent=True) or {}
+        champs = {c: v for c, v in donnees.items() if c in ("titre", "langue", "generale", "candidature_ids")}
+        if "candidature_ids" in champs:
+            champs["candidature_ids"] = _liste_entiers(champs["candidature_ids"])
+        if "generale" in champs:
+            champs["generale"] = _booleen(champs["generale"])
+        return jsonify(module["modifier"](numero, **champs))
+
+    @app.route(f"/api/{prefixe}/<int:numero>", methods=["DELETE"], endpoint=f"{prefixe}_supprimer")
+    def supprimer(numero):
+        module["supprimer"](numero)
+        return jsonify({"message": f"{type_libelle} n°{numero} supprimée."})
+
+    @app.route(f"/api/{prefixe}/importer", methods=["POST"], endpoint=f"{prefixe}_importer")
+    def importer():
+        fichier = request.files.get("fichier")
+        if fichier is None or not fichier.filename:
+            raise ValeurNonAutorisee("Aucun fichier reçu.")
+        ids = _liste_entiers(request.form.get("candidature_ids"))
+        numero = module["importer"](
+            _nom_entreprise_pour(ids, request.form.get("entreprise")),
+            fichier.filename, fichier.read(),
+            candidature_ids=ids or None, titre=request.form.get("titre"),
+            langue=request.form.get("langue"), generale=_booleen(request.form.get("generale")),
+        )
+        return jsonify(module["recuperer"](numero)), 201
+
+    @app.route(f"/api/{prefixe}/<int:numero>/telecharger", endpoint=f"{prefixe}_telecharger")
+    def telecharger(numero):
+        piece = module["recuperer"](numero)
+        if request.args.get("format") == "texte":
+            return send_file(
+                io.BytesIO((piece["contenu"] or "").encode("utf-8")), mimetype="text/markdown",
+                as_attachment=True, download_name=_nom_fichier_ascii(f"{piece['titre']}.md"),
+            )
+        if not piece["fichier_disponible"]:
+            raise EntiteIntrouvable("Le fichier est introuvable sur le disque.")
+        nom = piece["nom_fichier"] or Path(piece["chemin_fichier"]).name
+        return send_file(
+            reglages.chemin_reel(piece["chemin_fichier"]), as_attachment=True,
+            download_name=_nom_fichier_ascii(nom),
+        )
+
+    @app.route(f"/api/{prefixe}/<int:numero>/apercu", endpoint=f"{prefixe}_apercu")
+    def apercu(numero):
+        """Le PDF affiché dans la page (pas téléchargé), ou à défaut le texte."""
+        piece = module["recuperer"](numero)
+        if piece["apercu_pdf"]:
+            return send_file(reglages.chemin_reel(piece["chemin_fichier"]), mimetype="application/pdf")
+        return Response(piece["contenu"] or "", mimetype="text/plain; charset=utf-8")
+
+
+_routes_pieces("lettres", {
+    "lister": lettres.lister_lettres, "recuperer": lettres.recuperer_lettre,
+    "modifier": lettres.modifier_lettre, "supprimer": lettres.supprimer_lettre,
+    "importer": lettres.importer_lettre,
+}, "Lettre")
+
+_routes_pieces("fiches", {
+    "lister": fiches.lister_fiches, "recuperer": fiches.recuperer_fiche,
+    "modifier": fiches.modifier_fiche, "supprimer": fiches.supprimer_fiche,
+    "importer": fiches.importer_fiche,
+}, "Fiche")
+
+
+@app.route("/api/lettres/skill")
+def api_lettres_skill():
+    import lettres_skill
+
+    return send_file(
+        lettres_skill.zip_skill(),
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="azimut-lettre-motivation.skill",
+    )
+
+
+@app.route("/api/lettres/generer", methods=["POST"])
+def api_lettres_generer():
+    donnees = request.get_json(silent=True) or {}
+    numero = generation.generer_lettre(
+        donnees.get("entreprise"), _liste_entiers(donnees.get("candidature_ids")),
+        langue=donnees.get("langue"), generale=_booleen(donnees.get("generale")),
+    )
+    return jsonify(lettres.recuperer_lettre(numero)), 201
+
+
+@app.route("/api/fiches/generer", methods=["POST"])
+def api_fiches_generer():
+    donnees = request.get_json(silent=True) or {}
+    numero, avertissements = generation.generer_fiche(
+        donnees.get("entreprise"), _liste_entiers(donnees.get("candidature_ids")),
+        langue=donnees.get("langue"), date_entretien=donnees.get("date_entretien"),
+        lieu=donnees.get("lieu"), mode=donnees.get("mode"),
+        generale=_booleen(donnees.get("generale")),
+    )
+    return jsonify({**fiches.recuperer_fiche(numero), "avertissements": avertissements}), 201
+
+
+# --- notes d'entretien ---
+
+@app.route("/api/notes")
+def api_notes_lister():
+    return jsonify(notes_entretien.lister_notes(
+        entreprise_id=request.args.get("entreprise", type=int),
+        candidature_id=request.args.get("candidature", type=int),
+        recherche=request.args.get("recherche"),
+    ))
+
+
+@app.route("/api/notes", methods=["POST"])
+def api_notes_ajouter():
+    donnees = request.get_json(silent=True) or {}
+    numero = notes_entretien.ajouter_note(
+        entreprise_nom=donnees.get("entreprise"), candidature_id=donnees.get("candidature_id"),
+        titre=donnees.get("titre"), contenu=donnees.get("contenu") or "",
+        date_entretien=donnees.get("date_entretien"),
+    )
+    return jsonify(notes_entretien.recuperer_note(numero)), 201
+
+
+@app.route("/api/notes/<int:numero>")
+def api_notes_voir(numero):
+    return jsonify(notes_entretien.recuperer_note(numero))
+
+
+@app.route("/api/notes/<int:numero>", methods=["PATCH"])
+def api_notes_modifier(numero):
+    donnees = request.get_json(silent=True) or {}
+    return jsonify(notes_entretien.modifier_note(numero, **donnees))
+
+
+@app.route("/api/notes/<int:numero>", methods=["DELETE"])
+def api_notes_supprimer(numero):
+    notes_entretien.supprimer_note(numero)
+    return jsonify({"message": f"Note n°{numero} supprimée."})
+
+
 @app.route("/api/agent/tester", methods=["POST"])
 def api_agent_tester():
     import agent
@@ -493,7 +685,7 @@ def api_agent_analyser():
     return jsonify(proposition)
 
 
-# --- recherche, statistiques, agenda, sauvegarde ---
+# --- recherche, statistiques, sauvegarde ---
 
 @app.route("/api/recherche")
 def api_recherche():
@@ -527,52 +719,6 @@ def api_liens_verifier():
 def api_rapide_offre():
     donnees = request.get_json(silent=True) or {}
     return jsonify(rapide.creer_brouillon(donnees.get("lien"), donnees.get("texte"))), 201
-
-
-@app.route("/api/agenda")
-def api_agenda():
-    return jsonify(agenda.lister_echeances())
-
-
-@app.route("/api/agenda/ics")
-def api_agenda_ics():
-    """Téléchargement ponctuel - pour import manuel (Google Agenda, Outlook…)."""
-    contenu = agenda.generer_ics()
-    return send_file(
-        io.BytesIO(contenu.encode("utf-8")),
-        mimetype="text/calendar",
-        as_attachment=True,
-        download_name="azimut-agenda.ics",
-    )
-
-
-@app.route("/api/agenda/abonnement.ics")
-def api_agenda_abonnement():
-    """Même contenu, servi en ligne (pas en téléchargement) : c'est cette URL
-    qu'une appli de calendrier (webcal://) rappelle périodiquement pour se
-    tenir à jour tant qu'Azimut tourne."""
-    return Response(agenda.generer_ics(), mimetype="text/calendar")
-
-
-@app.route("/api/rappels/echeance", methods=["POST"])
-def api_rappels_echeance():
-    """Pousse une échéance précise vers l'app Rappels (macOS)."""
-    import rappels_macos
-
-    echeance = request.get_json(silent=True) or {}
-    for champ in ("date", "libelle", "entreprise", "poste"):
-        if not echeance.get(champ) and champ != "poste":
-            raise ValeurNonAutorisee(f"Champ manquant pour créer le rappel : {champ}.")
-    rappels_macos.pousser_echeance(echeance)
-    return jsonify({"ok": True})
-
-
-@app.route("/api/rappels/tout_pousser", methods=["POST"])
-def api_rappels_tout_pousser():
-    """Pousse toutes les échéances à venir vers l'app Rappels d'un coup."""
-    import rappels_macos
-
-    return jsonify(rappels_macos.pousser_toutes_les_echeances())
 
 
 @app.route("/api/sauvegarde", methods=["POST"])

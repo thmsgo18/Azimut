@@ -17,10 +17,6 @@ class DoublonCandidature(ErreurSuivi):
     """Une candidature existe déjà pour cette entreprise et ce poste."""
 
 
-class DoublonContact(ErreurSuivi):
-    """Un contact du même nom existe déjà pour cette entreprise."""
-
-
 class DoublonEntreprise(ErreurSuivi):
     """Une entreprise du même nom (à la casse/aux accents près) existe déjà."""
 

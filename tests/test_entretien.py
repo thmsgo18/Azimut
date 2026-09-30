@@ -1,4 +1,4 @@
-"""Tests de la fiche de préparation d'entretien."""
+"""Tests du récapitulatif d'une candidature (entretien.py)."""
 
 import sys
 import tempfile
@@ -9,10 +9,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import db
 from candidatures import ajouter_candidature
-from contacts import ajouter_contact
 from entreprises import ajouter_ou_recuperer_entreprise
 from entretien import generer_fiche_entretien
 from exceptions import EntiteIntrouvable
+from fiches import ajouter_fiche
+from lettres import ajouter_lettre
+from notes_entretien import ajouter_note
 
 
 class TestFicheEntretien(unittest.TestCase):
@@ -40,12 +42,17 @@ class TestFicheEntretien(unittest.TestCase):
             notes="Recruteuse très réactive.",
             chemin_db=self.chemin_db,
         )
-        ajouter_contact(
-            "AgentikCo",
-            "Marie Petit",
-            poste="Lead AI",
-            email="marie@agentik.co",
-            chemin_db=self.chemin_db,
+        ajouter_lettre(
+            "AgentikCo", "Madame, Monsieur, ma candidature.", candidature_ids=[numero],
+            titre="Lettre AgentikCo", chemin_db=self.chemin_db,
+        )
+        ajouter_fiche(
+            "AgentikCo", {"meta": {"company": "AgentikCo"}, "postes": [{"title": "Stage agents IA"}]},
+            candidature_ids=[numero], chemin_db=self.chemin_db,
+        )
+        ajouter_note(
+            candidature_id=numero, titre="Premier entretien",
+            contenu="Question posée : architecture des évals.", chemin_db=self.chemin_db,
         )
         fiche = generer_fiche_entretien(numero, chemin_db=self.chemin_db)
         # 1. En-tête
@@ -59,10 +66,12 @@ class TestFicheEntretien(unittest.TestCase):
         # 3. L'offre
         self.assertIn("## L'offre", fiche)
         self.assertIn("Concevoir des agents multi-étapes.", fiche)
-        # 4. Contacts
-        self.assertIn("## Contacts liés", fiche)
-        self.assertIn("Marie Petit", fiche)
-        self.assertIn("marie@agentik.co", fiche)
+        # 4. Préparation : lettres, fiches et notes liées à l'offre
+        self.assertIn("## Préparation", fiche)
+        self.assertIn("Lettre de motivation : Lettre AgentikCo", fiche)
+        self.assertIn("Fiche d'entretien : Fiche d'entretien - AgentikCo - Stage agents IA", fiche)
+        self.assertIn("Notes d'entretien", fiche)
+        self.assertIn("Question posée : architecture des évals.", fiche)
         # 5. Historique
         self.assertIn("## Historique de la candidature", fiche)
         self.assertIn("envoyée le 20/08/2026", fiche)
@@ -74,7 +83,7 @@ class TestFicheEntretien(unittest.TestCase):
         self.assertIn("non renseignée", fiche)  # date d'entretien absente
         self.assertIn("Aucun contexte enregistré", fiche)
         self.assertIn("Ni texte ni lien d'offre", fiche)
-        self.assertIn("Aucun contact identifié", fiche)
+        self.assertIn("Aucune lettre, fiche ni note d'entretien liée", fiche)
 
     def test_candidature_inconnue(self):
         with self.assertRaises(EntiteIntrouvable):

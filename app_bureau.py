@@ -22,10 +22,9 @@ from serveur import app
 
 def _port_libre():
     """Réserve un port local pour le serveur interne - de préférence toujours
-    le même (PORT_PREFERE) : un abonnement de calendrier (webcal://) pointe
-    vers ce port, il doit rester valide d'un lancement à l'autre. Ne bascule
-    sur un port éphémère que si ce port est déjà pris (rare : un autre
-    lancement d'Azimut, ou le serveur de développement)."""
+    le même (PORT_PREFERE), pour une adresse stable d'un lancement à l'autre.
+    Ne bascule sur un port éphémère que si ce port est déjà pris (rare : un
+    autre lancement d'Azimut, ou le serveur de développement)."""
     try:
         sonde = socket.socket()
         sonde.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

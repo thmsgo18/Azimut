@@ -1,22 +1,25 @@
 """Sauvegarde automatique de la base : une copie datée à chaque lancement,
-avec rotation (les plus anciennes sont supprimées au-delà de la limite)."""
+avec rotation (les plus anciennes sont supprimées au-delà de la limite).
 
-import shutil
+La copie passe par l'API de sauvegarde de SQLite : elle reste cohérente même
+si une écriture a lieu au même moment (une simple copie de fichier ne
+le garantit pas). Elle ne contient que la base - les fichiers (documents,
+lettres, fiches, CV) restent dans le dossier de données."""
+
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 
 import db
 import reglages
 
-DOSSIER_SAUVEGARDES_DEFAUT = Path(__file__).parent / "sauvegardes"
 NOMBRE_CONSERVE = 5
 
 
 def dossier_sauvegardes(chemin_db=None):
     """Dossier où ranger les sauvegardes : celui choisi dans Réglages, sinon
-    celui du projet par défaut."""
-    base = reglages.obtenir_reglage("dossier_donnees", chemin_db=chemin_db)
-    return Path(base) / "sauvegardes" if base else DOSSIER_SAUVEGARDES_DEFAUT
+    sauvegardes/ à côté de la base."""
+    return reglages.dossier_donnees_pour("sauvegardes", chemin_db=chemin_db)
 
 
 def sauvegarder_base(chemin_db=None, garder=NOMBRE_CONSERVE):
@@ -40,7 +43,13 @@ def sauvegarder_base(chemin_db=None, garder=NOMBRE_CONSERVE):
     while destination.exists():
         destination = dossier / f"{source.stem}-{horodatage}-{compteur}.db"
         compteur += 1
-    shutil.copy2(source, destination)
+    origine = sqlite3.connect(source)
+    copie = sqlite3.connect(destination)
+    try:
+        origine.backup(copie)
+    finally:
+        copie.close()
+        origine.close()
     existantes = sorted(dossier.glob(f"{source.stem}-*.db"))
     for ancienne in existantes[:-garder] if garder > 0 else []:
         ancienne.unlink(missing_ok=True)

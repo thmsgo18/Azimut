@@ -14,7 +14,6 @@ from candidatures import (
     modifier_candidature,
     verifier_doublon_candidature,
 )
-from contacts import ajouter_contact, lister_contacts, verifier_doublon_contact
 from entreprises import (
     ajouter_ou_recuperer_entreprise,
     lister_entreprises,
@@ -24,7 +23,6 @@ from exceptions import (
     ChampInconnu,
     ConflitMiseAJour,
     DoublonCandidature,
-    DoublonContact,
     DoublonEntreprise,
     EntiteIntrouvable,
     ValeurNonAutorisee,
@@ -163,35 +161,6 @@ class TestSuiviCandidatures(unittest.TestCase):
         self.assertEqual(len(rag), 1)
         with self.assertRaises(EntiteIntrouvable):
             modifier_candidature(999, chemin_db=self.chemin_db, statut="Refus")
-
-    # --- contacts ---
-
-    def test_doublon_contact_detecte(self):
-        numero = ajouter_contact(
-            "AgentikCo", "Marie Petit", poste="Lead AI", chemin_db=self.chemin_db
-        )
-        self.assertEqual(
-            verifier_doublon_contact("agentikco", "marie PETIT", chemin_db=self.chemin_db),
-            numero,
-        )
-        with self.assertRaises(DoublonContact):
-            ajouter_contact("AgentikCo", "Marie Petit", chemin_db=self.chemin_db)
-        # Même nom dans une autre entreprise : pas un doublon.
-        ajouter_contact("Mistral AI", "Marie Petit", chemin_db=self.chemin_db)
-        self.assertEqual(len(lister_contacts(chemin_db=self.chemin_db)), 2)
-
-    def test_lister_contacts_par_entreprise(self):
-        ajouter_contact("AgentikCo", "Marie Petit", chemin_db=self.chemin_db)
-        ajouter_contact("Mistral AI", "Paul Durand", chemin_db=self.chemin_db)
-        liste = lister_contacts(entreprise_nom="agentikco", chemin_db=self.chemin_db)
-        self.assertEqual([c["nom"] for c in liste], ["Marie Petit"])
-        self.assertEqual(lister_contacts(entreprise_nom="Inconnue", chemin_db=self.chemin_db), [])
-
-    def test_statut_contact_invalide_refuse(self):
-        with self.assertRaises(ValeurNonAutorisee):
-            ajouter_contact(
-                "AgentikCo", "Marie Petit", statut_contact="Injoignable", chemin_db=self.chemin_db
-            )
 
 
 if __name__ == "__main__":

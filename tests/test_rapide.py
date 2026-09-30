@@ -67,7 +67,6 @@ class TestCreerBrouillon(unittest.TestCase):
         proposition = {
             "entreprise": {"nom": "AgentikCo", "site_web": None},
             "candidature": {"poste": "Stage agents IA"},
-            "contacts": [],
         }
         with patch("agent.analyser_offre", return_value=proposition) as espion:
             resultat = rapide.creer_brouillon(

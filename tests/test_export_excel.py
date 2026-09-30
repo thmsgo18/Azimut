@@ -12,9 +12,9 @@ import openpyxl
 
 import db
 from candidatures import ajouter_candidature
-from contacts import ajouter_contact
 from entreprises import ajouter_ou_recuperer_entreprise
 from export_excel import exporter_excel
+from notes_entretien import ajouter_note
 
 
 class TestExportExcel(unittest.TestCase):
@@ -46,12 +46,12 @@ class TestExportExcel(unittest.TestCase):
         ajouter_candidature(
             "Mistral AI", "Stage RAG", statut="À préparer", chemin_db=cls.chemin_db
         )
-        ajouter_contact(
-            "AgentikCo",
-            "Marie Petit",
-            poste="Lead AI",
-            email="marie@agentik.co",
-            chemin_db=cls.chemin_db,
+        numero = ajouter_candidature(
+            "AgentikCo", "Stage évaluation", statut="Entretien", chemin_db=cls.chemin_db
+        )
+        ajouter_note(
+            candidature_id=numero, titre="Entretien technique",
+            contenu="Questions sur les évals.", date_entretien="2026-09-05", chemin_db=cls.chemin_db,
         )
         cls.chemin_xlsx = str(Path(cls.dossier.name) / "export.xlsx")
         exporter_excel(cls.chemin_xlsx, chemin_db=cls.chemin_db)
@@ -64,7 +64,7 @@ class TestExportExcel(unittest.TestCase):
     def test_quatre_onglets(self):
         self.assertEqual(
             self.wb.sheetnames,
-            ["Suivi candidatures", "Entreprises", "Contacts", "Tableau de bord"],
+            ["Suivi candidatures", "Entreprises", "Notes d'entretien", "Tableau de bord"],
         )
 
     def test_onglet_suivi_contenu(self):
@@ -81,17 +81,17 @@ class TestExportExcel(unittest.TestCase):
         self.assertEqual(ws["B3"].value, "20/08/2026")
         self.assertEqual(ws["H3"].value, "Envoyée")
         self.assertEqual(ws["M3"].value, 1400)
-        self.assertEqual(ws["A4"].value, "Mistral AI")
+        # Les candidatures sans date d'envoi passent en dernier.
+        self.assertEqual({ws["A4"].value, ws["A5"].value}, {"AgentikCo", "Mistral AI"})
+        self.assertEqual(ws["S1"].value, "Fiche entreprise")
+        self.assertIsNone(ws["T1"].value)  # plus de colonnes Contacts ni Notes entretien
 
     def test_liens_hyperlink_match(self):
         ws = self.wb["Suivi candidatures"]
-        self.assertIn("HYPERLINK", ws["T3"].value)
-        self.assertIn("MATCH($A3,Entreprises!$A:$A,0)", ws["T3"].value)
-        self.assertIn("MATCH($A3,Contacts!$A:$A,0)", ws["U3"].value)
+        self.assertIn("HYPERLINK", ws["S3"].value)
+        self.assertIn("MATCH($A3,Entreprises!$A:$A,0)", ws["S3"].value)
         ws_ent = self.wb["Entreprises"]
         self.assertIn("MATCH($A2,'Suivi candidatures'!$A:$A,0)", ws_ent["F2"].value)
-        ws_contacts = self.wb["Contacts"]
-        self.assertIn("MATCH($A2,'Suivi candidatures'!$A:$A,0)", ws_contacts["L2"].value)
 
     def test_listes_deroulantes(self):
         ws = self.wb["Suivi candidatures"]
@@ -100,8 +100,6 @@ class TestExportExcel(unittest.TestCase):
         formules = "\n".join(validations.values())
         self.assertIn("À préparer,Envoyée,Réponse reçue,Entretien,Refus,Accepté", formules)
         self.assertIn("Présentiel,Hybride,Full remote", formules)
-        ws_contacts = self.wb["Contacts"]
-        self.assertEqual(len(ws_contacts.data_validations.dataValidation), 2)
 
     def test_mise_en_forme_conditionnelle(self):
         ws = self.wb["Suivi candidatures"]
@@ -117,16 +115,22 @@ class TestExportExcel(unittest.TestCase):
 
     def test_onglet_entreprises(self):
         ws = self.wb["Entreprises"]
-        noms = {ws.cell(row=l, column=1).value for l in (2, 3)}
+        noms = {ws.cell(row=l, column=1).value for l in (2, 3)}  # deux entreprises
         self.assertEqual(noms, {"AgentikCo", "Mistral AI"})
         # Compteur de candidatures par formule, pas de valeur codée en dur.
         self.assertIn("COUNTIF('Suivi candidatures'!$A$3:$A$", ws["E2"].value)
 
-    def test_onglet_contacts(self):
-        ws = self.wb["Contacts"]
+    def test_onglet_notes_entretien(self):
+        ws = self.wb["Notes d'entretien"]
+        self.assertEqual(
+            [ws.cell(row=1, column=c).value for c in range(1, 6)],
+            ["Entreprise", "Offre", "Titre", "Date d'entretien", "Notes"],
+        )
         self.assertEqual(ws["A2"].value, "AgentikCo")
-        self.assertEqual(ws["B2"].value, "Marie Petit")
-        self.assertEqual(ws["E2"].value, "marie@agentik.co")
+        self.assertEqual(ws["B2"].value, "Stage évaluation")
+        self.assertEqual(ws["C2"].value, "Entretien technique")
+        self.assertEqual(ws["D2"].value, "05/09/2026")
+        self.assertEqual(ws["E2"].value, "Questions sur les évals.")
 
     def test_tableau_de_bord_formules(self):
         ws = self.wb["Tableau de bord"]
@@ -138,9 +142,10 @@ class TestExportExcel(unittest.TestCase):
         self.assertIn("=COUNTA('Suivi candidatures'!$A$3:$A$", ws["B12"].value)
         self.assertEqual(ws["B13"].value, "=IFERROR((B6+B7+B8+B9)/B12,0)")
         self.assertEqual(ws["B13"].number_format, "0%")
-        # Sections sous-domaines et contacts.
+        # Section sous-domaines ; plus aucune référence à l'ancien onglet Contacts.
         self.assertIn('"Orchestration multi-agents"', ws["B17"].value)
-        self.assertIn("Contacts!$H$2", ws["B25"].value)
+        toutes_formules = " ".join(str(c.value) for ligne in ws.iter_rows() for c in ligne if c.value)
+        self.assertNotIn("Contacts", toutes_formules)
 
     def test_export_relancable(self):
         # Relancer l'export ne perd rien : le fichier est régénéré depuis la base.

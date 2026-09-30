@@ -3,12 +3,14 @@ données dans la base - utile pour restaurer une sauvegarde ou fusionner.
 
 Règles :
 - toutes les écritures passent par les fonctions métier (jamais de SQL direct) ;
-- une ligne déjà présente (doublon entreprise+poste ou entreprise+contact) est
+- une ligne déjà présente (doublon entreprise+poste, ou note identique) est
   ignorée et signalée, jamais écrasée ;
 - une ligne invalide (valeur hors liste, date impossible) est ignorée et
   signalée avec son numéro de ligne - le reste du fichier est importé ;
 - les identifiants/mots de passe de portail ne figurent pas dans les exports :
-  la sauvegarde complète reste le fichier suivi_candidatures.db.
+  la sauvegarde complète reste le fichier suivi_candidatures.db ;
+- les anciens exports restent lisibles : l'onglet « Contacts » (section retirée)
+  est ignoré, et la colonne « Notes entretien » devient une note d'entretien.
 """
 
 from pathlib import Path
@@ -16,14 +18,15 @@ from pathlib import Path
 import openpyxl
 
 from candidatures import ajouter_candidature, verifier_doublon_candidature
-from contacts import ajouter_contact, verifier_doublon_contact
 from entreprises import ajouter_ou_recuperer_entreprise, lister_entreprises, modifier_entreprise
 from exceptions import ConflitMiseAJour, ErreurSuivi, ValeurNonAutorisee
+from notes_entretien import ajouter_note, lister_notes
 from valeurs import normaliser
 
 # Correspondance en-tête de colonne -> champ de la base, par onglet. Les
 # colonnes absentes de ces tables sont ignorées (ex. « Priorité » ou
-# « Nb relances » des anciens exports).
+# « Nb relances » des anciens exports). « Notes entretien » n'est plus un champ
+# de la candidature : l'import en fait une note (voir importer_excel).
 COLONNES_SUIVI = {
     "Entreprise": "entreprise",
     "Date d'envoi": "date_envoi",
@@ -43,7 +46,7 @@ COLONNES_SUIVI = {
     "Convention envoyée": "convention_envoyee",
     "Source": "source",
     "Notes": "notes",
-    "Notes entretien": "notes_entretien",
+    "Notes entretien": "notes_entretien_ancien",
 }
 
 COLONNES_ENTREPRISES = {
@@ -53,18 +56,12 @@ COLONNES_ENTREPRISES = {
     "Dernière recherche": "derniere_recherche",
 }
 
-COLONNES_CONTACTS = {
+COLONNES_NOTES = {
     "Entreprise": "entreprise",
-    "Nom": "nom",
-    "Poste": "poste",
-    "Équipe": "equipe",
-    "Email": "email",
-    "Téléphone": "telephone",
-    "LinkedIn": "linkedin",
-    "Statut": "statut_contact",
-    "Date de contact": "date_contact",
-    "Source": "source",
-    "Notes": "notes",
+    "Offre": "poste",
+    "Titre": "titre",
+    "Date d'entretien": "date_entretien",
+    "Notes": "contenu",
 }
 
 
@@ -112,7 +109,7 @@ def _nettoyer(valeurs):
 def importer_excel(chemin_fichier, chemin_db=None):
     """Importe un fichier d'export Excel et retourne un rapport détaillé.
 
-    Rapport : {"entreprises_ajoutees", "candidatures_ajoutees", "contacts_ajoutes",
+    Rapport : {"entreprises_ajoutees", "candidatures_ajoutees", "notes_ajoutees",
     "ignores" (doublons, liste de textes), "erreurs" (liste de textes)}.
     """
     chemin = Path(chemin_fichier).expanduser()
@@ -126,7 +123,7 @@ def importer_excel(chemin_fichier, chemin_db=None):
         )
     manquants = [
         onglet
-        for onglet in ("Suivi candidatures", "Entreprises", "Contacts")
+        for onglet in ("Suivi candidatures", "Entreprises")
         if onglet not in wb.sheetnames
     ]
     if manquants:
@@ -138,7 +135,7 @@ def importer_excel(chemin_fichier, chemin_db=None):
     rapport = {
         "entreprises_ajoutees": 0,
         "candidatures_ajoutees": 0,
-        "contacts_ajoutes": 0,
+        "notes_ajoutees": 0,
         "ignores": [],
         "erreurs": [],
     }
@@ -180,6 +177,7 @@ def importer_excel(chemin_fichier, chemin_db=None):
         valeurs = _nettoyer(valeurs)
         entreprise = valeurs.pop("entreprise", None)
         poste = valeurs.pop("poste", None)
+        ancienne_note = valeurs.pop("notes_entretien_ancien", None)
         # Statut abandonné des anciens exports : une relance reste une candidature envoyée.
         if normaliser(valeurs.get("statut")) == "relancee":
             valeurs["statut"] = "Envoyée"
@@ -194,30 +192,57 @@ def importer_excel(chemin_fichier, chemin_db=None):
                     f"Candidatures ligne {numero} : « {poste} » chez {entreprise} existe déjà."
                 )
                 continue
-            ajouter_candidature(entreprise, poste, chemin_db=chemin_db, **valeurs)
+            id_candidature = ajouter_candidature(entreprise, poste, chemin_db=chemin_db, **valeurs)
             rapport["candidatures_ajoutees"] += 1
+            if ancienne_note and str(ancienne_note).strip():
+                ajouter_note(
+                    candidature_id=id_candidature, contenu=str(ancienne_note),
+                    titre=f"Notes d'entretien - {poste}", chemin_db=chemin_db,
+                )
+                rapport["notes_ajoutees"] += 1
         except ErreurSuivi as erreur:
             rapport["erreurs"].append(f"Candidatures ligne {numero} : {erreur}")
 
-    # 3. Contacts (données dès la ligne 2).
-    for numero, valeurs in _lignes(wb["Contacts"], COLONNES_CONTACTS, 2):
-        valeurs = _nettoyer(valeurs)
-        entreprise = valeurs.pop("entreprise", None)
-        nom = valeurs.pop("nom", None)
-        if not entreprise or not nom:
-            rapport["erreurs"].append(
-                f"Contacts ligne {numero} : entreprise ou nom manquant - ligne ignorée."
-            )
-            continue
-        try:
-            if verifier_doublon_contact(entreprise, nom, chemin_db=chemin_db):
-                rapport["ignores"].append(
-                    f"Contacts ligne {numero} : {nom} ({entreprise}) existe déjà."
+    # 3. Notes d'entretien (données dès la ligne 2). L'onglet manque dans les
+    #    anciens exports : rien à faire dans ce cas.
+    if "Notes d'entretien" in wb.sheetnames:
+        deja = {
+            (normaliser(n["entreprise"]), normaliser(n["poste"]), normaliser(n["titre"]),
+             normaliser(n["contenu"]))
+            for n in lister_notes(chemin_db=chemin_db)
+        }
+        for numero, valeurs in _lignes(wb["Notes d'entretien"], COLONNES_NOTES, 2):
+            valeurs = _nettoyer(valeurs)
+            entreprise = valeurs.get("entreprise")
+            if not entreprise:
+                rapport["erreurs"].append(
+                    f"Notes d'entretien ligne {numero} : entreprise manquante - ligne ignorée."
                 )
                 continue
-            ajouter_contact(entreprise, nom, chemin_db=chemin_db, **valeurs)
-            rapport["contacts_ajoutes"] += 1
-        except ErreurSuivi as erreur:
-            rapport["erreurs"].append(f"Contacts ligne {numero} : {erreur}")
+            poste = valeurs.get("poste")
+            titre = valeurs.get("titre") or ""
+            contenu = str(valeurs.get("contenu") or "")
+            try:
+                candidature_id = (
+                    verifier_doublon_candidature(entreprise, poste, chemin_db=chemin_db) if poste else None
+                )
+                if poste and candidature_id is None:
+                    raise ValeurNonAutorisee(
+                        f"l'offre « {poste} » chez {entreprise} n'existe pas dans la base."
+                    )
+                cle = (normaliser(entreprise), normaliser(poste), normaliser(titre), normaliser(contenu))
+                if cle in deja:
+                    rapport["ignores"].append(
+                        f"Notes d'entretien ligne {numero} : « {titre or entreprise} » existe déjà."
+                    )
+                    continue
+                ajouter_note(
+                    entreprise_nom=entreprise, candidature_id=candidature_id, titre=titre or None,
+                    contenu=contenu, date_entretien=valeurs.get("date_entretien"), chemin_db=chemin_db,
+                )
+                deja.add(cle)
+                rapport["notes_ajoutees"] += 1
+            except ErreurSuivi as erreur:
+                rapport["erreurs"].append(f"Notes d'entretien ligne {numero} : {erreur}")
 
     return rapport

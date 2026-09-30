@@ -3,7 +3,7 @@ de l'interface bilingue - voir CLAUDE.md, section Portabilité.
 
 Ces tests n'ont pas besoin de tourner réellement sur Windows/Linux pour
 attraper les bugs qui s'y produisent : ils reproduisent la condition exacte
-(encodage de console forcé, absence de marqueur de plateforme, etc.) de
+(encodage de console forcé, etc.) de
 façon portable, pour attraper une régression avant même un push. La CI
 (.github/workflows/tests.yml) fait tourner cette même suite sur les 3 OS
 à chaque push - la vérification finale, pas seulement ce fichier."""
@@ -62,38 +62,6 @@ class TestCliEncodageUtf8(unittest.TestCase):
         self.assertEqual(resultat.returncode, 0, resultat.stderr)
         self.assertIn("1 candidature(s)", resultat.stdout)
         self.assertIn("Envoyée le", resultat.stdout)
-
-
-class TestValeursExposePlateforme(unittest.TestCase):
-    """/api/valeurs doit toujours exposer plateforme_macos (booléen) :
-    c'est sur ce champ que l'interface s'appuie pour masquer les extras
-    macOS (app Rappels) ailleurs."""
-
-    def setUp(self):
-        import db
-
-        self.dossier = tempfile.TemporaryDirectory()
-        self.chemin_origine = db.CHEMIN_DB
-        db.CHEMIN_DB = Path(self.dossier.name) / "test.db"
-        db.initialiser_base()
-        from serveur import app
-
-        app.config["TESTING"] = True
-        self.client = app.test_client()
-
-    def tearDown(self):
-        import db
-
-        db.CHEMIN_DB = self.chemin_origine
-        self.dossier.cleanup()
-
-    def test_plateforme_macos_est_un_booleen_coherent(self):
-        import platform
-
-        donnees = self.client.get("/api/valeurs").get_json()
-        self.assertIn("plateforme_macos", donnees)
-        self.assertIsInstance(donnees["plateforme_macos"], bool)
-        self.assertEqual(donnees["plateforme_macos"], platform.system() == "Darwin")
 
 
 @unittest.skipUnless(NODE, "node introuvable - impossible de charger les fichiers de langue")
@@ -158,6 +126,56 @@ class TestCoherenceLangues(unittest.TestCase):
             f"Clés présentes en anglais mais absentes de fr.js (probable faute "
             f"de frappe/oubli lors d'un renommage) : {sorted(orphelines)}",
         )
+
+    def test_toute_cle_utilisee_par_le_code_existe_en_francais(self):
+        """Une clé t("...") absente de fr.js s'afficherait brute (« lettres.nouvelle ») dans
+        l'interface : on relit le code JS et on vérifie que chaque clé existe."""
+        import re
+
+        codes = {
+            # Sans les commentaires : ils citent des exemples (t("section.cle")), pas des clés réelles.
+            nom: re.sub(r"/\*.*?\*/", "", (PROJET / "static" / nom).read_text(encoding="utf-8"), flags=re.S)
+            for nom in ("app.js", "preparation.js")
+        }
+        absentes = []
+        for nom, code in codes.items():
+            for cle in re.findall(r'\bt\(\s*"([\w.]+)"', code):
+                if cle not in self.cles_fr:
+                    absentes.append(f"{nom} : {cle}")
+            for cle in re.findall(r'\bpluriel\(\s*"([\w.]+)"', code):
+                for forme in ("singulier", "pluriel"):
+                    if f"{cle}_{forme}" not in self.cles_fr:
+                        absentes.append(f"{nom} : {cle}_{forme}")
+            # Clés composées avec la section (lettres / fiches) : t(`${section}.ajoutee`)
+            for suffixe in re.findall(r"\bt\(`\$\{section\}\.([\w]+)`", code):
+                for section in ("lettres", "fiches"):
+                    if f"{section}.{suffixe}" not in self.cles_fr:
+                        absentes.append(f"{nom} : {section}.{suffixe}")
+        self.assertEqual(absentes, [], f"Clés utilisées par le code mais absentes de fr.js : {absentes}")
+
+    def test_pas_de_cle_francaise_inutilisee(self):
+        """Une clé jamais utilisée est du texte mort qui traîne (souvent l'écho d'une
+        fonctionnalité retirée) : chaque clé de fr.js doit servir quelque part."""
+        import re
+
+        sources = "\n".join(
+            (PROJET / "static" / nom).read_text(encoding="utf-8")
+            for nom in ("app.js", "preparation.js", "index.html")
+        )
+        # Clés construites dynamiquement : leur préfixe suffit à les considérer comme utilisées.
+        dynamiques = ("profil.source_", "lettres.origine_", "fiches.origine_", "preparation.type_",
+                      "entretiens.cible_", "valeurs.")
+        inutilisees = []
+        for cle in sorted(self.cles_fr):
+            if cle.startswith(dynamiques):
+                continue
+            base = re.sub(r"_(singulier|pluriel)$", "", cle)
+            if cle not in sources and base not in sources:
+                # clé composée : section + suffixe (t(`${section}.suffixe`))
+                section, _, suffixe = cle.partition(".")
+                if not (section in ("lettres", "fiches") and f"${{section}}.{suffixe}" in sources):
+                    inutilisees.append(cle)
+        self.assertEqual(inutilisees, [], f"Clés de fr.js jamais utilisées : {inutilisees}")
 
     def test_data_i18n_de_index_html_existe_en_francais(self):
         html = (PROJET / "static" / "index.html").read_text(encoding="utf-8")

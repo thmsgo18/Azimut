@@ -11,11 +11,11 @@ import openpyxl
 
 import db
 from candidatures import ajouter_candidature, lister_candidatures
-from contacts import ajouter_contact, lister_contacts
 from entreprises import ajouter_ou_recuperer_entreprise, lister_entreprises
 from exceptions import ValeurNonAutorisee
 from export_excel import exporter_excel
 from import_excel import importer_excel
+from notes_entretien import ajouter_note, lister_notes
 
 
 class TestImportExcel(unittest.TestCase):
@@ -48,13 +48,15 @@ class TestImportExcel(unittest.TestCase):
             chemin_db=self.source,
         )
         ajouter_candidature("Mistral AI", "Stage RAG", chemin_db=self.source)
-        ajouter_contact(
-            "AgentikCo",
-            "Marie Petit",
-            poste="Lead AI",
-            email="marie@agentik.co",
-            statut_contact="Répondu",
-            date_contact="2026-08-12",
+        numero = next(
+            c["id"] for c in lister_candidatures(chemin_db=self.source) if c["poste"] == "Stage agents IA"
+        )
+        ajouter_note(
+            candidature_id=numero, titre="Entretien RH", contenu="Poste confirmé, équipe de 6.",
+            date_entretien="2026-08-12", chemin_db=self.source,
+        )
+        ajouter_note(
+            entreprise_nom="Mistral AI", titre="Veille", contenu="Levée de fonds récente.",
             chemin_db=self.source,
         )
 
@@ -68,7 +70,7 @@ class TestImportExcel(unittest.TestCase):
         self._peupler_source()
         rapport = importer_excel(self._exporter(), chemin_db=self.cible)
         self.assertEqual(rapport["candidatures_ajoutees"], 2)
-        self.assertEqual(rapport["contacts_ajoutes"], 1)
+        self.assertEqual(rapport["notes_ajoutees"], 2)
         self.assertEqual(rapport["entreprises_ajoutees"], 2)
         self.assertEqual(rapport["erreurs"], [])
         self.assertEqual(rapport["ignores"], [])
@@ -81,11 +83,12 @@ class TestImportExcel(unittest.TestCase):
         self.assertEqual(agentik["gratification"], 1400)
         self.assertEqual(agentik["texte_offre"], "Concevoir des agents multi-étapes.")
 
-        contacts_cible = lister_contacts(chemin_db=self.cible)
-        self.assertEqual(contacts_cible[0]["nom"], "Marie Petit")
-        self.assertEqual(contacts_cible[0]["date_contact"], "2026-08-12")
-        self.assertEqual(contacts_cible[0]["statut_contact"], "Répondu")
-        self.assertEqual(contacts_cible[0]["email"], "marie@agentik.co")
+        notes_cible = {n["titre"]: n for n in lister_notes(chemin_db=self.cible)}
+        self.assertEqual(notes_cible["Entretien RH"]["date_entretien"], "2026-08-12")
+        self.assertEqual(notes_cible["Entretien RH"]["poste"], "Stage agents IA")  # lien à l'offre rétabli
+        self.assertEqual(notes_cible["Entretien RH"]["contenu"], "Poste confirmé, équipe de 6.")
+        self.assertIsNone(notes_cible["Veille"]["poste"])  # note d'entreprise, sans offre
+        self.assertEqual(notes_cible["Veille"]["entreprise"], "Mistral AI")
 
         entreprises_cible = lister_entreprises(chemin_db=self.cible)
         agentik_ent = next(e for e in entreprises_cible if e["nom"] == "AgentikCo")
@@ -98,10 +101,11 @@ class TestImportExcel(unittest.TestCase):
         importer_excel(chemin, chemin_db=self.cible)
         rapport = importer_excel(chemin, chemin_db=self.cible)
         self.assertEqual(rapport["candidatures_ajoutees"], 0)
-        self.assertEqual(rapport["contacts_ajoutes"], 0)
+        self.assertEqual(rapport["notes_ajoutees"], 0)
         self.assertEqual(rapport["entreprises_ajoutees"], 0)
-        self.assertEqual(len(rapport["ignores"]), 3)  # 2 candidatures + 1 contact
+        self.assertEqual(len(rapport["ignores"]), 4)  # 2 candidatures + 2 notes
         self.assertEqual(len(lister_candidatures(chemin_db=self.cible)), 2)
+        self.assertEqual(len(lister_notes(chemin_db=self.cible)), 2)
 
     def test_ligne_exemple_ignoree(self):
         """La ligne 2 (exemple jaune) de l'export n'est jamais importée."""
@@ -158,6 +162,38 @@ class TestImportExcel(unittest.TestCase):
         self.assertEqual(agentik["contexte_actus"], "Contexte local à préserver.")
         self.assertTrue(any("AgentikCo" in ligne for ligne in rapport["ignores"]))
         self.assertEqual(rapport["candidatures_ajoutees"], 2)
+
+    def test_ancien_export_avec_contacts_et_notes_entretien(self):
+        """Un export d'avant la refonte (onglet Contacts, colonne « Notes entretien »)
+        reste importable : les contacts sont ignorés, l'ancien texte devient une note."""
+        self._peupler_source()
+        chemin = self._exporter()
+        wb = openpyxl.load_workbook(chemin)
+        wb.remove(wb["Notes d'entretien"])
+        wb.create_sheet("Contacts").append(["Entreprise", "Nom"])
+        ws = wb["Suivi candidatures"]
+        ws.cell(row=1, column=20, value="Notes entretien")  # ancienne colonne, après « Fiche entreprise »
+        ws.cell(row=3, column=20, value="Ancienne note tapée avant la refonte.")
+        wb.save(chemin)
+        rapport = importer_excel(chemin, chemin_db=self.cible)
+        self.assertEqual(rapport["erreurs"], [])
+        self.assertEqual(rapport["notes_ajoutees"], 1)
+        notes = lister_notes(chemin_db=self.cible)
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0]["contenu"], "Ancienne note tapée avant la refonte.")
+        self.assertIsNotNone(notes[0]["candidature_id"])
+
+    def test_note_sur_offre_inconnue_signalee_sans_bloquer(self):
+        self._peupler_source()
+        chemin = self._exporter()
+        wb = openpyxl.load_workbook(chemin)
+        ws = wb["Notes d'entretien"]
+        ws.cell(row=2, column=2, value="Offre qui n'existe pas")
+        wb.save(chemin)
+        rapport = importer_excel(chemin, chemin_db=self.cible)
+        self.assertEqual(len(rapport["erreurs"]), 1)
+        self.assertIn("Notes d'entretien ligne 2", rapport["erreurs"][0])
+        self.assertEqual(rapport["notes_ajoutees"], 1)  # l'autre note passe
 
     def test_export_sans_mot_de_passe_portail(self):
         """Les identifiants de portail ne sortent jamais dans un export Excel."""

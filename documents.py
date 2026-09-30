@@ -2,8 +2,8 @@
 
 Les fichiers sont copiés dans le dossier « documents » choisi par
 l'utilisateur (réglage dossier_donnees - voir reglages.py), ou à défaut dans
-documents/ à côté du code. La base ne stocke que les métadonnées et le chemin
-absolu. Ce dossier est exclu du zip de partage (fichiers personnels).
+documents/ à côté de la base. La base ne stocke que les métadonnées et le
+chemin absolu. Ce dossier est exclu du zip de partage (fichiers personnels).
 """
 
 import uuid
@@ -15,23 +15,13 @@ import reglages
 from exceptions import EntiteIntrouvable, ValeurNonAutorisee
 from valeurs import TYPES_DOCUMENT, normaliser
 
-DOSSIER_DOCUMENTS_DEFAUT = Path(__file__).parent / "documents"
 TAILLE_MAX = 25 * 1024 * 1024  # 25 Mo par fichier
 
 
 def dossier_documents(chemin_db=None):
     """Dossier où stocker les fichiers : celui choisi dans Réglages, sinon
-    celui du projet par défaut."""
-    base = reglages.obtenir_reglage("dossier_donnees", chemin_db=chemin_db)
-    return Path(base) / "documents" if base else DOSSIER_DOCUMENTS_DEFAUT
-
-
-def _chemin_reel(chemin_enregistre):
-    """Un chemin déjà absolu est utilisé tel quel ; un ancien chemin relatif
-    (fichiers enregistrés avant l'introduction du dossier configurable) est
-    résolu par rapport au projet, où ces fichiers ont réellement été écrits."""
-    chemin = Path(chemin_enregistre)
-    return chemin if chemin.is_absolute() else Path(__file__).parent / chemin_enregistre
+    documents/ à côté de la base."""
+    return reglages.dossier_donnees_pour("documents", chemin_db=chemin_db)
 
 
 def _nom_securise(nom_fichier):
@@ -107,7 +97,7 @@ def recuperer_document(id_document, chemin_db=None):
         if ligne is None:
             raise EntiteIntrouvable(f"Aucun document avec l'id {id_document}.")
         document = dict(ligne)
-        document["chemin_absolu"] = str(_chemin_reel(document["chemin"]))
+        document["chemin_absolu"] = str(reglages.chemin_reel(document["chemin"]))
         return document
     finally:
         conn.close()
@@ -132,4 +122,4 @@ def supprimer_pour_candidature(conn, candidature_id):
     ).fetchall()
     conn.execute("DELETE FROM documents WHERE candidature_id = ?", (candidature_id,))
     for ligne in lignes:
-        _chemin_reel(ligne["chemin"]).unlink(missing_ok=True)
+        reglages.chemin_reel(ligne["chemin"]).unlink(missing_ok=True)

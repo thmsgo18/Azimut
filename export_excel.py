@@ -2,9 +2,11 @@
 
 Reproduit le style du fichier « suivi candidatures.xlsx » existant (en-têtes
 bleu foncé, Arial, bordures grises, ligne d'exemple jaune, tableau de bord à
-formules) étendu aux 4 onglets du cahier des charges : Suivi candidatures,
-Entreprises, Contacts, Tableau de bord. La base reste la seule source de
-vérité : l'export peut être relancé à tout moment.
+formules) étendu aux 4 onglets : Suivi candidatures, Entreprises, Notes
+d'entretien, Tableau de bord. Les lettres et fiches d'entretien sont des
+fichiers : elles ne figurent pas dans l'export (elles vivent dans le dossier de
+données). La base reste la seule source de vérité : l'export peut être relancé
+à tout moment.
 """
 
 from pathlib import Path
@@ -16,16 +18,14 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from candidatures import lister_candidatures
-from contacts import lister_contacts
 from entreprises import lister_entreprises
+from notes_entretien import lister_notes
 from valeurs import (
     CONVENTIONS,
     MODES_TRAVAIL,
     SOURCES_CANDIDATURE,
-    SOURCES_CONTACT,
     SOUS_DOMAINES,
     STATUTS,
-    STATUTS_CONTACT,
     TYPES_CANDIDATURE,
 )
 
@@ -136,11 +136,9 @@ def _onglet_suivi(wb, liste, ligne_max):
         "Convention envoyée",
         "Source",
         "Notes",
-        "Notes entretien",
         "Fiche entreprise",
-        "Contacts",
     ]
-    largeurs = [20, 14, 26, 24, 30, 18, 20, 16, 16, 16, 20, 14, 18, 16, 16, 16, 14, 30, 24, 16, 14]
+    largeurs = [20, 14, 26, 24, 30, 18, 20, 16, 16, 16, 20, 14, 18, 16, 16, 16, 14, 30, 16]
     _preparer_onglet(ws, titres, largeurs, ligne_max, ligne_donnees=3)
 
     # Ligne 2 : exemple (fond jaune, italique), comme dans le fichier existant.
@@ -163,8 +161,6 @@ def _onglet_suivi(wb, liste, ligne_max):
         "Non",
         "LinkedIn",
         "Contact RH trouvé sur LinkedIn",
-        None,
-        None,
         None,
     ]
     for i, valeur in enumerate(exemple, start=1):
@@ -194,7 +190,6 @@ def _onglet_suivi(wb, liste, ligne_max):
             cand["convention_envoyee"],
             cand["source"],
             _texte_cellule(cand["notes"]),
-            _texte_cellule(cand.get("notes_entretien")),
         ]
         for col, valeur in enumerate(valeurs_ligne, start=1):
             ws.cell(row=ligne, column=col, value=valeur)
@@ -202,19 +197,13 @@ def _onglet_suivi(wb, liste, ligne_max):
             cellule = ws.cell(row=ligne, column=5)
             cellule.hyperlink = cand["lien_offre"]
             cellule.font = POLICE_LIEN
-        # Liens HYPERLINK + MATCH vers les onglets Entreprises et Contacts.
+        # Lien HYPERLINK + MATCH vers l'onglet Entreprises.
         fiche = ws.cell(
             row=ligne,
-            column=20,
+            column=19,
             value=f'=HYPERLINK("#Entreprises!A"&MATCH($A{ligne},Entreprises!$A:$A,0),"→ Entreprise")',
         )
         fiche.font = POLICE_LIEN
-        lien_contacts = ws.cell(
-            row=ligne,
-            column=21,
-            value=f'=IFERROR(HYPERLINK("#Contacts!A"&MATCH($A{ligne},Contacts!$A:$A,0),"→ Contacts"),"(aucun)")',
-        )
-        lien_contacts.font = POLICE_LIEN
 
     # Listes déroulantes sur les colonnes à valeurs autorisées.
     for colonne, valeurs in [
@@ -268,59 +257,30 @@ def _onglet_entreprises(wb, liste, ligne_max, ligne_max_suivi):
     return ws
 
 
-def _onglet_contacts(wb, liste, ligne_max):
-    ws = wb.create_sheet("Contacts")
-    titres = [
-        "Entreprise",
-        "Nom",
-        "Poste",
-        "Équipe",
-        "Email",
-        "Téléphone",
-        "LinkedIn",
-        "Statut",
-        "Date de contact",
-        "Source",
-        "Notes",
-        "Offre associée",
-    ]
-    largeurs = [20, 20, 24, 18, 24, 16, 30, 16, 16, 24, 30, 14]
+def _onglet_notes(wb, liste, ligne_max):
+    ws = wb.create_sheet("Notes d'entretien")
+    titres = ["Entreprise", "Offre", "Titre", "Date d'entretien", "Notes"]
+    largeurs = [22, 34, 30, 16, 80]
     _preparer_onglet(ws, titres, largeurs, ligne_max, ligne_donnees=2)
-    for i, contact in enumerate(liste):
+    for i, note in enumerate(liste):
         ligne = 2 + i
-        valeurs_ligne = [
-            contact["entreprise"],
-            contact["nom"],
-            contact["poste"],
-            contact["equipe"],
-            contact["email"],
-            contact["telephone"],
-            contact["linkedin"],
-            contact["statut_contact"],
-            _date_fr(contact["date_contact"]),
-            contact["source"],
-            _texte_cellule(contact["notes"]),
-        ]
-        for col, valeur in enumerate(valeurs_ligne, start=1):
-            ws.cell(row=ligne, column=col, value=valeur)
-        lien = ws.cell(
-            row=ligne,
-            column=12,
-            value=(
-                "=IFERROR(HYPERLINK(\"#'Suivi candidatures'!A\"&"
-                f"MATCH($A{ligne},'Suivi candidatures'!$A:$A,0),\"→ Offre\"),\"(aucune)\")"
-            ),
-        )
-        lien.font = POLICE_LIEN
-    for colonne, valeurs in [
-        ("H", STATUTS_CONTACT),
-        ("J", SOURCES_CONTACT),
-    ]:
-        _ajouter_validation(ws, colonne, valeurs, 2, ligne_max)
+        for col, valeur in enumerate(
+            [
+                note["entreprise"],
+                note["poste"],
+                note["titre"],
+                _date_fr(note["date_entretien"]),
+                _texte_cellule(note["contenu"]),
+            ],
+            start=1,
+        ):
+            cellule = ws.cell(row=ligne, column=col, value=valeur)
+            if col == 5:
+                cellule.alignment = Alignment(vertical="top", wrap_text=True)
     return ws
 
 
-def _onglet_tableau_de_bord(wb, ligne_max_suivi, ligne_max_contacts):
+def _onglet_tableau_de_bord(wb, ligne_max_suivi):
     ws = wb.create_sheet("Tableau de bord")
     ws.column_dimensions["A"].width = 26
     ws.column_dimensions["B"].width = 14
@@ -375,14 +335,6 @@ def _onglet_tableau_de_bord(wb, ligne_max_suivi, ligne_max_contacts):
     for i, domaine in enumerate(SOUS_DOMAINES):
         ligne_compteur(16 + i, domaine, f'=COUNTIF({plage_domaine},"{domaine}")')
 
-    plage_contacts = f"Contacts!$H$2:$H${ligne_max_contacts}"
-    entete_section(24, "Statut des contacts")
-    for i, statut in enumerate(STATUTS_CONTACT):
-        ligne_compteur(25 + i, statut, f'=COUNTIF({plage_contacts},"{statut}")')
-    ligne_compteur(
-        30, "Total contacts", f"=COUNTA(Contacts!$B$2:$B${ligne_max_contacts})", gras_libelle=True
-    )
-
     conseils = [
         "1. Ce fichier est généré automatiquement depuis la base de données "
         "(suivi_candidatures.db) : la base reste la seule source de vérité.",
@@ -391,8 +343,7 @@ def _onglet_tableau_de_bord(wb, ligne_max_suivi, ligne_max_contacts):
         "ou par Claude Code, puis relancer « export excel ».",
         "4. La ligne 2 (fond jaune, italique) de « Suivi candidatures » est un exemple de format.",
         "5. Les compteurs ci-contre se mettent à jour automatiquement via des formules.",
-        "6. Les colonnes « Fiche entreprise », « Contacts », « Candidatures » et « Offre associée » "
-        "sont des liens cliquables entre onglets.",
+        "6. Les colonnes « Fiche entreprise » et « Candidatures » sont des liens cliquables entre onglets.",
     ]
     ws["D3"].value = "Comment utiliser ce fichier"
     ws["D3"].font = Font(name="Arial", size=11, bold=True, color=BLEU_ENTETE)
@@ -409,17 +360,17 @@ def exporter_excel(chemin_sortie, chemin_db=None):
     """Génère le fichier .xlsx complet depuis la base et retourne son chemin."""
     liste_candidatures = lister_candidatures(chemin_db=chemin_db)
     liste_entreprises = lister_entreprises(chemin_db=chemin_db)
-    liste_contacts = lister_contacts(chemin_db=chemin_db)
+    liste_notes = lister_notes(chemin_db=chemin_db)
 
     ligne_max_suivi = max(LIGNE_MAX_MINI, len(liste_candidatures) + 2)
     ligne_max_entreprises = max(LIGNE_MAX_MINI, len(liste_entreprises) + 1)
-    ligne_max_contacts = max(LIGNE_MAX_MINI, len(liste_contacts) + 1)
+    ligne_max_notes = max(LIGNE_MAX_MINI, len(liste_notes) + 1)
 
     wb = Workbook()
     _onglet_suivi(wb, liste_candidatures, ligne_max_suivi)
     _onglet_entreprises(wb, liste_entreprises, ligne_max_entreprises, ligne_max_suivi)
-    _onglet_contacts(wb, liste_contacts, ligne_max_contacts)
-    _onglet_tableau_de_bord(wb, ligne_max_suivi, ligne_max_contacts)
+    _onglet_notes(wb, liste_notes, ligne_max_notes)
+    _onglet_tableau_de_bord(wb, ligne_max_suivi)
 
     chemin = Path(chemin_sortie).expanduser()
     chemin.parent.mkdir(parents=True, exist_ok=True)

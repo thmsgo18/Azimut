@@ -4,24 +4,29 @@ Exemples :
     python cli.py candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée
     python cli.py candidatures lister --statut Entretien
     python cli.py candidatures modifier 12 --statut "Réponse reçue"
-    python cli.py contacts ajouter --entreprise "AgentikCo" --nom "Marie Petit" --poste "Lead AI"
+    python cli.py lettres importer --entreprise "AgentikCo" --fichier ma-lettre.pdf
+    python cli.py notes ajouter --entreprise "AgentikCo" --titre "Entretien RH" --contenu "..."
     python cli.py export excel --sortie suivi_candidatures.xlsx
     python cli.py entretien preparer 12
 """
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 import candidatures
-import contacts
 import db
 import doublons
 import entreprises
 import entretien
 import export_excel
+import fiches
 import import_csv
 import import_excel
+import lettres
+import notes_entretien
+import profil
 from exceptions import ErreurSuivi
 
 
@@ -99,19 +104,6 @@ CHAMPS_CANDIDATURE = {
     "portail_mdp": "portail_mdp",
 }
 
-CHAMPS_CONTACT = {
-    "poste": "poste",
-    "equipe": "equipe",
-    "email": "email",
-    "telephone": "telephone",
-    "linkedin": "linkedin",
-    "statut_contact": "statut_contact",
-    "date_contact": "date_contact",
-    "source": "source",
-    "notes": "notes",
-    "nom": "nom",
-}
-
 CHAMPS_ENTREPRISE = {
     "nom": "nom",
     "site_web": "site_web",
@@ -142,20 +134,6 @@ def _options_candidature(parseur, avec_poste_option):
     parseur.add_argument("--portail-url", dest="portail_url", help="URL du portail de candidature")
     parseur.add_argument("--portail-identifiant", dest="portail_identifiant", help="Identifiant sur le portail")
     parseur.add_argument("--portail-mdp", dest="portail_mdp", help="Mot de passe du portail (stocké en clair dans la base locale)")
-
-
-def _options_contact(parseur, avec_nom_option):
-    if avec_nom_option:
-        parseur.add_argument("--nom", help="Nouveau nom du contact")
-    parseur.add_argument("--poste", help="Poste du contact")
-    parseur.add_argument("--equipe", help="Équipe du contact")
-    parseur.add_argument("--email", help="Adresse email du contact")
-    parseur.add_argument("--telephone", help="Numéro de téléphone du contact")
-    parseur.add_argument("--linkedin", help="URL du profil LinkedIn du contact")
-    parseur.add_argument("--statut", dest="statut_contact", help="Statut du contact")
-    parseur.add_argument("--date-contact", dest="date_contact", help="Date de prise de contact")
-    parseur.add_argument("--source", help="Où le contact a été trouvé")
-    parseur.add_argument("--notes", help="Notes libres")
 
 
 def construire_analyseur():
@@ -210,22 +188,6 @@ def construire_analyseur():
     fusionner.add_argument("conserver", type=int, help="Numéro de l'entreprise à conserver")
     fusionner.add_argument("supprimer", type=int, help="Numéro de l'entreprise à fusionner dedans")
 
-    # --- contacts ---
-    cont = sections.add_parser("contacts", help="Gérer les contacts")
-    actions = cont.add_subparsers(dest="action", required=True, metavar="action")
-
-    ajouter = actions.add_parser("ajouter", help="Ajouter un contact")
-    ajouter.add_argument("--entreprise", required=True, help="Nom de l'entreprise")
-    ajouter.add_argument("--nom", required=True, help="Nom du contact")
-    _options_contact(ajouter, avec_nom_option=False)
-
-    lister = actions.add_parser("lister", help="Lister les contacts")
-    lister.add_argument("--entreprise", help="Filtrer par entreprise")
-
-    modifier = actions.add_parser("modifier", help="Modifier un contact")
-    modifier.add_argument("id", type=int, help="Numéro du contact")
-    _options_contact(modifier, avec_nom_option=True)
-
     # --- export ---
     export = sections.add_parser("export", help="Exporter la base")
     actions = export.add_subparsers(dest="action", required=True, metavar="action")
@@ -261,11 +223,90 @@ def construire_analyseur():
     )
 
     # --- entretien ---
-    entretien_p = sections.add_parser("entretien", help="Préparer un entretien")
+    entretien_p = sections.add_parser("entretien", help="Récapitulatif d'une candidature")
     actions = entretien_p.add_subparsers(dest="action", required=True, metavar="action")
-    preparer = actions.add_parser("preparer", help="Générer la fiche de préparation")
+    preparer = actions.add_parser("preparer", help="Générer le récapitulatif de la candidature (Markdown)")
     preparer.add_argument("id", type=int, help="Numéro de la candidature")
-    preparer.add_argument("--sortie", help="Enregistrer la fiche dans un fichier .md")
+    preparer.add_argument("--sortie", help="Enregistrer le récapitulatif dans un fichier .md")
+
+    # --- profil (CV) ---
+    profil_p = sections.add_parser(
+        "profil", help="Gérer le profil (CV) utilisé pour les lettres de motivation"
+    )
+    actions = profil_p.add_subparsers(dest="action", required=True, metavar="action")
+    actions.add_parser("cv", help="Afficher le texte du CV configuré (voir Réglages > Profil)")
+
+    # --- lettres de motivation et fiches d'entretien ---
+    for section, libelle, article in (
+        ("lettres", "lettres de motivation", "une lettre"),
+        ("fiches", "fiches d'entretien", "une fiche"),
+    ):
+        pieces_p = sections.add_parser(section, help=f"Gérer les {libelle}")
+        actions = pieces_p.add_subparsers(dest="action", required=True, metavar="action")
+
+        if section == "lettres":
+            ajouter = actions.add_parser(
+                "ajouter", help="Enregistrer une lettre dont le texte est déjà rédigé"
+            )
+            ajouter.add_argument("--fichier", required=True, help="Fichier texte de la lettre (.md/.txt)")
+        else:
+            ajouter = actions.add_parser(
+                "ajouter", help="Enregistrer une fiche à partir de données JSON (rendu PDF par Azimut)"
+            )
+            ajouter.add_argument(
+                "--json", dest="fichier", required=True,
+                help="Fichier JSON de la fiche (format décrit dans fiches_pdf.py)",
+            )
+        importer = actions.add_parser(
+            "importer", help=f"Ajouter {article} déjà faite (PDF, Word ou texte), conservée telle quelle"
+        )
+        importer.add_argument("--fichier", required=True, help="Chemin du fichier à ajouter")
+        for parseur in (ajouter, importer):
+            parseur.add_argument("--entreprise", required=True, help="Nom de l'entreprise")
+            parseur.add_argument(
+                "--poste", help="Intitulé du poste - lie automatiquement l'offre suivie chez cette entreprise"
+            )
+            parseur.add_argument("--titre", help="Titre affiché dans Azimut (défaut : entreprise + poste)")
+            parseur.add_argument("--langue", help="Langue (ex. fr, en)")
+            parseur.add_argument(
+                "--candidature-id", dest="candidature_id", type=int, action="append",
+                help="Numéro de candidature à lier (répétable) - prioritaire sur --poste",
+            )
+            parseur.add_argument(
+                "--generale", action="store_true",
+                help="Porte aussi sur l'entreprise en général (pas seulement les offres liées)",
+            )
+
+        lister = actions.add_parser("lister", help=f"Lister les {libelle}")
+        lister.add_argument("--entreprise", help="Filtrer par nom d'entreprise")
+        lister.add_argument("--recherche", help="Recherche texte (titre, contenu, entreprise)")
+
+        supprimer = actions.add_parser("supprimer", help=f"Supprimer {article}")
+        supprimer.add_argument("id", type=int, help="Numéro")
+
+    # --- notes d'entretien ---
+    notes_p = sections.add_parser("notes", help="Gérer les notes d'entretien")
+    actions = notes_p.add_subparsers(dest="action", required=True, metavar="action")
+
+    ajouter = actions.add_parser("ajouter", help="Ajouter une note d'entretien")
+    ajouter.add_argument("--entreprise", help="Nom de l'entreprise (note sur l'entreprise)")
+    ajouter.add_argument(
+        "--candidature-id", dest="candidature_id", type=int, help="Numéro de l'offre (note sur une offre précise)"
+    )
+    ajouter.add_argument("--titre", help="Titre de la note")
+    ajouter.add_argument("--date-entretien", dest="date_entretien", help="Date de l'entretien")
+    ajouter.add_argument("--contenu", help="Texte de la note")
+    ajouter.add_argument("--fichier", help="Fichier texte dont le contenu devient la note")
+
+    lister = actions.add_parser("lister", help="Lister les notes d'entretien")
+    lister.add_argument("--entreprise", help="Filtrer par nom d'entreprise")
+    lister.add_argument("--recherche", help="Recherche texte (titre, contenu, entreprise, poste)")
+
+    voir = actions.add_parser("voir", help="Afficher une note d'entretien")
+    voir.add_argument("id", type=int, help="Numéro de la note")
+
+    supprimer = actions.add_parser("supprimer", help="Supprimer une note d'entretien")
+    supprimer.add_argument("id", type=int, help="Numéro de la note")
 
     # --- init ---
     sections.add_parser("init", help="Créer la base de données si besoin")
@@ -348,6 +389,10 @@ def executer(args):
             for libelle, valeur in libelles:
                 if valeur not in (None, ""):
                     print(f"  {libelle} : {valeur}")
+            if cand["texte_offre"]:
+                print("  Texte de l'offre :")
+                for ligne in str(cand["texte_offre"]).splitlines():
+                    print(f"    {ligne}")
 
     elif args.section == "entreprises":
         if args.action == "ajouter":
@@ -391,43 +436,13 @@ def executer(args):
             print(
                 f"✓ Fusion effectuée dans « {resultat['nom']} » (n°{resultat['id']}) : "
                 f"{resultat['candidatures_deplacees']} candidature(s), "
-                f"{resultat['contacts_deplaces']} contact(s) déplacé(s)"
+                f"{resultat['lettres_deplacees']} lettre(s), "
+                f"{resultat['fiches_deplacees']} fiche(s), "
+                f"{resultat['notes_deplacees']} note(s) d'entretien déplacé(s)"
                 + (f", champs complétés : {', '.join(resultat['champs_completes'])}"
                    if resultat["champs_completes"] else "")
                 + "."
             )
-
-    elif args.section == "contacts":
-        if args.action == "ajouter":
-            champs = _champs_fournis(args, CHAMPS_CONTACT)
-            champs.pop("nom", None)
-            numero = contacts.ajouter_contact(
-                args.entreprise, args.nom, chemin_db=chemin_db, **champs
-            )
-            print(f"✓ Contact n°{numero} ajouté : {args.nom} ({args.entreprise}).")
-        elif args.action == "lister":
-            liste = contacts.lister_contacts(entreprise_nom=args.entreprise, chemin_db=chemin_db)
-            if not liste:
-                print("Aucun contact trouvé.")
-                return
-            _afficher_table(
-                [
-                    ("N°", 5), ("Entreprise", 20), ("Nom", 20), ("Poste", 22),
-                    ("Email", 24), ("Téléphone", 14), ("LinkedIn", 24), ("Statut", 14),
-                ],
-                [
-                    (
-                        c["id"], c["entreprise"], c["nom"], c["poste"],
-                        c["email"], c["telephone"], c["linkedin"], c["statut_contact"],
-                    )
-                    for c in liste
-                ],
-            )
-            print(f"\n{len(liste)} contact(s).")
-        elif args.action == "modifier":
-            champs = _champs_fournis(args, CHAMPS_CONTACT)
-            contacts.modifier_contact(args.id, chemin_db=chemin_db, **champs)
-            print(f"✓ Contact n°{args.id} modifié ({', '.join(champs)}).")
 
     elif args.section == "export":
         chemin = export_excel.exporter_excel(args.sortie, chemin_db=chemin_db)
@@ -437,7 +452,7 @@ def executer(args):
         rapport = import_excel.importer_excel(args.fichier, chemin_db=chemin_db)
         print(
             f"✓ Import terminé : {rapport['candidatures_ajoutees']} candidature(s), "
-            f"{rapport['contacts_ajoutes']} contact(s), "
+            f"{rapport['notes_ajoutees']} note(s) d'entretien, "
             f"{rapport['entreprises_ajoutees']} entreprise(s) ajoutée(s)."
         )
         for ligne in rapport["ignores"]:
@@ -478,6 +493,16 @@ def executer(args):
         for ligne in rapport["erreurs"]:
             print(f"  ✗ {ligne}")
 
+    elif args.section == "profil":
+        if args.action == "cv":
+            print(profil.obtenir_cv_texte(chemin_db=chemin_db))
+
+    elif args.section in ("lettres", "fiches"):
+        _executer_pieces(args, chemin_db)
+
+    elif args.section == "notes":
+        _executer_notes(args, chemin_db)
+
     elif args.section == "entretien":
         fiche = entretien.generer_fiche_entretien(args.id, chemin_db=chemin_db)
         if args.sortie:
@@ -487,6 +512,130 @@ def executer(args):
             print(f"✓ Fiche d'entretien enregistrée : {chemin}")
         else:
             print(fiche)
+
+
+def _candidatures_a_lier(args, chemin_db):
+    """Numéros de candidatures à lier : --candidature-id (répétable), sinon
+    l'offre suivie qui porte exactement l'intitulé --poste chez cette entreprise."""
+    ids = list(dict.fromkeys(args.candidature_id or []))
+    if not ids and args.poste:
+        id_auto = candidatures.verifier_doublon_candidature(
+            args.entreprise, args.poste, chemin_db=chemin_db
+        )
+        if id_auto is not None:
+            ids = [id_auto]
+    return ids
+
+
+def _executer_pieces(args, chemin_db):
+    """Commandes communes aux lettres de motivation et aux fiches d'entretien."""
+    if args.section == "lettres":
+        module = {
+            "ajouter": lettres.ajouter_lettre, "importer": lettres.importer_lettre,
+            "lister": lettres.lister_lettres, "supprimer": lettres.supprimer_lettre,
+            "recuperer": lettres.recuperer_lettre,
+        }
+        nom = "lettre"
+    else:
+        module = {
+            "ajouter": fiches.ajouter_fiche, "importer": fiches.importer_fiche,
+            "lister": fiches.lister_fiches, "supprimer": fiches.supprimer_fiche,
+            "recuperer": fiches.recuperer_fiche,
+        }
+        nom = "fiche"
+
+    if args.action in ("ajouter", "importer"):
+        chemin_fichier = Path(args.fichier).expanduser()
+        if not chemin_fichier.is_file():
+            raise ErreurSuivi(f"Fichier introuvable : {chemin_fichier}.")
+        ids = _candidatures_a_lier(args, chemin_db)
+        commun = dict(
+            candidature_ids=ids or None, titre=args.titre, langue=args.langue,
+            generale=args.generale, chemin_db=chemin_db,
+        )
+        if args.action == "importer":
+            numero = module["importer"](
+                args.entreprise, chemin_fichier.name, chemin_fichier.read_bytes(), **commun
+            )
+        elif args.section == "lettres":
+            numero = module["ajouter"](
+                args.entreprise, chemin_fichier.read_text(encoding="utf-8"),
+                source="claude_code", **commun,
+            )
+        else:
+            try:
+                donnees = json.loads(chemin_fichier.read_text(encoding="utf-8"))
+            except ValueError as erreur:
+                raise ErreurSuivi(f"JSON invalide dans {chemin_fichier} : {erreur}")
+            numero = module["ajouter"](args.entreprise, donnees, source="claude_code", **commun)
+        piece = module["recuperer"](numero, chemin_db=chemin_db)
+        print(
+            f"✓ {nom.capitalize()} n°{numero} enregistrée pour {args.entreprise} : "
+            f"{piece.get('chemin_fichier') or 'texte seul (aucun fichier)'}"
+        )
+    elif args.action == "lister":
+        liste = module["lister"](recherche=args.recherche, chemin_db=chemin_db)
+        if args.entreprise:
+            cible = args.entreprise.strip().casefold()
+            liste = [p for p in liste if p["entreprise"].strip().casefold() == cible]
+        if not liste:
+            print(f"Aucune {nom} trouvée.")
+            return
+        _afficher_table(
+            [("N°", 5), ("Entreprise", 22), ("Titre", 48), ("Origine", 12), ("Créée le", 10)],
+            [
+                (p["id"], p["entreprise"], p["titre"], p["source"], _date_fr(p["date_creation"]))
+                for p in liste
+            ],
+        )
+        print(f"\n{len(liste)} {nom}(s).")
+    elif args.action == "supprimer":
+        module["supprimer"](args.id, chemin_db=chemin_db)
+        print(f"✓ {nom.capitalize()} n°{args.id} supprimée.")
+
+
+def _executer_notes(args, chemin_db):
+    if args.action == "ajouter":
+        contenu = args.contenu or ""
+        if args.fichier:
+            chemin_fichier = Path(args.fichier).expanduser()
+            if not chemin_fichier.is_file():
+                raise ErreurSuivi(f"Fichier introuvable : {chemin_fichier}.")
+            contenu = chemin_fichier.read_text(encoding="utf-8")
+        numero = notes_entretien.ajouter_note(
+            entreprise_nom=args.entreprise, candidature_id=args.candidature_id, titre=args.titre,
+            contenu=contenu, date_entretien=args.date_entretien, chemin_db=chemin_db,
+        )
+        note = notes_entretien.recuperer_note(numero, chemin_db=chemin_db)
+        print(f"✓ Note n°{numero} ajoutée : {note['titre']} ({note['entreprise']}).")
+    elif args.action == "lister":
+        liste = notes_entretien.lister_notes(recherche=args.recherche, chemin_db=chemin_db)
+        if args.entreprise:
+            cible = args.entreprise.strip().casefold()
+            liste = [n for n in liste if n["entreprise"].strip().casefold() == cible]
+        if not liste:
+            print("Aucune note d'entretien trouvée.")
+            return
+        _afficher_table(
+            [("N°", 5), ("Entreprise", 22), ("Offre", 30), ("Titre", 30), ("Entretien le", 12)],
+            [
+                (n["id"], n["entreprise"], n["poste"], n["titre"],
+                 _date_fr(n["date_entretien"] or n["date_creation"][:10]))
+                for n in liste
+            ],
+        )
+        print(f"\n{len(liste)} note(s).")
+    elif args.action == "voir":
+        note = notes_entretien.recuperer_note(args.id, chemin_db=chemin_db)
+        print(f"Note n°{note['id']} - {note['titre']}")
+        print(f"  Entreprise : {note['entreprise']}" + (f" - {note['poste']}" if note["poste"] else ""))
+        if note["date_entretien"]:
+            print(f"  Entretien le : {_date_fr(note['date_entretien'])}")
+        print()
+        print(note["contenu"])
+    elif args.action == "supprimer":
+        notes_entretien.supprimer_note(args.id, chemin_db=chemin_db)
+        print(f"✓ Note n°{args.id} supprimée.")
 
 
 def principal(arguments=None):

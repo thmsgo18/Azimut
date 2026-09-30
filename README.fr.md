@@ -23,7 +23,7 @@
 
 ---
 
-Azimut centralise toute une recherche de stage - candidatures, entreprises, contacts, documents, entretiens - dans une seule base SQLite locale, derrière une interface soignée qui s'ouvre comme n'importe quelle application de bureau. Pensé au départ pour un M2 IA, il ne fait aucune hypothèse sur le domaine : il convient à n'importe quelle recherche de stage ou d'alternance.
+Azimut centralise toute une recherche de stage - candidatures, entreprises, lettres de motivation, fiches et notes d'entretien, documents - dans une seule base SQLite locale, derrière une interface soignée qui s'ouvre comme n'importe quelle application de bureau. Pensé au départ pour un M2 IA, il ne fait aucune hypothèse sur le domaine : il convient à n'importe quelle recherche de stage ou d'alternance.
 
 Aucun compte, aucun cloud, aucun abonnement. Tout vit dans un seul fichier, sur ta machine.
 
@@ -41,6 +41,13 @@ Aucun compte, aucun cloud, aucun abonnement. Tout vit dans un seul fichier, sur 
 <p align="center">
   <img src="docs/screenshot-pipeline.png" width="800" alt="Pipeline kanban">
 </p>
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshot-lettres.png" alt="Lettres de motivation, liées à une offre ou à l'entreprise"></td>
+<td width="50%"><img src="docs/screenshot-entretien.png" alt="Note d'entretien enregistrée au fil de la frappe, avec le contexte de l'offre"></td>
+</tr>
+</table>
 
 <p align="center"><sub>Captures de l'application réelle, remplie de données de démonstration.</sub></p>
 
@@ -182,20 +189,21 @@ Le premier lancement installe les dépendances (1 à 3 minutes), puis la fenêtr
 ### Mettre à jour Azimut sans perdre ses données
 
 - **Avec Git** : dans le dossier d'Azimut, `git pull`, puis relance.
-- **Avec le ZIP** : télécharge le nouveau ZIP et décompresse-le. Copie ton fichier **`suivi_candidatures.db`** de l'ancien dossier vers le nouveau, ainsi que les dossiers `documents` et `sauvegardes` si tu as gardé l'emplacement par défaut. Supprime ensuite l'ancien dossier. Au premier lancement, la nouvelle version met ta base à jour toute seule, et garde une copie de sécurité de l'ancienne.
+- **Avec le ZIP** : télécharge le nouveau ZIP et décompresse-le. Copie ton fichier **`suivi_candidatures.db`** de l'ancien dossier vers le nouveau, ainsi que les dossiers `documents`, `lettres`, `fiches`, `profil` et `sauvegardes` si tu as gardé l'emplacement par défaut. Supprime ensuite l'ancien dossier. Au premier lancement, la nouvelle version met ta base à jour toute seule, et garde une copie de sécurité de l'ancienne.
 
 ## Fonctionnalités
 
 - **Liste & pipeline kanban** - vue liste filtrable par défaut (statut modifiable en un clic, lien direct vers l'offre), ou kanban en glisser-déposer.
-- **Entreprises & contacts** - liés à chaque candidature, avec une détection de doublons qui repère « Mistral » vs « Mistral AI ».
+- **Entreprises** - liées à chaque candidature, avec une détection de doublons qui repère « Mistral » vs « Mistral AI ».
+- **Lettres de motivation** - génère-les avec l'IA, rédige-les avec Claude Code, ou **glisse-dépose celles que tu as déjà écrites** (PDF, Word, texte). Chaque lettre est liée à une entreprise et à une ou plusieurs de ses offres, ou à l'entreprise en général.
+- **Fiches d'entretien** - présentation de l'entreprise, détail des postes, questions à poser : générées par l'IA (en PDF) ou ajoutées telles quelles.
+- **Notes d'entretien** - une vraie prise de notes, enregistrée au fil de la frappe, sur une entreprise ou une offre précise.
 - **Tableau de bord & statistiques** - entonnoir, taux de réponse par source, courbe hebdomadaire, objectif hebdo.
-- **Agenda** - vue mois/2 semaines, export vers Calendrier (Mac), Google Agenda, ou `.ics`.
-- **Fiche de préparation d'entretien** et un mode entretien en écran partagé avec prise de notes en direct.
 - **Saisie assistée par IA** (optionnelle, tout fournisseur) - colle une offre, le formulaire se pré-remplit. Rien n'est écrit sans ta confirmation.
-- **Export/import Excel**, import CSV depuis LinkedIn/Indeed, sauvegardes automatiques.
+- **Export/import Excel**, import CSV depuis LinkedIn/Indeed, sauvegardes automatiques de la base.
 - **100 % local** - rien ne quitte ta machine, sauf export explicite ou activation de l'assistant IA.
 
-Quelques extras (app Rappels, vue compagnon iPhone) sont propres à macOS et détaillés dans [la doc complète](#docs).
+Quelques extras (vue compagnon iPhone/iPad, capture rapide depuis Safari) sont détaillés dans [la doc complète](#docs).
 
 ## Ligne de commande & IA
 

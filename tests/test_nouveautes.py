@@ -1,5 +1,5 @@
 """Tests des nouveautés : journal, documents, réglages, recherche globale,
-statistiques avancées, agenda (.ics), sauvegardes, notes d'entretien, agent."""
+statistiques avancées, sauvegardes, agent."""
 
 import io
 import sys
@@ -116,22 +116,43 @@ class TestModulesNouveautes(unittest.TestCase):
     # --- recherche globale ---
 
     def test_recherche_types_et_accents(self):
-        from contacts import ajouter_contact
+        from notes_entretien import ajouter_note
         from recherche import rechercher
 
         self._candidature(notes="Équipe très réactive, poste orienté évaluation d'agents")
-        ajouter_contact("AgentikCo", "Éléonore Petit", poste="Lead AI", chemin_db=self.chemin_db)
+        ajouter_note(
+            entreprise_nom="AgentikCo", titre="Échange avec Éléonore",
+            contenu="Elle a parlé du budget.", chemin_db=self.chemin_db,
+        )
         resultats = rechercher("eleonore", chemin_db=self.chemin_db)
-        self.assertEqual(len(resultats["contacts"]), 1)
-        self.assertEqual(resultats["contacts"][0]["champs_trouves"], ["Nom"])
+        self.assertEqual(len(resultats["notes"]), 1)
+        self.assertEqual(resultats["notes"][0]["champs_trouves"], ["Titre"])
         resultats = rechercher("EVALUATION", chemin_db=self.chemin_db)
         self.assertEqual(len(resultats["candidatures"]), 1)
         self.assertIn("Notes", resultats["candidatures"][0]["champs_trouves"])
         self.assertIn("évaluation", resultats["candidatures"][0]["extrait"])
         resultats = rechercher("agentik", chemin_db=self.chemin_db)
         self.assertEqual(len(resultats["entreprises"]), 1)
-        self.assertEqual(rechercher("", chemin_db=self.chemin_db),
-                         {"candidatures": [], "entreprises": [], "contacts": []})
+        self.assertEqual(
+            rechercher("", chemin_db=self.chemin_db),
+            {"candidatures": [], "entreprises": [], "notes": [], "lettres": [], "fiches": []},
+        )
+
+    def test_recherche_lettres_et_fiches(self):
+        from fiches import ajouter_fiche
+        from lettres import ajouter_lettre
+        from recherche import rechercher
+
+        ajouter_lettre("AgentikCo", "Je souhaite rejoindre votre équipe d'orchestration.",
+                       chemin_db=self.chemin_db)
+        ajouter_fiche("AgentikCo", {"meta": {"company": "AgentikCo"},
+                                    "postes": [{"title": "Stage évaluation d'agents"}]},
+                      chemin_db=self.chemin_db)
+        resultats = rechercher("orchestration", chemin_db=self.chemin_db)
+        self.assertEqual(len(resultats["lettres"]), 1)
+        self.assertEqual(resultats["lettres"][0]["champs_trouves"], ["Contenu"])
+        resultats = rechercher("EVALUATION d'agents", chemin_db=self.chemin_db)
+        self.assertEqual(len(resultats["fiches"]), 1)
 
     # --- statistiques avancées ---
 
@@ -167,46 +188,30 @@ class TestModulesNouveautes(unittest.TestCase):
         self.assertEqual(entonnoir["Envoyées"]["nombre"], 0)
         self.assertEqual(entonnoir["Entretiens"]["nombre"], 0)
 
-    # --- agenda ---
-
-    def test_agenda_et_ics(self):
-        from agenda import generer_ics, lister_echeances
-
-        self._candidature(date_entretien="2099-01-15", date_debut_souhaitee="2099-03-01")
-        echeances = lister_echeances(chemin_db=self.chemin_db)
-        self.assertEqual([e["type"] for e in echeances], ["entretien", "debut"])
-        ics = generer_ics(chemin_db=self.chemin_db)
-        self.assertIn("BEGIN:VCALENDAR", ics)
-        self.assertEqual(ics.count("BEGIN:VEVENT"), 2)
-        self.assertIn("DTSTART;VALUE=DATE:20990115", ics)
-        self.assertIn("Entretien - AgentikCo", ics.replace("\\,", ","))
-        self.assertIn("BEGIN:VALARM", ics)
-
     # --- sauvegardes ---
+
+    def _dossier_sauvegardes(self):
+        # Sans dossier de données choisi, les sauvegardes vont à côté de la base
+        # (ici le dossier temporaire du test - jamais le vrai dossier du projet).
+        return Path(self.dossier.name) / "sauvegardes"
 
     def test_sauvegarde_et_rotation(self):
         import sauvegarde
 
         self._candidature()
-        dossier_origine = sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT
-        sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = Path(self.dossier.name) / "sauvegardes"
-        try:
-            chemins = set()
-            for _ in range(4):
-                chemin = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=3)
-                self.assertIsNotNone(chemin)
-                chemins.add(chemin)
-            # Chaque appel doit produire un fichier distinct, même déclenchés
-            # coup sur coup dans la même seconde (voir le correctif microsecondes).
-            self.assertEqual(len(chemins), 4)
-            restantes = list(sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT.glob("*.db"))
-            self.assertLessEqual(len(restantes), 3)
-            absente = sauvegarde.sauvegarder_base(
-                chemin_db=str(Path(self.dossier.name) / "inexistante.db")
-            )
-            self.assertIsNone(absente)
-        finally:
-            sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = dossier_origine
+        chemins = set()
+        for _ in range(4):
+            chemin = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=3)
+            self.assertIsNotNone(chemin)
+            chemins.add(chemin)
+        # Chaque appel doit produire un fichier distinct, même déclenchés
+        # coup sur coup dans la même seconde (voir le correctif microsecondes).
+        self.assertEqual(len(chemins), 4)
+        self.assertLessEqual(len(list(self._dossier_sauvegardes().glob("*.db"))), 3)
+        absente = sauvegarde.sauvegarder_base(
+            chemin_db=str(Path(self.dossier.name) / "inexistante.db")
+        )
+        self.assertIsNone(absente)
 
     def test_sauvegarde_rapide_repetee_jamais_ecrasee(self):
         # Régression : deux sauvegardes déclenchées dans la même seconde
@@ -216,53 +221,120 @@ class TestModulesNouveautes(unittest.TestCase):
         import sauvegarde
 
         self._candidature()
-        dossier_origine = sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT
-        sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = Path(self.dossier.name) / "sauvegardes"
-        try:
-            chemin1 = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=0)
-            chemin2 = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=0)
-            self.assertNotEqual(chemin1, chemin2)
-            self.assertTrue(Path(chemin1).exists())
-            self.assertTrue(Path(chemin2).exists())
-        finally:
-            sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = dossier_origine
+        chemin1 = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=0)
+        chemin2 = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db, garder=0)
+        self.assertNotEqual(chemin1, chemin2)
+        self.assertTrue(Path(chemin1).exists())
+        self.assertTrue(Path(chemin2).exists())
 
     def test_sauvegarde_auto_tous_les_n_candidatures(self):
-        import sauvegarde
         from candidatures import INTERVALLE_SAUVEGARDE_AUTO
 
-        dossier_origine = sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT
-        sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = Path(self.dossier.name) / "sauvegardes"
-        try:
-            for i in range(INTERVALLE_SAUVEGARDE_AUTO - 1):
-                self._candidature(entreprise=f"Entreprise{i}")
-            self.assertEqual(
-                len(list(sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT.glob("*.db"))), 0,
-                "pas encore de sauvegarde avant la Nème candidature",
-            )
-            self._candidature(entreprise="EntrepriseDeclencheuse")
-            self.assertEqual(
-                len(list(sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT.glob("*.db"))), 1,
-                "une sauvegarde doit apparaître exactement à la Nème candidature",
-            )
-        finally:
-            sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = dossier_origine
+        for i in range(INTERVALLE_SAUVEGARDE_AUTO - 1):
+            self._candidature(entreprise=f"Entreprise{i}")
+        self.assertEqual(
+            len(list(self._dossier_sauvegardes().glob("*.db"))), 0,
+            "pas encore de sauvegarde avant la Nème candidature",
+        )
+        self._candidature(entreprise="EntrepriseDeclencheuse")
+        self.assertEqual(
+            len(list(self._dossier_sauvegardes().glob("*.db"))), 1,
+            "une sauvegarde doit apparaître exactement à la Nème candidature",
+        )
 
     def test_sauvegarde_auto_rotation_sur_cinq(self):
         import sauvegarde
         from candidatures import INTERVALLE_SAUVEGARDE_AUTO
 
         self.assertEqual(sauvegarde.NOMBRE_CONSERVE, 5)
-        dossier_origine = sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT
-        sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = Path(self.dossier.name) / "sauvegardes"
+        for i in range(INTERVALLE_SAUVEGARDE_AUTO * 7):  # 7 déclenchements
+            self._candidature(entreprise=f"Entreprise{i}")
+        self.assertEqual(len(list(self._dossier_sauvegardes().glob("*.db"))), 5)
+
+    def test_sauvegarde_est_une_copie_coherente_et_complete(self):
+        """La copie contient toutes les tables (y compris lettres, fiches, notes) et
+        s'ouvre comme une base normale - c'est ce qui permet de la restaurer."""
+        import sqlite3
+
+        import sauvegarde
+        from notes_entretien import ajouter_note
+
+        numero = self._candidature()
+        ajouter_note(candidature_id=numero, titre="Entretien", contenu="Tout s'est bien passé.",
+                     chemin_db=self.chemin_db)
+        chemin = sauvegarde.sauvegarder_base(chemin_db=self.chemin_db)
+        conn = sqlite3.connect(chemin)
         try:
-            for i in range(INTERVALLE_SAUVEGARDE_AUTO * 7):  # 7 déclenchements
-                self._candidature(entreprise=f"Entreprise{i}")
-            self.assertEqual(
-                len(list(sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT.glob("*.db"))), 5
-            )
+            self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM candidatures").fetchone()[0], 1)
+            self.assertEqual(conn.execute("SELECT contenu FROM notes_entretien").fetchone()[0],
+                             "Tout s'est bien passé.")
         finally:
-            sauvegarde.DOSSIER_SAUVEGARDES_DEFAUT = dossier_origine
+            conn.close()
+        # Restaurer = remplacer la base par la copie : l'appli la rouvre sans rien perdre.
+        from candidatures import lister_candidatures
+
+        self.assertEqual(len(lister_candidatures(chemin_db=chemin)), 1)
+
+    def test_sauvegarde_ancienne_est_migree_a_la_restauration(self):
+        """Une sauvegarde faite AVANT la refonte (contacts, notes d'entretien dans la
+        candidature) se rouvre avec la version actuelle : rien n'est perdu, la
+        section retirée disparaît, l'ancien texte de notes devient une note."""
+        import sqlite3
+
+        from candidatures import lister_candidatures
+        from notes_entretien import lister_notes
+
+        ancienne = Path(self.dossier.name) / "restauree.db"
+        conn = sqlite3.connect(ancienne)
+        conn.executescript(
+            """
+            CREATE TABLE entreprises (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nom TEXT NOT NULL UNIQUE, site_web TEXT, contexte_actus TEXT, derniere_recherche DATE);
+            CREATE TABLE candidatures (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entreprise_id INTEGER NOT NULL REFERENCES entreprises(id), date_envoi DATE,
+                poste TEXT NOT NULL, sous_domaine TEXT, lien_offre TEXT, texte_offre TEXT,
+                type_candidature TEXT, statut TEXT DEFAULT 'À préparer', date_reponse DATE,
+                date_entretien DATE, date_debut_souhaitee DATE, duree TEXT, gratification INTEGER,
+                ville TEXT, mode_travail TEXT, convention_envoyee TEXT DEFAULT 'Non', source TEXT,
+                notes TEXT, portail_url TEXT, portail_identifiant TEXT, portail_mdp TEXT,
+                notes_entretien TEXT, lien_dernier_etat TEXT, lien_dernier_controle TEXT);
+            CREATE TABLE contacts (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entreprise_id INTEGER NOT NULL REFERENCES entreprises(id), nom TEXT NOT NULL,
+                poste TEXT, equipe TEXT, email TEXT, telephone TEXT, linkedin TEXT,
+                statut_contact TEXT DEFAULT 'À contacter', date_contact DATE, source TEXT, notes TEXT);
+            INSERT INTO entreprises (nom) VALUES ('AgentikCo');
+            INSERT INTO candidatures (entreprise_id, poste, statut, date_entretien, notes_entretien)
+                VALUES (1, 'Stage agents IA', 'Entretien', '2026-09-05', 'Question sur les évals.');
+            INSERT INTO candidatures (entreprise_id, poste) VALUES (1, 'Stage sans notes');
+            INSERT INTO contacts (entreprise_id, nom, email) VALUES (1, 'Marie Petit', 'm@agentik.co');
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        candidatures_relues = lister_candidatures(chemin_db=str(ancienne))
+        self.assertEqual(len(candidatures_relues), 2)
+        self.assertNotIn("notes_entretien", candidatures_relues[0])
+        notes = lister_notes(chemin_db=str(ancienne))
+        self.assertEqual(len(notes), 1)  # seul le texte non vide devient une note
+        self.assertEqual(notes[0]["contenu"], "Question sur les évals.")
+        self.assertEqual(notes[0]["poste"], "Stage agents IA")
+        self.assertEqual(notes[0]["date_entretien"], "2026-09-05")
+        conn = sqlite3.connect(ancienne)
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        conn.close()
+        self.assertNotIn("contacts", tables)
+        # Une copie de sécurité, à côté, garde l'état d'avant (contact compris).
+        copies = list(Path(self.dossier.name).glob("restauree-avant-migration-*.db"))
+        self.assertEqual(len(copies), 1)
+        conn = sqlite3.connect(copies[0])
+        self.assertEqual(conn.execute("SELECT nom FROM contacts").fetchone()[0], "Marie Petit")
+        conn.close()
+        # Rouvrir ne refait rien : pas de seconde copie, pas de note en double.
+        lister_candidatures(chemin_db=str(ancienne))
+        self.assertEqual(len(list(Path(self.dossier.name).glob("restauree-avant-migration-*.db"))), 1)
+        self.assertEqual(len(lister_notes(chemin_db=str(ancienne))), 1)
 
     def test_sauvegarde_respecte_dossier_donnees_choisi(self):
         import reglages
@@ -278,37 +350,6 @@ class TestModulesNouveautes(unittest.TestCase):
         # de la représentation exacte du dossier temporaire de l'OS.
         self.assertTrue(str(personnalise.resolve()) in chemin)
         self.assertTrue((personnalise / "sauvegardes").exists())
-
-    # --- notes d'entretien : fiche + export/import ---
-
-    def test_notes_entretien_fiche_et_export(self):
-        import openpyxl
-
-        from candidatures import modifier_candidature
-        from entretien import generer_fiche_entretien
-        from export_excel import exporter_excel
-        from import_excel import importer_excel
-
-        numero = self._candidature(statut="Entretien")
-        modifier_candidature(numero, chemin_db=self.chemin_db,
-                             notes_entretien="Question posée : architecture des évals.")
-        fiche = generer_fiche_entretien(numero, chemin_db=self.chemin_db)
-        self.assertIn("Notes d'entretien : Question posée", fiche)
-        self.assertIn("## Journal", fiche)
-        self.assertIn("Candidature créée", fiche)
-
-        chemin_xlsx = str(Path(self.dossier.name) / "export.xlsx")
-        exporter_excel(chemin_xlsx, chemin_db=self.chemin_db)
-        ws = openpyxl.load_workbook(chemin_xlsx)["Suivi candidatures"]
-        self.assertEqual(ws["S1"].value, "Notes entretien")
-        self.assertIn("Question posée", ws["S3"].value)
-
-        cible = str(Path(self.dossier.name) / "cible.db")
-        db.initialiser_base(cible)
-        importer_excel(chemin_xlsx, chemin_db=cible)
-        from candidatures import lister_candidatures
-
-        self.assertIn("Question posée", lister_candidatures(chemin_db=cible)[0]["notes_entretien"])
 
 
 class TestApiNouveautes(unittest.TestCase):
@@ -382,20 +423,16 @@ class TestApiNouveautes(unittest.TestCase):
         vide = self.client.get("/api/recherche").get_json()
         self.assertEqual(vide["candidatures"], [])
 
-    def test_stats_agenda_ics_endpoints(self):
+    def test_stats_avancees_endpoint(self):
         self._ajouter(date_entretien="2099-03-01")
-        self.assertEqual(self.client.get("/api/stats/avancees").status_code, 200)
-        agenda_liste = self.client.get("/api/agenda").get_json()
-        self.assertEqual(agenda_liste[0]["type"], "entretien")
-        ics = self.client.get("/api/agenda/ics")
-        self.assertEqual(ics.status_code, 200)
-        self.assertIn("text/calendar", ics.headers["Content-Type"])
+        reponse = self.client.get("/api/stats/avancees")
+        self.assertEqual(reponse.status_code, 200)
+        self.assertIn("entonnoir", reponse.get_json())
 
-    def test_notes_entretien_par_api(self):
-        numero = self._ajouter()
-        self.client.patch(f"/api/candidatures/{numero}", json={"notes_entretien": "Très bon échange."})
-        relu = self.client.get(f"/api/candidatures/{numero}").get_json()
-        self.assertEqual(relu["notes_entretien"], "Très bon échange.")
+    def test_les_sections_retirees_n_existent_plus(self):
+        """Agenda et Contacts ont été retirés : leurs routes ne répondent plus."""
+        for chemin in ("/api/agenda", "/api/agenda/ics", "/api/contacts", "/api/rappels/echeance"):
+            self.assertEqual(self.client.get(chemin).status_code, 404, chemin)
 
 
 if __name__ == "__main__":

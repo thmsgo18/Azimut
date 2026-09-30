@@ -3,3 +3,6 @@ flask
 pywebview
 anthropic
 openai
+reportlab
+pypdf
+python-docx

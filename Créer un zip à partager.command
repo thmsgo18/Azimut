@@ -1,7 +1,8 @@
 #!/bin/bash
 # Crée sur le Bureau un zip de l'appli à envoyer à un ami.
-# Le zip ne contient NI tes données (suivi_candidatures.db), NI le venv,
-# NI les exports Excel : ton ami démarre avec une base vierge.
+# Le zip ne contient NI tes données (suivi_candidatures.db, documents, lettres,
+# fiches d'entretien, CV, sauvegardes), NI le venv, NI les exports Excel : ton
+# ami démarre avec une base vierge.
 cd "$(dirname "$0")" || exit 1
 
 DESTINATION="$HOME/Desktop/azimut-suivi-candidatures.zip"
@@ -12,6 +13,10 @@ zip -r -q "$DESTINATION" . \
     -x "*.db" \
     -x "*.xlsx" \
     -x "documents/*" \
+    -x "lettres/*" \
+    -x "fiches/*" \
+    -x "profil/*" \
+    -x "import_temp/*" \
     -x "sauvegardes/*" \
     -x "__pycache__/*" -x "*/__pycache__/*" \
     -x ".DS_Store" -x "*/.DS_Store"

@@ -127,14 +127,14 @@ class TestServeurRobustesse(unittest.TestCase):
                 "entreprise": "AgentikCo",
                 "poste": "Stage",
                 "portail_url": "https://jobs.agentik.co",
-                "portail_identifiant": "thomas.gourmelen",
+                "portail_identifiant": "candidat.test",
                 "portail_mdp": "s3cret!",
             },
         )
         self.assertEqual(creation.status_code, 201)
         relu = self.client.get(f"/api/candidatures/{creation.get_json()['id']}").get_json()
         self.assertEqual(relu["portail_url"], "https://jobs.agentik.co")
-        self.assertEqual(relu["portail_identifiant"], "thomas.gourmelen")
+        self.assertEqual(relu["portail_identifiant"], "candidat.test")
         self.assertEqual(relu["portail_mdp"], "s3cret!")
 
     def test_fiche_entretien_sans_mot_de_passe(self):
@@ -212,7 +212,6 @@ class TestServeurRobustesse(unittest.TestCase):
         conn.close()
 
         from candidatures import lister_candidatures, modifier_candidature
-        from contacts import lister_contacts
 
         liste = sorted(lister_candidatures(chemin_db=str(ancienne)), key=lambda c: c["id"])
         self.assertEqual(liste[0]["poste"], "Stage")
@@ -232,28 +231,23 @@ class TestServeurRobustesse(unittest.TestCase):
         self.assertEqual(liste[1]["statut"], "Envoyée")
         for colonne in ("priorite", "nb_relances", "date_relance_prevue"):
             self.assertNotIn(colonne, liste[1])
-        # ... après une copie de sécurité intacte, prise juste avant.
-        copie = ancienne.with_name("ancienne-avant-suppression-relances.db")
-        conn = sqlite3.connect(copie)
+        # ... après UNE copie de sécurité intacte, prise avant toute modification.
+        copies = list(ancienne.parent.glob("ancienne-avant-migration-*.db"))
+        self.assertEqual(len(copies), 1)
+        conn = sqlite3.connect(copies[0])
         ligne = conn.execute(
             "SELECT statut, priorite, nb_relances FROM candidatures WHERE poste = 'Stage relancé'"
         ).fetchone()
+        contacts_copie = conn.execute("SELECT COUNT(*) FROM contacts").fetchone()[0]
         conn.close()
         self.assertEqual(ligne, ("Relancée", "Haute", 2))
+        self.assertEqual(contacts_copie, 3)  # les contacts d'origine, intacts dans la copie
 
-        # L'ancien couple (type_contact, valeur_contact) est réparti dans les
-        # nouveaux champs dédiés, sans perte pour un type non reconnu (« Fax »).
-        contacts_migres = {c["nom"]: c for c in lister_contacts(chemin_db=str(ancienne))}
-        self.assertEqual(contacts_migres["Marie Petit"]["email"], "marie@agentik.co")
-        self.assertEqual(contacts_migres["Karim Haddad"]["linkedin"], "linkedin.com/in/karim")
-        self.assertIn("Fax", contacts_migres["Ali Ben"]["notes"])
-        self.assertIn("01 23 45 67 89", contacts_migres["Ali Ben"]["notes"])
-        self.assertIn("Contact ancien", contacts_migres["Ali Ben"]["notes"])
+        # La section Contacts a été retirée : la table n'existe plus dans la base migrée.
         conn = sqlite3.connect(ancienne)
-        colonnes = {ligne[1] for ligne in conn.execute("PRAGMA table_info(contacts)")}
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
         conn.close()
-        self.assertNotIn("type_contact", colonnes)
-        self.assertNotIn("valeur_contact", colonnes)
+        self.assertNotIn("contacts", tables)
 
 
 class TestValidationValeurs(unittest.TestCase):

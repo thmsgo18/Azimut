@@ -14,25 +14,24 @@ const etat = {
   langue: "fr",           // langue de l'interface, chargée depuis /api/reglages
   modeCandidatures: "liste",
   filtres: { statut: "", sous_domaine: "", texte: "" },
-  agendaBase: null,       // premier jour du mois affiché dans l'agenda
-  agendaMode: "mois",
   rechercheTexte: "",
   focusRecherche: false,
   propositionEntreprise: null,  // infos entreprise proposées par l'IA, écrites après validation
   selectionComparaison: new Set(),  // ids cochés en vue liste, pour le comparateur
   versionDb: null,        // dernier mtime de la base connu, pour détecter les écritures externes
+  filtresPieces: { lettres: { recherche: "" }, fiches: { recherche: "" } },
+  filtresNotes: { recherche: "", candidature: null, entreprise: null },
+  noteEnCours: null,      // éditeur de note ouvert : { enregistrer } pour vider l'enregistrement en attente
 };
 
-/* Couleurs par type d'objet (recherche) et par type d'échéance (agenda),
-   toujours accompagnées d'un libellé texte, jamais la couleur seule. */
+/* Couleurs par type d'objet (recherche), toujours accompagnées d'un libellé
+   texte, jamais la couleur seule. */
 const COULEURS_TYPE = {
   candidature: "var(--accent)",
   entreprise: "var(--st-reponse)",
-  contact: "var(--violet)",
-};
-const COULEURS_ECHEANCE = {
-  entretien: "var(--st-entretien)",
-  debut: "var(--st-accepte)",
+  note: "var(--violet)",
+  lettre: "var(--st-entretien)",
+  fiche: "var(--st-accepte)",
 };
 
 /* Icônes SVG des états vides (aucun emoji dans l'interface). */
@@ -43,8 +42,12 @@ const ICONES = {
     '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="5" height="13" rx="1.5"/></svg>',
   entreprises:
     '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V5a1.5 1.5 0 0 1 1.5-1.5H13A1.5 1.5 0 0 1 14.5 5v16"/><path d="M14.5 9H18a1.5 1.5 0 0 1 1.5 1.5V21"/><path d="M8 7.5h3M8 11h3M8 14.5h3"/></svg>',
-  contacts:
-    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M3.5 20c.6-3.4 2.8-5.2 5.5-5.2s4.9 1.8 5.5 5.2"/><path d="M16.5 5.4a3.4 3.4 0 0 1 0 5.2"/><path d="M17.8 14.9c1.6.8 2.7 2.6 2.9 5.1"/></svg>',
+  fiches:
+    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 11h6M9 15h4"/></svg>',
+  entretiens:
+    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/><path d="m14 8 3 3"/></svg>',
+  lettres:
+    '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>',
 };
 
 const COULEURS_STATUT = {
@@ -98,6 +101,13 @@ function tv(valeur) {
   return table[valeur] ?? valeur;
 }
 
+/* « 1 candidature » / « 3 candidatures » : deux clés par mot (_singulier,
+   _pluriel) pour que chaque langue accorde comme il se doit. Zéro suit le
+   singulier en français (« 0 candidature »), comme le fait l'usage. */
+function pluriel(cle, n) {
+  return t(`${cle}_${n > 1 ? "pluriel" : "singulier"}`, { n });
+}
+
 function echapper(texte) {
   const div = document.createElement("div");
   div.textContent = texte == null ? "" : String(texte);
@@ -129,6 +139,11 @@ function toast(message, erreur = false) {
 
 async function api(chemin, options = {}) {
   let reponse;
+  // Une écriture faite depuis cette fenêtre change la base : on oublie la version
+  // connue pour que le prochain contrôle l'adopte au lieu de la prendre pour une
+  // modification venue d'ailleurs (sinon « Actualiser » s'allume à chaque frappe
+  // enregistrée automatiquement).
+  if (options.methode && options.methode !== "GET") etat.versionDb = null;
   try {
     reponse = await fetch(chemin, {
       headers: options.corps ? { "Content-Type": "application/json" } : undefined,
@@ -153,10 +168,11 @@ async function api(chemin, options = {}) {
 const VUES = {
   bord: vueBord,
   candidatures: vueCandidatures,
-  agenda: vueAgenda,
   entreprises: vueEntreprises,
-  contacts: vueContacts,
   documents: vueDocuments,
+  lettres: () => vuePieces("lettres"),
+  fiches: () => vuePieces("fiches"),
+  entretiens: vueNotes,
   statistiques: vueStats,
   recherche: vueRecherche,
   comparer: vueComparateur,
@@ -165,23 +181,30 @@ const VUES = {
 
 const ACTIVATIONS = {
   candidatures: activerCandidatures,
-  agenda: activerAgenda,
   recherche: activerRecherche,
   comparer: activerComparateur,
   statistiques: activerStats,
   reglages: activerReglages,
+  lettres: () => activerPieces("lettres"),
+  fiches: () => activerPieces("fiches"),
+  entretiens: activerNotes,
 };
 
 async function rendre() {
   const brut = location.hash.replace(/^#\//, "");
   const conteneur = document.getElementById("vue");
   try {
-    if (brut.startsWith("entretien/")) {
-      // Mode entretien : plein écran, hors navigation classique.
+    // Ce qu'on vient de taper dans une note ne doit jamais se perdre en changeant de page.
+    if (etat.noteEnCours) await etat.noteEnCours.enregistrer();
+    etat.noteEnCours = null;
+    if (brut.startsWith("entretiens/")) {
+      // Éditeur d'une note d'entretien : une page à part, sous l'entrée « Entretiens ».
       const numero = Number(brut.split("/")[1]);
-      document.querySelectorAll(".nav a").forEach((l) => l.classList.remove("actif"));
-      conteneur.innerHTML = await vueModeEntretien(numero);
-      activerModeEntretien(numero);
+      document.querySelectorAll(".nav a").forEach((lien) => {
+        lien.classList.toggle("actif", lien.dataset.vue === "entretiens");
+      });
+      conteneur.innerHTML = await vueEditeurNote(numero);
+      activerEditeurNote(numero);
       return;
     }
     const nom = VUES[brut] ? brut : "bord";
@@ -275,7 +298,7 @@ function barres(donnees, ordre) {
 
 async function vueBord() {
   const stats = await api("/api/stats");
-  if (stats.total === 0 && stats.total_contacts === 0) {
+  if (stats.total === 0) {
     return `
       <div class="entete-vue"><h1>${t("bord.titre")}</h1></div>
       <div class="etat-vide">
@@ -323,9 +346,9 @@ async function vueBord() {
         <div class="tuile-detail">${t("bord.kpi_entretiens_detail", { n: stats.par_statut["Entretien"] })}</div>
       </div>
       <div class="tuile">
-        <div class="tuile-libelle">${t("bord.kpi_contacts")}</div>
-        <div class="tuile-valeur">${stats.total_contacts}</div>
-        <div class="tuile-detail">${t("bord.kpi_contacts_detail", { n: stats.contacts_par_statut["Répondu"] || 0 })}</div>
+        <div class="tuile-libelle">${t("bord.kpi_preparation")}</div>
+        <div class="tuile-valeur">${stats.total_lettres}</div>
+        <div class="tuile-detail">${t("bord.kpi_preparation_detail", { fiches: stats.total_fiches, notes: stats.total_notes })}</div>
       </div>
     </div>
     <div class="grille-bord">
@@ -343,8 +366,6 @@ async function vueBord() {
       </div>
     </div>`;
 }
-
-function activerBord() { /* rien à brancher : liens inline */ }
 
 /* ========================================================================
    Candidatures : kanban + liste
@@ -827,7 +848,6 @@ async function ouvrirFormCandidature(cand = null) {
       ${champMotDePasse("portail_mdp", t("formulaire.portail_mdp"), cand.portail_mdp)}
       ${champZone("texte_offre", t("formulaire.texte_offre"), cand.texte_offre)}
       ${champZone("notes", t("formulaire.notes"), cand.notes)}
-      ${creation ? "" : champZone("notes_entretien", t("formulaire.notes_entretien"), cand.notes_entretien)}
     </form>`;
 
   // À la création : zone d'analyse IA (si une clé API est configurée dans Réglages).
@@ -877,8 +897,7 @@ async function ouvrirFormCandidature(cand = null) {
     ? `<button class="btn" onclick="fermerPanneau()">${t("commun.annuler")}</button>
        <button class="btn btn-accent" id="btn-enregistrer">${t("formulaire.ajouter_candidature")}</button>`
     : `<button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-       <button class="btn" id="btn-fiche">${t("formulaire.fiche_entretien")}</button>
-       <button class="btn" id="btn-mode-entretien">${t("formulaire.mode_entretien")}</button>
+       <button class="btn" id="btn-recap">${t("formulaire.recapitulatif")}</button>
        <button class="btn btn-accent" id="btn-enregistrer">${t("commun.enregistrer")}</button>`;
 
   ouvrirPanneau(
@@ -980,12 +999,8 @@ async function ouvrirFormCandidature(cand = null) {
         toast(erreur.message, true);
       }
     });
-    document.getElementById("btn-fiche").addEventListener("click", () => {
-      ouvrirFicheEntretien(cand.id);
-    });
-    document.getElementById("btn-mode-entretien").addEventListener("click", () => {
-      fermerPanneau();
-      location.hash = `#/entretien/${cand.id}`;
+    document.getElementById("btn-recap").addEventListener("click", () => {
+      ouvrirRecapitulatif(cand.id);
     });
   }
 }
@@ -1075,31 +1090,32 @@ function contenuFicheCandidature(cand) {
     </div>
     ${cand.portail_mdp ? champAfficheMotDePasse("mdp-portail-affiche", t("formulaire.portail_mdp"), cand.portail_mdp) : ""}
     ${cand.texte_offre ? `<h3 class="section-panneau">${t("formulaire.texte_offre")}</h3><div class="texte-long">${echapper(cand.texte_offre)}</div>` : ""}
-    ${cand.notes ? `<h3 class="section-panneau">${t("formulaire.notes")}</h3><div class="texte-long">${echapper(cand.notes)}</div>` : ""}
-    ${cand.notes_entretien ? `<h3 class="section-panneau">${t("formulaire.notes_entretien")}</h3><div class="texte-long">${echapper(cand.notes_entretien)}</div>` : ""}`;
+    ${cand.notes ? `<h3 class="section-panneau">${t("formulaire.notes")}</h3><div class="texte-long">${echapper(cand.notes)}</div>` : ""}`;
 }
 
 async function ouvrirDetailCandidature(numero) {
   try {
     const cand = await api(`/api/candidatures/${numero}`);
-    const [journal, docs] = await Promise.all([
+    const [journal, docs, lettresLiees, fichesLiees, notesLiees] = await Promise.all([
       api(`/api/candidatures/${numero}/evenements`),
       api(`/api/documents?candidature=${numero}`),
+      api(`/api/lettres?candidature=${numero}`),
+      api(`/api/fiches?candidature=${numero}`),
+      api(`/api/notes?candidature=${numero}`),
     ]);
-    const corps = contenuFicheCandidature(cand) + sectionsCandidature(numero, journal, docs);
+    const corps = contenuFicheCandidature(cand)
+      + sectionPreparation(lettresLiees, fichesLiees, notesLiees)
+      + sectionsCandidature(numero, journal, docs);
     const pied = `
       <button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-      <button class="btn" id="btn-fiche">${t("formulaire.fiche_entretien")}</button>
-      <button class="btn" id="btn-mode-entretien">${t("formulaire.mode_entretien")}</button>
+      <button class="btn" id="btn-recap">${t("formulaire.recapitulatif")}</button>
+      <button class="btn" id="btn-notes">${t("formulaire.notes_entretien")}</button>
       <button class="btn btn-accent" id="btn-modifier">${t("commun.modifier")}</button>`;
     ouvrirPanneau(`${cand.poste} - ${cand.entreprise}`, corps, pied);
 
     document.getElementById("btn-modifier").addEventListener("click", () => ouvrirFormCandidature(cand));
-    document.getElementById("btn-fiche").addEventListener("click", () => ouvrirFicheEntretien(cand.id));
-    document.getElementById("btn-mode-entretien").addEventListener("click", () => {
-      fermerPanneau();
-      location.hash = `#/entretien/${cand.id}`;
-    });
+    document.getElementById("btn-recap").addEventListener("click", () => ouvrirRecapitulatif(cand.id));
+    document.getElementById("btn-notes").addEventListener("click", () => ouvrirNotesDeLOffre(cand.id));
     document.getElementById("btn-supprimer").addEventListener("click", async () => {
       const accord = await confirmer(
         t("formulaire.supprimer_candidature_titre"),
@@ -1137,8 +1153,10 @@ async function vueEntreprises() {
       ${ent.site_web ? `<a class="site" href="${echapper(ent.site_web)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${echapper(ent.site_web)}</a>` : ""}
       <div class="contexte">${echapper(ent.contexte_actus || t("entreprises.pas_de_contexte"))}</div>
       <div class="compteurs">
-        <span class="puce">${t("entreprises.nb_candidatures", { n: ent.nb_candidatures })}${ent.nb_candidatures > 1 ? "s" : ""}</span>
-        <span class="puce">${t("entreprises.nb_contacts", { n: ent.nb_contacts })}${ent.nb_contacts > 1 ? "s" : ""}</span>
+        <span class="puce">${pluriel("entreprises.nb_candidatures", ent.nb_candidatures)}</span>
+        ${ent.nb_lettres ? `<span class="puce">${pluriel("entreprises.nb_lettres", ent.nb_lettres)}</span>` : ""}
+        ${ent.nb_fiches ? `<span class="puce">${pluriel("entreprises.nb_fiches", ent.nb_fiches)}</span>` : ""}
+        ${ent.nb_notes ? `<span class="puce">${pluriel("entreprises.nb_notes", ent.nb_notes)}</span>` : ""}
         ${ent.derniere_recherche ? `<span class="puce" title="${t("entreprises.derniere_recherche")}">${t("entreprises.recherche_du", { date: dateFr(ent.derniere_recherche) })}</span>` : ""}
       </div>
     </div>`
@@ -1167,8 +1185,6 @@ async function vueEntreprises() {
       </div>`}`;
 }
 
-function activerEntreprises() { /* liens inline */ }
-
 async function ouvrirFusionEntreprises() {
   const [paires, liste] = await Promise.all([
     api("/api/entreprises/doublons_suspects"),
@@ -1181,7 +1197,7 @@ async function ouvrirFusionEntreprises() {
     const bouton = (garder, fusionner) => `
       <button type="button" class="btn btn-fusion" data-conserver="${garder.id}" data-supprimer="${fusionner.id}">
         ${t("entreprises.garder", { nom: echapper(garder.nom) })}
-        <span class="cellule-secondaire">${t("entreprises.fusionner_dedans", { cand: garder.nb_candidatures ?? 0, contacts: garder.nb_contacts ?? 0, nom: echapper(fusionner.nom) })}</span>
+        <span class="cellule-secondaire">${t("entreprises.fusionner_dedans", { cand: garder.nb_candidatures ?? 0, prep: (garder.nb_lettres ?? 0) + (garder.nb_fiches ?? 0) + (garder.nb_notes ?? 0), nom: echapper(fusionner.nom) })}</span>
       </button>`;
     return `
       <div class="paire-fusion">
@@ -1215,7 +1231,9 @@ async function ouvrirFusionEntreprises() {
         fermerModale();
         toast(
           t("entreprises.fusion_effectuee", {
-            cand: resultat.candidatures_deplacees, contacts: resultat.contacts_deplaces, nom: resultat.nom,
+            cand: resultat.candidatures_deplacees,
+            prep: resultat.lettres_deplacees + resultat.fiches_deplacees + resultat.notes_deplacees,
+            nom: resultat.nom,
           })
         );
         rendre();
@@ -1284,25 +1302,17 @@ async function ouvrirFormEntreprise(numero = null) {
 
 async function ouvrirDetailEntreprise(numero) {
   try {
-    const [listeEntreprises, listeContacts, listeCandidatures] = await Promise.all([
+    const [listeEntreprises, listeCandidatures, lettresEnt, fichesEnt, notesEnt] = await Promise.all([
       api("/api/entreprises"),
-      api("/api/contacts"),
       api("/api/candidatures"),
+      api(`/api/lettres?entreprise=${numero}`),
+      api(`/api/fiches?entreprise=${numero}`),
+      api(`/api/notes?entreprise=${numero}`),
     ]);
     const ent = listeEntreprises.find((e) => e.id === numero);
     if (!ent) { toast(t("entreprises.introuvable"), true); return; }
-    const contactsEnt = listeContacts.filter((c) => c.entreprise === ent.nom);
     const candidaturesEnt = listeCandidatures.filter((c) => c.entreprise === ent.nom);
 
-    const ligneContact = (c) => {
-      const coordonnee = c.email || c.telephone || c.linkedin || "";
-      return `
-      <div class="ligne-liee" onclick="ouvrirDetailContact(${c.id})">
-        <span class="cellule-principale">${echapper(c.nom)}${c.poste ? ` <span class="cellule-secondaire">${echapper(c.poste)}</span>` : ""}</span>
-        ${coordonnee ? `<span class="cellule-secondaire">${echapper(coordonnee)}</span>` : ""}
-        ${c.statut_contact ? `<span class="puce">${echapper(tv(c.statut_contact))}</span>` : ""}
-      </div>`;
-    };
     const ligneCandidature = (c) => `
       <div class="ligne-liee" onclick="ouvrirDetailCandidature(${c.id})">
         <span class="cellule-principale">${echapper(c.poste)}</span>
@@ -1322,11 +1332,9 @@ async function ouvrirDetailEntreprise(numero) {
         : `<div class="valeur-affichee vide">${t("entreprises.pas_de_contexte_fiche")}</div>`}
       ${ent.derniere_recherche ? `<p class="cellule-secondaire" style="margin-top:8px;">${t("entreprises.derniere_recherche_texte", { date: dateFr(ent.derniere_recherche) })}</p>` : ""}
 
-      <h3 class="section-panneau">${t("entreprises.contacts_titre", { n: contactsEnt.length })}</h3>
-      ${contactsEnt.length ? `<div class="liste-liee">${contactsEnt.map(ligneContact).join("")}</div>` : `<p class="sous-titre">${t("entreprises.aucun_contact")}</p>`}
-
       <h3 class="section-panneau">${t("entreprises.candidatures_titre", { n: candidaturesEnt.length })}</h3>
-      ${candidaturesEnt.length ? `<div class="liste-liee">${candidaturesEnt.map(ligneCandidature).join("")}</div>` : `<p class="sous-titre">${t("entreprises.aucune_candidature")}</p>`}`;
+      ${candidaturesEnt.length ? `<div class="liste-liee">${candidaturesEnt.map(ligneCandidature).join("")}</div>` : `<p class="sous-titre">${t("entreprises.aucune_candidature")}</p>`}
+      ${sectionPreparation(lettresEnt, fichesEnt, notesEnt)}`;
 
     const pied = `
       <button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
@@ -1351,404 +1359,6 @@ async function ouvrirDetailEntreprise(numero) {
     });
   } catch (erreur) {
     toast(erreur.message, true);
-  }
-}
-
-/* ========================================================================
-   Contacts
-   ======================================================================== */
-
-async function vueContacts() {
-  const liste = await api("/api/contacts");
-  const lignes = liste
-    .map(
-      (contact) => `
-    <tr onclick="ouvrirDetailContact(${contact.id})">
-      <td class="cellule-principale">${echapper(contact.nom)}</td>
-      <td>${echapper(contact.entreprise)}</td>
-      <td class="cellule-secondaire">${echapper(contact.poste || "")}</td>
-      <td class="cellule-secondaire">${echapper(contact.email || "")}</td>
-      <td class="cellule-secondaire">${echapper(contact.telephone || "")}</td>
-      <td class="cellule-secondaire">${echapper(contact.linkedin || "")}</td>
-      <td><span class="puce">${echapper(tv(contact.statut_contact || ""))}</span></td>
-      <td class="cellule-date">${dateFr(contact.date_contact)}</td>
-    </tr>`
-    )
-    .join("");
-
-  return `
-    <div class="entete-vue">
-      <h1>${t("nav.contacts")}</h1>
-      <button class="btn btn-accent" onclick="ouvrirFormContact()">${t("commun.ajouter")}</button>
-    </div>
-    ${liste.length ? `
-      <div class="enveloppe-tableau"><table class="tableau">
-        <thead><tr><th>${t("contacts.col_nom")}</th><th>${t("candidatures.col_entreprise")}</th><th>${t("candidatures.col_poste")}</th><th>${t("contacts.email")}</th><th>${t("contacts.telephone")}</th><th>${t("contacts.linkedin")}</th><th>${t("candidatures.col_statut")}</th><th>${t("contacts.contacte_le")}</th></tr></thead>
-        <tbody>${lignes}</tbody>
-      </table></div>` : `
-      <div class="etat-vide">
-        <div class="icone">${ICONES.contacts}</div>
-        <div class="titre">${t("contacts.vide_titre")}</div>
-        <p>${t("contacts.vide_texte")}</p>
-        <button class="btn btn-accent" onclick="ouvrirFormContact()">${t("contacts.ajouter_bouton")}</button>
-      </div>`}`;
-}
-
-function activerContacts() { /* liens inline */ }
-
-async function ouvrirDetailContact(numero) {
-  try {
-    const [liste, listeEntreprises] = await Promise.all([
-      api("/api/contacts"),
-      api("/api/entreprises"),
-    ]);
-    const contact = liste.find((c) => c.id === numero);
-    if (!contact) { toast(t("contacts.introuvable"), true); return; }
-    const entreprise = listeEntreprises.find((e) => e.nom === contact.entreprise);
-
-    const ligneEntreprise = entreprise
-      ? `<a class="lien-detail" href="#" onclick="event.preventDefault(); ouvrirDetailEntreprise(${entreprise.id})">${echapper(contact.entreprise)}</a>`
-      : echapper(contact.entreprise);
-
-    // Un champ n'est affiché que s'il n'est pas vide (aucun email/téléphone/
-    // LinkedIn) : pas de ligne vide pour une coordonnée non renseignée.
-    const champsCoordonnees = [
-      contact.email ? champAffiche(t("contacts.email"), `<a class="lien-detail" href="mailto:${echapper(contact.email)}">${echapper(contact.email)}</a>`) : "",
-      contact.telephone ? champAffiche(t("contacts.telephone"), `<a class="lien-detail" href="tel:${echapper(contact.telephone)}">${echapper(contact.telephone)}</a>`) : "",
-      contact.linkedin ? champAffiche(t("contacts.linkedin"), /^https?:\/\//i.test(contact.linkedin)
-        ? `<a class="lien-detail" href="${echapper(contact.linkedin)}" target="_blank" rel="noopener">${echapper(contact.linkedin)}</a>`
-        : echapper(contact.linkedin)) : "",
-    ].join("");
-
-    const corps = `
-      <div class="fiche-entete-detail">
-        <div>
-          <h2>${echapper(contact.nom)}</h2>
-          <p class="fiche-soustitre">${ligneEntreprise}${contact.poste ? " · " + echapper(contact.poste) : ""}</p>
-        </div>
-        ${contact.statut_contact ? `<span class="puce">${echapper(tv(contact.statut_contact))}</span>` : ""}
-      </div>
-      <div class="grille-form">
-        ${champAffiche(t("contacts.equipe"), contact.equipe ? echapper(contact.equipe) : null)}
-        ${champAffiche(t("contacts.contacte_le"), dateFr(contact.date_contact))}
-        ${champsCoordonnees}
-        ${champAffiche(t("contacts.trouve_via"), contact.source ? echapper(tv(contact.source)) : null)}
-      </div>
-      ${contact.notes ? `<h3 class="section-panneau">${t("formulaire.notes")}</h3><div class="texte-long">${echapper(contact.notes)}</div>` : ""}`;
-
-    const pied = `
-      <button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-      <button class="btn btn-accent" id="btn-modifier">${t("commun.modifier")}</button>`;
-    ouvrirPanneau(contact.nom, corps, pied);
-
-    document.getElementById("btn-modifier").addEventListener("click", () => ouvrirFormContact(numero));
-    document.getElementById("btn-supprimer").addEventListener("click", async () => {
-      const accord = await confirmer(
-        t("contacts.supprimer_titre"),
-        t("contacts.supprimer_texte", { nom: contact.nom, entreprise: contact.entreprise })
-      );
-      if (!accord) return;
-      try {
-        await api(`/api/contacts/${numero}`, { methode: "DELETE" });
-        toast(t("contacts.contact_supprime"));
-        fermerPanneau();
-        rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
-  } catch (erreur) {
-    toast(erreur.message, true);
-  }
-}
-
-async function ouvrirFormContact(numero = null) {
-  const v = etat.valeurs;
-  const creation = numero === null;
-  let contact = {};
-  const listeEntreprises = await api("/api/entreprises");
-  if (!creation) {
-    const liste = await api("/api/contacts");
-    contact = liste.find((c) => c.id === numero) || {};
-  }
-  const champEntreprise = creation
-    ? `<div class="champ">
-        <label for="champ-entreprise">${t("formulaire.entreprise_requis")}</label>
-        <input type="text" id="champ-entreprise" name="entreprise" list="liste-entreprises" required>
-        <datalist id="liste-entreprises">
-          ${listeEntreprises.map((ent) => `<option value="${echapper(ent.nom)}">`).join("")}
-        </datalist>
-      </div>`
-    : `<div class="champ"><label>${t("formulaire.entreprise")}</label>
-        <input type="text" value="${echapper(contact.entreprise)}" disabled></div>`;
-
-  const corps = `
-    <form id="form-contact" class="grille-form" onsubmit="return false;">
-      ${champEntreprise}
-      ${champTexte("nom", t("contacts.nom_requis"), contact.nom)}
-      ${champTexte("poste", t("candidatures.col_poste"), contact.poste)}
-      ${champTexte("equipe", t("contacts.equipe"), contact.equipe)}
-      ${champTexte("email", t("contacts.email"), contact.email, "email")}
-      ${champTexte("telephone", t("contacts.telephone"), contact.telephone, "tel")}
-      ${champTexte("linkedin", t("contacts.linkedin"), contact.linkedin, "url")}
-      ${champSelect("statut_contact", t("candidatures.col_statut"), v.statuts_contact, contact.statut_contact || "À contacter", false)}
-      ${champTexte("date_contact", t("contacts.contacte_le"), contact.date_contact, "date")}
-      ${champSelect("source", t("contacts.trouve_via"), v.sources_contact, contact.source)}
-      ${champZone("notes", t("formulaire.notes"), contact.notes)}
-    </form>`;
-  const pied = creation
-    ? `<button class="btn" onclick="fermerPanneau()">${t("commun.annuler")}</button>
-       <button class="btn btn-accent" id="btn-enregistrer">${t("contacts.ajouter_contact")}</button>`
-    : `<button class="btn btn-danger" id="btn-supprimer">${t("commun.supprimer")}</button>
-       <button class="btn btn-accent" id="btn-enregistrer">${t("commun.enregistrer")}</button>`;
-  ouvrirPanneau(creation ? t("contacts.nouveau_contact") : t("commun.titre_modifier", { nom: contact.nom }), corps, pied);
-
-  document.getElementById("btn-enregistrer").addEventListener("click", async () => {
-    const donnees = lireFormulaire(document.getElementById("form-contact"));
-    try {
-      if (creation) {
-        await api("/api/contacts", { methode: "POST", corps: donnees });
-        toast(t("contacts.contact_ajoute"));
-      } else {
-        await api(`/api/contacts/${numero}`, { methode: "PATCH", corps: donnees });
-        toast(t("contacts.contact_enregistre"));
-      }
-      fermerPanneau();
-      rendre();
-    } catch (erreur) {
-      toast(erreur.message, true);
-    }
-  });
-  if (!creation) {
-    document.getElementById("btn-supprimer").addEventListener("click", async () => {
-      const accord = await confirmer(
-        t("contacts.supprimer_titre"),
-        t("contacts.supprimer_texte", { nom: contact.nom, entreprise: contact.entreprise })
-      );
-      if (!accord) return;
-      try {
-        await api(`/api/contacts/${numero}`, { methode: "DELETE" });
-        toast(t("contacts.contact_supprime"));
-        fermerPanneau();
-        rendre();
-      } catch (erreur) {
-        toast(erreur.message, true);
-      }
-    });
-  }
-}
-
-/* ========================================================================
-   Agenda : échéances en vue mois / 2 semaines, export .ics
-   ======================================================================== */
-
-function dateISOLocale(objet) {
-  return `${objet.getFullYear()}-${String(objet.getMonth() + 1).padStart(2, "0")}-${String(objet.getDate()).padStart(2, "0")}`;
-}
-
-/* Lien « Ajouter à Google Agenda » pré-rempli pour une échéance (événement
-   d'une journée). Google n'acceptant pas les abonnements à une adresse
-   locale, ce lien par-événement est la voie recommandée pour Google Agenda. */
-function lienGoogleAgenda(echeance) {
-  const debut = new Date(`${echeance.date}T00:00:00`);
-  const fin = new Date(debut);
-  fin.setDate(fin.getDate() + 1);
-  const format = (d) => dateISOLocale(d).replace(/-/g, "");
-  const parametres = new URLSearchParams({
-    action: "TEMPLATE",
-    text: `${tv(echeance.libelle)} - ${echeance.entreprise}`,
-    dates: `${format(debut)}/${format(fin)}`,
-    details: echeance.poste,
-  });
-  return `https://www.google.com/calendar/render?${parametres}`;
-}
-
-function chipEcheance(echeance) {
-  const donneesEcheance = echapperAttribut(JSON.stringify(echeance));
-  const boutonRappel = etat.valeurs.plateforme_macos
-    ? `<button type="button" class="chip-echeance-ajout" data-echeance="${donneesEcheance}"
-              title="${t("agenda.envoyer_rappels")}"
-              onclick="event.stopPropagation(); pousserRappelDepuisBouton(this)">R</button>`
-    : "";
-  return `
-    <span class="chip-echeance-groupe" style="--couleur-statut:${COULEURS_ECHEANCE[echeance.type]}">
-      <button class="chip-echeance"
-              onclick="ouvrirDetailCandidature(${echeance.candidature_id})"
-              title="${echapper(tv(echeance.libelle))} - ${echapper(echeance.entreprise)} (${echapper(echeance.poste)})">
-        <span class="point"></span>${echapper(tv(echeance.libelle))} · ${echapper(echeance.entreprise)}
-      </button>
-      <a class="chip-echeance-ajout" href="${lienGoogleAgenda(echeance)}" target="_blank" rel="noopener"
-         title="${t("agenda.ajouter_google")}" onclick="event.stopPropagation()">+</a>
-      ${boutonRappel}
-    </span>`;
-}
-
-async function pousserRappelDepuisBouton(bouton) {
-  const echeance = JSON.parse(bouton.dataset.echeance);
-  const texteInitial = bouton.textContent;
-  bouton.textContent = "…";
-  try {
-    await api("/api/rappels/echeance", { methode: "POST", corps: echeance });
-    toast(t("agenda.rappel_cree"));
-    bouton.textContent = "✓";
-    setTimeout(() => { bouton.textContent = texteInitial; }, 1500);
-  } catch (erreur) {
-    toast(erreur.message, true);
-    bouton.textContent = texteInitial;
-  }
-}
-
-async function vueAgenda() {
-  const echeances = await api("/api/agenda");
-  if (!etat.agendaBase) {
-    const maintenant = new Date();
-    etat.agendaBase = new Date(maintenant.getFullYear(), maintenant.getMonth(), 1);
-  }
-  const parJour = {};
-  echeances.forEach((e) => (parJour[e.date] = parJour[e.date] || []).push(e));
-
-  const localeAgenda = etat.langue === "en" ? "en-US" : "fr-FR";
-  const entete = `
-    <div class="entete-vue">
-      <h1>${t("nav.agenda")}</h1>
-      <div class="bascule">
-        <button data-agenda="mois" class="${etat.agendaMode === "mois" ? "actif" : ""}">${t("agenda.mois")}</button>
-        <button data-agenda="semaine" class="${etat.agendaMode === "semaine" ? "actif" : ""}">${t("agenda.deux_semaines")}</button>
-      </div>
-      <a class="btn" href="/api/agenda/ics" title="${t("agenda.exporter_titre")}">${t("agenda.exporter")}</a>
-      <button class="btn btn-accent" onclick="ouvrirConnexionCalendrier()">${t("agenda.connecter_calendrier")}</button>
-    </div>
-    <div class="legende-agenda">
-      <span class="puce puce-statut" style="--couleur-statut:${COULEURS_ECHEANCE.entretien}"><span class="point"></span>${tv("Entretien")}</span>
-      <span class="puce puce-statut" style="--couleur-statut:${COULEURS_ECHEANCE.debut}"><span class="point"></span>${t("agenda.legende_debut")}</span>
-    </div>`;
-
-  if (etat.agendaMode === "semaine") {
-    const blocs = [];
-    const curseur = new Date();
-    for (let i = 0; i < 14; i++) {
-      const iso = dateISOLocale(curseur);
-      const jour = parJour[iso] || [];
-      if (jour.length) {
-        const libelle = curseur.toLocaleDateString(localeAgenda, { weekday: "long", day: "numeric", month: "long" });
-        blocs.push(`
-          <div class="jour-semaine">
-            <div class="jour-semaine-titre">${echapper(libelle)}${i === 0 ? " - " + t("agenda.aujourdhui_minuscule") : ""}</div>
-            ${jour.map(chipEcheance).join("")}
-          </div>`);
-      }
-      curseur.setDate(curseur.getDate() + 1);
-    }
-    return entete + (blocs.length
-      ? `<div class="carte">${blocs.join("")}</div>`
-      : `<div class="etat-vide"><div class="titre">${t("agenda.vide_titre")}</div><p>${t("agenda.vide_texte")}</p></div>`);
-  }
-
-  // Vue mois
-  const base = etat.agendaBase;
-  const nomMois = base.toLocaleDateString(localeAgenda, { month: "long", year: "numeric" });
-  const decalage = (new Date(base.getFullYear(), base.getMonth(), 1).getDay() + 6) % 7; // lundi = 0
-  const joursDansMois = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
-  const aujourdHui = dateISOLocale(new Date());
-  const cellules = [];
-  for (let i = 0; i < decalage; i++) cellules.push(`<div class="cellule-jour hors-mois"></div>`);
-  for (let jour = 1; jour <= joursDansMois; jour++) {
-    const iso = dateISOLocale(new Date(base.getFullYear(), base.getMonth(), jour));
-    const evenementsJour = parJour[iso] || [];
-    const visibles = evenementsJour.slice(0, 3).map(chipEcheance).join("");
-    const reste = evenementsJour.length > 3 ? `<span class="sous-titre">+${evenementsJour.length - 3}</span>` : "";
-    cellules.push(`
-      <div class="cellule-jour${iso === aujourdHui ? " aujourdhui" : ""}">
-        <div class="jour-numero">${jour}</div>
-        ${visibles}${reste}
-      </div>`);
-  }
-  return `${entete}
-    <div class="agenda-nav">
-      <button class="btn" id="agenda-precedent">‹</button>
-      <div class="agenda-mois">${echapper(nomMois)}</div>
-      <button class="btn" id="agenda-suivant">›</button>
-      <button class="btn btn-discret" id="agenda-aujourdhui">${t("agenda.aujourdhui")}</button>
-    </div>
-    <div class="grille-agenda-entete">${t("agenda.jours_semaine").split(",").map((j) => `<div>${j}</div>`).join("")}</div>
-    <div class="grille-agenda">${cellules.join("")}</div>`;
-}
-
-function activerAgenda() {
-  document.querySelectorAll("[data-agenda]").forEach((bouton) => {
-    bouton.addEventListener("click", () => { etat.agendaMode = bouton.dataset.agenda; rendre(); });
-  });
-  const decaler = (mois) => {
-    etat.agendaBase = new Date(etat.agendaBase.getFullYear(), etat.agendaBase.getMonth() + mois, 1);
-    rendre();
-  };
-  const precedent = document.getElementById("agenda-precedent");
-  if (precedent) {
-    precedent.addEventListener("click", () => decaler(-1));
-    document.getElementById("agenda-suivant").addEventListener("click", () => decaler(1));
-    document.getElementById("agenda-aujourdhui").addEventListener("click", () => {
-      const maintenant = new Date();
-      etat.agendaBase = new Date(maintenant.getFullYear(), maintenant.getMonth(), 1);
-      rendre();
-    });
-  }
-}
-
-/* « S'abonner » (webcal, en direct tant qu'Azimut tourne) pour Calendrier/
-   Outlook, et marche à suivre pour Google Agenda (pas d'abonnement possible
-   sur une adresse locale : lien par événement ou import du fichier .ics). */
-function ouvrirConnexionCalendrier() {
-  const lienAbonnement = location.origin.replace(/^http/, "webcal") + "/api/agenda/abonnement.ics";
-  const blocRappels = etat.valeurs.plateforme_macos
-    ? `<div class="bloc-calendrier">
-      <h3>${t("agenda.rappels_titre")}</h3>
-      <p class="sous-titre">${t("agenda.rappels_texte")}</p>
-      <button class="btn" id="btn-tout-pousser-rappels">${t("agenda.envoyer_toutes_echeances")}</button>
-      <p class="sous-titre" id="resultat-rappels" style="margin-top:8px;"></p>
-    </div>`
-    : "";
-  ouvrirModale(
-    t("agenda.connecter_calendrier"),
-    `
-    <div class="bloc-calendrier">
-      <h3>${t("agenda.calendrier_mac_titre")}</h3>
-      <p class="sous-titre">${t("agenda.calendrier_mac_texte")}</p>
-      <a class="btn btn-accent" href="${lienAbonnement}">${t("agenda.sabonner")}</a>
-    </div>
-    <div class="bloc-calendrier">
-      <h3>${t("agenda.google_titre")}</h3>
-      <p class="sous-titre">${t("agenda.google_texte")}</p>
-      <ul>
-        <li>${t("agenda.google_option1")}</li>
-        <li>${t("agenda.google_option2")}</li>
-      </ul>
-      <a class="btn" href="/api/agenda/ics">${t("agenda.telecharger_ics")}</a>
-    </div>
-    <div class="bloc-calendrier">
-      <h3>${t("agenda.outlook_titre")}</h3>
-      <p class="sous-titre">${t("agenda.outlook_texte")}</p>
-    </div>
-    ${blocRappels}`,
-    `<button class="btn btn-accent" onclick="fermerModale()">${t("commun.fermer")}</button>`
-  );
-  const boutonToutPousser = document.getElementById("btn-tout-pousser-rappels");
-  if (boutonToutPousser) {
-    boutonToutPousser.addEventListener("click", async (evenement) => {
-      const bouton = evenement.currentTarget;
-      bouton.disabled = true;
-      bouton.textContent = t("agenda.envoi_en_cours");
-      try {
-        const resultat = await api("/api/rappels/tout_pousser", { methode: "POST" });
-        document.getElementById("resultat-rappels").textContent =
-          t("agenda.rappels_crees", { n: resultat.reussies }) + (resultat.echouees ? ", " + t("agenda.rappels_echecs", { n: resultat.echouees }) : ".");
-        toast(t("agenda.rappels_envoyes", { n: resultat.reussies }));
-      } catch (erreur) {
-        toast(erreur.message, true);
-      } finally {
-        bouton.disabled = false;
-        bouton.textContent = t("agenda.envoyer_toutes_echeances");
-      }
-    });
   }
 }
 
@@ -2080,14 +1690,21 @@ async function vueRecherche() {
       ...resultats.entreprises.map((e) =>
         resultatRecherche("entreprise", t("recherche.badge_entreprise"), `ouvrirDetailEntreprise(${e.id})`,
           e.nom, e.site_web || "", e)),
-      ...resultats.contacts.map((c) =>
-        resultatRecherche("contact", t("recherche.badge_contact"), `ouvrirDetailContact(${c.id})`,
-          c.nom, `${c.entreprise}${c.poste ? " · " + c.poste : ""}`, c)),
+      ...resultats.notes.map((n) =>
+        resultatRecherche("note", t("recherche.badge_note"), `location.hash='#/entretiens/${n.id}'`,
+          n.titre, `${n.entreprise}${n.poste ? " · " + n.poste : ""}`, n)),
+      ...resultats.lettres.map((l) =>
+        resultatRecherche("lettre", t("recherche.badge_lettre"), `ouvrirApercuPiece('lettres', ${l.id})`,
+          l.titre, l.entreprise, l)),
+      ...resultats.fiches.map((f) =>
+        resultatRecherche("fiche", t("recherche.badge_fiche"), `ouvrirApercuPiece('fiches', ${f.id})`,
+          f.titre, f.entreprise, f)),
     ];
     corps = rendus.length
       ? `<div class="liste-resultats">${rendus.join("")}</div>
          <p class="sous-titre">${t("recherche.resultats_compte", {
-           n: rendus.length, cand: resultats.candidatures.length, ent: resultats.entreprises.length, contacts: resultats.contacts.length,
+           n: rendus.length, cand: resultats.candidatures.length, ent: resultats.entreprises.length,
+           notes: resultats.notes.length, lettres: resultats.lettres.length, fiches: resultats.fiches.length,
          })}</p>`
       : `<div class="etat-vide"><div class="titre">${t("recherche.aucun_resultat", { requete: echapper(requete) })}</div><p>${t("recherche.aucun_resultat_texte")}</p></div>`;
   }
@@ -2124,8 +1741,44 @@ function activerRecherche() {
    Réglages : clé API, modèle, sauvegardes
    ======================================================================== */
 
+function carteProfilCv(cv) {
+  const sourceLabel = cv.defini ? t(`profil.source_${cv.source}`) : null;
+  let details = "";
+  if (cv.defini) {
+    if (cv.source === "fichier" && cv.nom_fichier) {
+      details += `<p class="sous-titre">${t("profil.fichier_nom", { nom: echapper(cv.nom_fichier) })}</p>`;
+    }
+    if (cv.source === "dossier_latex" && cv.chemin) {
+      details += `<p class="sous-titre">${t("profil.dossier_chemin", { chemin: echapper(cv.chemin) })}</p>`;
+    }
+    if (cv.erreur) {
+      details += `<p class="sous-titre" style="color:var(--danger);">${t("profil.erreur_lecture", { erreur: echapper(cv.erreur) })}</p>`;
+    } else if (cv.apercu) {
+      details += `<div class="champ pleine-largeur" style="margin-top:8px;"><label>${t("profil.apercu")}</label>
+        <textarea readonly style="min-height:80px;">${echapper(cv.apercu)}${cv.apercu.length >= 300 ? "…" : ""}</textarea></div>`;
+    }
+  }
+  return `
+    <div class="carte">
+      <h2>${t("profil.titre")}</h2>
+      <p class="sous-titre">${t("profil.texte")}</p>
+      <div class="champ" style="margin-top:12px;">
+        <label>${t("profil.cv_actuel")}</label>
+        <input type="text" readonly value="${cv.defini ? echapper(sourceLabel) : echapper(t("profil.aucun_cv"))}">
+      </div>
+      ${details}
+      <div class="actions-reglages" style="flex-wrap:wrap;">
+        <button class="btn" id="profil-cv-fichier-btn">${t("profil.televerser_fichier")}</button>
+        <input type="file" id="profil-cv-fichier" accept=".pdf,.docx,.txt,.md" hidden>
+        <button class="btn" id="profil-cv-dossier-latex">${t("profil.indiquer_dossier_latex")}</button>
+        <button class="btn" id="profil-cv-texte">${t("profil.coller_texte")}</button>
+        ${cv.defini ? `<button class="btn btn-danger" id="profil-cv-supprimer">${t("commun.supprimer")}</button>` : ""}
+      </div>
+    </div>`;
+}
+
 async function vueReglages() {
-  const r = await api("/api/reglages");
+  const [r, cv] = await Promise.all([api("/api/reglages"), api("/api/profil/cv")]);
   etat.ia = r;
   const modelesAnthropic = ["claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"];
   const estAnthropic = r.fournisseur_ia !== "openai_compatible";
@@ -2201,6 +1854,8 @@ async function vueReglages() {
           ${r.cle_api_definie ? `<button class="btn btn-danger" id="reg-supprimer-cle">${t("reglages.supprimer_cle")}</button>` : ""}
         </div>
       </div>
+
+      ${carteProfilCv(cv)}
 
       <div class="carte">
         <h2>${t("reglages.dossier_titre")}</h2>
@@ -2349,6 +2004,79 @@ function activerReglages() {
     });
   }
 
+  // Profil - CV (voir profil.py) : trois façons de le fournir, une seule active à la fois.
+  document.getElementById("profil-cv-fichier-btn").addEventListener("click", () => {
+    document.getElementById("profil-cv-fichier").click();
+  });
+  document.getElementById("profil-cv-fichier").addEventListener("change", async (evenement) => {
+    const fichier = evenement.target.files[0];
+    if (!fichier) return;
+    const formulaire = new FormData();
+    formulaire.append("fichier", fichier);
+    try {
+      const reponse = await fetch("/api/profil/cv/fichier", { method: "POST", body: formulaire });
+      const donnees = await reponse.json();
+      if (!reponse.ok) throw new Error(donnees.erreur || t("documents.envoi_impossible"));
+      toast(t("profil.cv_enregistre"));
+      rendre();
+    } catch (erreur) {
+      toast(erreur.message, true);
+    }
+  });
+
+  document.getElementById("profil-cv-dossier-latex").addEventListener("click", async () => {
+    const chemin = await demanderTexte(
+      t("profil.indiquer_dossier_latex"), t("profil.dossier_latex_placeholder"), ""
+    );
+    if (chemin === null || !chemin.trim()) return;
+    try {
+      await api("/api/profil/cv/dossier_latex", { methode: "POST", corps: { chemin: chemin.trim() } });
+      toast(t("profil.cv_enregistre"));
+      rendre();
+    } catch (erreur) {
+      toast(erreur.message, true);
+    }
+  });
+
+  document.getElementById("profil-cv-texte").addEventListener("click", () => {
+    ouvrirModale(
+      t("profil.coller_texte"),
+      `<div class="champ pleine-largeur">
+        <textarea id="profil-cv-texte-zone" style="min-height:220px;" placeholder="${t("profil.texte_placeholder")}"></textarea>
+      </div>`,
+      `<button class="btn" id="profil-cv-texte-annuler">${t("commun.annuler")}</button>
+       <button class="btn btn-accent" id="profil-cv-texte-valider">${t("commun.enregistrer")}</button>`,
+      true
+    );
+    document.getElementById("profil-cv-texte-annuler").addEventListener("click", fermerModale);
+    document.getElementById("profil-cv-texte-valider").addEventListener("click", async () => {
+      const texte = document.getElementById("profil-cv-texte-zone").value;
+      try {
+        await api("/api/profil/cv/texte", { methode: "POST", corps: { texte } });
+        toast(t("profil.cv_enregistre"));
+        fermerModale();
+        rendre();
+      } catch (erreur) {
+        toast(erreur.message, true);
+      }
+    });
+  });
+
+  const supprimerCv = document.getElementById("profil-cv-supprimer");
+  if (supprimerCv) {
+    supprimerCv.addEventListener("click", async () => {
+      const accord = await confirmer(t("profil.supprimer_cv_titre"), t("profil.supprimer_cv_texte"));
+      if (!accord) return;
+      try {
+        await api("/api/profil/cv", { methode: "DELETE" });
+        toast(t("profil.cv_supprime"));
+        rendre();
+      } catch (erreur) {
+        toast(erreur.message, true);
+      }
+    });
+  }
+
   document.getElementById("reg-sauvegarder").addEventListener("click", async () => {
     try {
       const resultat = await api("/api/sauvegarde", { methode: "POST" });
@@ -2465,67 +2193,15 @@ function activerReglages() {
 }
 
 /* ========================================================================
-   Mode entretien : fiche à gauche, notes en direct à droite
+   Modales : confirmations, saisies, récapitulatif
    ======================================================================== */
 
-async function vueModeEntretien(numero) {
-  const [fiche, cand] = await Promise.all([
-    api(`/api/entretien/${numero}`),
-    api(`/api/candidatures/${numero}`),
-  ]);
-  return `
-    <div class="entete-vue">
-      <button class="btn" onclick="location.hash='#/candidatures'">${t("entretien.retour")}</button>
-      <div style="flex:1;">
-        <h1>${echapper(cand.entreprise)}</h1>
-        <div class="sous-titre">${echapper(cand.poste)} - ${t("entretien.mode_entretien_soustitre")}${cand.date_entretien ? " · " + dateFr(cand.date_entretien) : ""}</div>
-      </div>
-      <span class="sous-titre" id="indicateur-notes"></span>
-    </div>
-    <div class="mode-entretien">
-      <div class="carte fiche">${rendreMarkdown(fiche.markdown)}</div>
-      <div class="carte colonne-notes">
-        <h2>${t("formulaire.notes_entretien")}</h2>
-        <textarea id="zone-notes-entretien"
-          placeholder="${t("entretien.notes_placeholder")}">${echapper(cand.notes_entretien || "")}</textarea>
-      </div>
-    </div>`;
-}
-
-function activerModeEntretien(numero) {
-  const zone = document.getElementById("zone-notes-entretien");
-  const indicateur = document.getElementById("indicateur-notes");
-  if (!zone) return;
-  zone.focus();
-  let minuteur;
-  zone.addEventListener("input", () => {
-    indicateur.textContent = t("entretien.enregistrement_en_cours");
-    clearTimeout(minuteur);
-    minuteur = setTimeout(async () => {
-      try {
-        await api(`/api/candidatures/${numero}`, {
-          methode: "PATCH",
-          corps: { notes_entretien: zone.value },
-        });
-        const heure = new Date().toLocaleTimeString(etat.langue === "en" ? "en-US" : "fr-FR", { hour: "2-digit", minute: "2-digit" });
-        indicateur.textContent = t("entretien.enregistre_a", { heure });
-      } catch (erreur) {
-        indicateur.textContent = "";
-        toast(erreur.message, true);
-      }
-    }, 800);
-  });
-}
-
-/* ========================================================================
-   Modale : fiche entretien + confirmations
-   ======================================================================== */
-
-function ouvrirModale(titre, corpsHTML, piedHTML, etroite = false) {
+function ouvrirModale(titre, corpsHTML, piedHTML, etroite = false, large = false) {
   document.getElementById("modale-titre").textContent = titre;
   document.getElementById("modale-corps").innerHTML = corpsHTML;
   document.getElementById("modale-pied").innerHTML = piedHTML;
   document.getElementById("modale-boite").classList.toggle("etroite", etroite);
+  document.getElementById("modale-boite").classList.toggle("large", large);
   document.getElementById("modale").classList.add("visible");
 }
 
@@ -2651,11 +2327,11 @@ function rendreMarkdown(texte) {
   return sortie.join("\n");
 }
 
-async function ouvrirFicheEntretien(numero) {
+async function ouvrirRecapitulatif(numero) {
   try {
     const fiche = await api(`/api/entretien/${numero}`);
     ouvrirModale(
-      t("entretien.fiche_titre"),
+      t("entretien.recap_titre"),
       `<div class="fiche">${rendreMarkdown(fiche.markdown)}</div>`,
       `<a class="btn" href="/api/entretien/${numero}/telecharger">${t("entretien.telecharger_md")}</a>
        <button class="btn btn-accent" onclick="fermerModale()">${t("commun.fermer")}</button>`
@@ -2704,7 +2380,7 @@ document.getElementById("fichier-import").addEventListener("change", async (even
     if (!reponse.ok) throw new Error(rapport.erreur || t("branchements.import_impossible"));
     const morceaux = [
       `<p>${t("branchements.import_resume", {
-        cand: rapport.candidatures_ajoutees, contacts: rapport.contacts_ajoutes, ent: rapport.entreprises_ajoutees,
+        cand: rapport.candidatures_ajoutees, notes: rapport.notes_ajoutees, ent: rapport.entreprises_ajoutees,
       })}</p>`,
     ];
     if (rapport.ignores.length) {
@@ -2878,6 +2554,14 @@ document.addEventListener("click", (evenement) => {
   const masque = champ.type === "password";
   champ.type = masque ? "text" : "password";
   bouton.textContent = masque ? t("commun.masquer") : t("commun.afficher");
+});
+
+// Un fichier lâché en dehors d'une zone de dépôt ferait naviguer la fenêtre vers ce
+// fichier (et quitter Azimut) : on annule ce comportement par défaut partout.
+["dragover", "drop"].forEach((evenement) => {
+  window.addEventListener(evenement, (e) => {
+    if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files")) e.preventDefault();
+  });
 });
 
 // Filet de sécurité : aucune erreur JS ne doit rester silencieuse.

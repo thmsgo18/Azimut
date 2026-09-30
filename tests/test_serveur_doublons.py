@@ -1,4 +1,4 @@
-"""Tests API : quasi-doublons, fusion d'entreprises, calendrier (webcal)."""
+"""Tests API : quasi-doublons et fusion d'entreprises."""
 
 import sys
 import tempfile
@@ -70,9 +70,7 @@ class TestApiDoublonsEtFusion(unittest.TestCase):
         e2 = self.client.post(
             "/api/entreprises", json={"nom": "Mistral", "site_web": "https://mistral.ai"}
         ).get_json()["id"]
-        self.client.post(
-            "/api/contacts", json={"entreprise": "Mistral", "nom": "Jean Dupont"}
-        )
+        self.client.post("/api/notes", json={"entreprise": "Mistral", "titre": "Appel RH"})
 
         suspects = self.client.get("/api/entreprises/doublons_suspects").get_json()
         self.assertEqual(len(suspects), 1)
@@ -82,7 +80,7 @@ class TestApiDoublonsEtFusion(unittest.TestCase):
         )
         self.assertEqual(fusion.status_code, 200)
         resultat = fusion.get_json()
-        self.assertEqual(resultat["contacts_deplaces"], 1)
+        self.assertEqual(resultat["notes_deplacees"], 1)
         self.assertEqual(resultat["champs_completes"], ["site_web"])
 
         entreprises = self.client.get("/api/entreprises").get_json()
@@ -102,36 +100,6 @@ class TestApiDoublonsEtFusion(unittest.TestCase):
             "/api/entreprises/fusionner", json={"conserver": e1, "supprimer": 999}
         )
         self.assertEqual(reponse.status_code, 404)
-
-
-class TestApiCalendrier(unittest.TestCase):
-    def setUp(self):
-        self.dossier = tempfile.TemporaryDirectory()
-        self.chemin_origine = db.CHEMIN_DB
-        db.CHEMIN_DB = Path(self.dossier.name) / "test.db"
-        db.initialiser_base()
-        from serveur import app
-
-        app.config["TESTING"] = True
-        self.client = app.test_client()
-
-    def tearDown(self):
-        db.CHEMIN_DB = self.chemin_origine
-        self.dossier.cleanup()
-
-    def test_telechargement_et_abonnement_meme_contenu(self):
-        self.client.post(
-            "/api/candidatures",
-            json={"entreprise": "AgentikCo", "poste": "Stage", "date_entretien": "2099-03-01"},
-        )
-        telechargement = self.client.get("/api/agenda/ics")
-        abonnement = self.client.get("/api/agenda/abonnement.ics")
-        self.assertEqual(telechargement.status_code, 200)
-        self.assertEqual(abonnement.status_code, 200)
-        self.assertEqual(telechargement.data, abonnement.data)
-        self.assertIn("attachment", telechargement.headers.get("Content-Disposition", ""))
-        self.assertNotIn("attachment", abonnement.headers.get("Content-Disposition", ""))
-        self.assertIn("text/calendar", abonnement.headers["Content-Type"])
 
 
 if __name__ == "__main__":
