@@ -224,9 +224,10 @@ la base reste telle qu'elle était et une connexion n'est jamais laissée ouvert
 section Contacts retirée (table `contacts`), les notes d'entretien de la candidature (ancienne colonne
 `notes_entretien`) devenues des notes de la section Entretiens, les lettres à fichier principal unique
 (`chemin_fichier`), les **documents** (ancienne table liée à UNE candidature → entreprise + une ou
-plusieurs candidatures, mêmes identifiants et mêmes fichiers) et le **CV** unique des réglages
+plusieurs candidatures, mêmes identifiants et mêmes fichiers, texte extrait pour la recherche) et le **CV** unique des réglages
 (`cv_source`…) devenu le CV principal de la table `cvs`. Toute modification du schéma passe par là,
-avec un test dans `tests/test_migrations.py` sur une base « à l'ancienne ».
+avec un test dans `tests/test_migrations.py` sur une base « à l'ancienne ». Les lignes de journal d'une candidature disparue
+(anciennes suppressions) sont aussi retirées. `cli.py documents reindexer` complète le texte des documents qui n'en ont pas.
 
 **Ne jamais ouvrir la vraie base avec une version du code plus récente que l'appli en cours
 d'exécution** sans prévenir : l'ancienne version, encore ouverte, retape son schéma dessus.

@@ -14,6 +14,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import db
 
@@ -88,6 +89,36 @@ class TestMigrationDocuments(BaseMigration):
         )
         self.assertEqual(self._lignes("PRAGMA foreign_key_check"), [])
         self.assertNotIn("documents_nouvelle", str(self._lignes("SELECT name FROM sqlite_master")))
+
+    def test_le_texte_des_fichiers_deja_ranges_est_extrait_pour_la_recherche(self):
+        from fichiers_exemple import pdf_avec_texte
+
+        fichier = Path(self.dossier.name) / "offre.pdf"
+        fichier.write_bytes(pdf_avec_texte("Mission : orchestrer des agents Kubernetes."))
+        self._vieille_base(
+            "INSERT INTO documents (candidature_id, nom_fichier, chemin, type_document) VALUES "
+            f"(1, 'offre.pdf', '{fichier}', 'Offre (PDF)'), (1, 'perdu.pdf', '/nulle/part/perdu.pdf', 'Autre');"
+        )
+        db.initialiser_base(self.chemin)
+        textes = {l["titre"]: l["contenu"] for l in self._lignes("SELECT titre, contenu FROM documents")}
+        self.assertIn("Kubernetes", textes["offre.pdf"])
+        self.assertEqual(textes["perdu.pdf"], "")  # fichier absent : rien d'extrait, rien de cassé
+        import documents
+
+        self.assertEqual(documents.lister_documents(recherche="kubernetes", chemin_db=self.chemin)[0]["titre"], "offre.pdf")
+
+    def test_reindexer_complete_les_documents_sans_texte(self):
+        import documents
+
+        self._vieille_base("INSERT INTO entreprises (nom) VALUES ('Autre');")
+        db.initialiser_base(self.chemin)
+        numero = documents.importer_document("Wavestone", "note.txt", "Texte à indexer".encode("utf-8"), chemin_db=self.chemin)
+        conn = db.connexion(self.chemin)
+        conn.execute("UPDATE documents SET contenu = '' WHERE id = ?", (numero,))
+        conn.commit(); conn.close()
+        self.assertEqual(documents.reindexer_documents(chemin_db=self.chemin), 1)
+        self.assertIn("indexer", documents.recuperer_document(numero, chemin_db=self.chemin)["contenu"])
+        self.assertEqual(documents.reindexer_documents(chemin_db=self.chemin), 0)  # idempotent
 
     def test_une_seule_copie_de_securite_prise_avant_toute_modification(self):
         self._vieille_base(
@@ -188,6 +219,26 @@ class TestMigrationCv(BaseMigration):
 
         self._vieille_base("INSERT INTO reglages VALUES ('cv_source', 'texte'), ('cv_texte', 'Mon CV en texte.');")
         self.assertEqual(cvs.obtenir_cv_texte(chemin_db=self.chemin), "Mon CV en texte.")
+
+
+class TestJournalOrphelin(BaseMigration):
+    def test_les_evenements_d_une_candidature_disparue_sont_retires_apres_copie_de_securite(self):
+        self._vieille_base(
+            "CREATE TABLE evenements (id INTEGER PRIMARY KEY AUTOINCREMENT, candidature_id INTEGER NOT NULL, "
+            "horodatage TEXT NOT NULL, type_evenement TEXT NOT NULL, description TEXT);"
+            "INSERT INTO evenements (candidature_id, horodatage, type_evenement, description) VALUES "
+            "(1, '2026-09-16T10:00:00', 'creation', 'valide'), (77, '2026-09-16T10:01:00', 'creation', 'orphelin');"
+        )
+        db.initialiser_base(self.chemin)
+        self.assertEqual(self._lignes("SELECT description FROM evenements"), [{"description": "valide"}])
+        self.assertEqual(self._lignes("PRAGMA foreign_key_check"), [])
+        copie = sqlite3.connect(self._copies()[0])
+        try:  # la copie de sécurité garde l'orphelin d'origine
+            self.assertEqual(copie.execute("SELECT COUNT(*) FROM evenements").fetchone()[0], 2)
+        finally:
+            copie.close()
+        db.initialiser_base(self.chemin)  # idempotent : pas de seconde copie
+        self.assertEqual(len(self._copies()), 1)
 
 
 class TestToutOuRien(BaseMigration):

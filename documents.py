@@ -77,3 +77,9 @@ def modifier_document(id_document, chemin_db=None, **champs):
 def supprimer_document(id_document, chemin_db=None):
     """Supprime un document (fichier, métadonnées et liens vers les candidatures)."""
     pieces_liees.supprimer(TYPE_DOCUMENT, id_document, chemin_db=chemin_db)
+
+
+def reindexer_documents(chemin_db=None):
+    """Extrait le texte des documents qui n'en ont pas encore (recherche). Retourne le
+    nombre de documents complétés."""
+    return pieces_liees.reindexer(TYPE_DOCUMENT, chemin_db=chemin_db)

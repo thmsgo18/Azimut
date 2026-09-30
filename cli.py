@@ -291,6 +291,7 @@ def construire_analyseur():
     )
     modifier.add_argument("--generale", action="store_true", help="Porte aussi sur l'entreprise en général")
     modifier.add_argument("--pas-generale", action="store_true", help="Ne porte plus sur l'entreprise en général")
+    actions.add_parser("reindexer", help="Extraire le texte des documents qui n'en ont pas encore (recherche)")
     lister = actions.add_parser("lister", help="Lister les documents")
     lister.add_argument("--entreprise", help="Filtrer par nom d'entreprise")
     lister.add_argument("--recherche", help="Recherche texte (titre, contenu, entreprise)")
@@ -666,6 +667,9 @@ def _executer_documents(args, chemin_db):
         )
         document = documents.recuperer_document(numero, chemin_db=chemin_db)
         print(f"✓ Document n°{numero} enregistré pour {args.entreprise} : {document['chemin_fichier']}")
+    elif args.action == "reindexer":
+        nombre = documents.reindexer_documents(chemin_db=chemin_db)
+        print(f"✓ Texte extrait pour {nombre} document(s).")
     elif args.action == "modifier":
         champs = {
             champ: valeur for champ, valeur in (

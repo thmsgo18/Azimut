@@ -497,6 +497,35 @@ def supprimer(type_piece, id_piece, chemin_db=None):
         reglages.chemin_reel(piece["chemin_fichier"]).unlink(missing_ok=True)
 
 
+def reindexer(type_piece, chemin_db=None):
+    """Extrait (au mieux) le texte des pièces qui n'en ont pas encore, pour que la
+    recherche les retrouve. Retourne le nombre de pièces completees."""
+    conn = db.ouvrir(chemin_db)
+    completees = 0
+    try:
+        lignes = conn.execute(
+            f"SELECT id, chemin_fichier FROM {type_piece.table} "
+            "WHERE (contenu IS NULL OR contenu = '') AND chemin_fichier IS NOT NULL"
+        ).fetchall()
+        for ligne in lignes:
+            chemin = reglages.chemin_reel(ligne["chemin_fichier"])
+            if chemin.suffix.lower() not in EXTENSIONS_TEXTE or not chemin.is_file():
+                continue
+            try:
+                texte = extraire_texte(chemin)[:TAILLE_MAX_TEXTE]
+            except ValeurNonAutorisee:
+                continue
+            if texte:
+                conn.execute(
+                    f"UPDATE {type_piece.table} SET contenu = ? WHERE id = ?", (texte, ligne["id"])
+                )
+                completees += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return completees
+
+
 def detacher_candidature(conn, type_piece, candidature_id):
     """Retire une candidature supprimée des liens d'une pièce (même connexion).
     La pièce elle-même est conservée : elle peut viser d'autres offres, ou rester

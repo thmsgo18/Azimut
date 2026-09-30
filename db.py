@@ -235,6 +235,17 @@ def _copier_avant_migration(conn):
         copie.close()
 
 
+def _evenements_orphelins(conn):
+    """Vrai s'il reste des lignes de journal dont la candidature n'existe plus
+    (anciennes suppressions qui oubliaient le journal)."""
+    return (
+        _table_existe(conn, "evenements") and _table_existe(conn, "candidatures")
+        and conn.execute(
+            "SELECT 1 FROM evenements WHERE candidature_id NOT IN (SELECT id FROM candidatures) LIMIT 1"
+        ).fetchone() is not None
+    )
+
+
 def _migration_destructive_necessaire(conn):
     """Vrai si une migration en attente supprimerait des données (table ou
     colonnes abandonnées) - évalué AVANT la création du schéma courant."""
@@ -246,6 +257,7 @@ def _migration_destructive_necessaire(conn):
         or "chemin_texte" in _colonnes(conn, "lettres_motivation")
         or "candidature_id" in _colonnes(conn, "documents")
         or _cv_dans_reglages(conn)
+        or _evenements_orphelins(conn)
     )
 
 
@@ -367,6 +379,24 @@ def _migrer_documents_ancienne_forme(conn):
         "SELECT document_id, candidature_id FROM liens_documents"
     )
     conn.execute("DROP TABLE liens_documents")
+    _indexer_documents_migres(conn)
+
+
+def _indexer_documents_migres(conn):
+    """L'ancienne table ne gardait pas le texte des fichiers : on l'extrait maintenant
+    (PDF, Word, texte) pour que la recherche retrouve aussi les documents déjà rangés.
+    Au mieux : un fichier absent ou illisible reste simplement sans texte."""
+    from extraction import EXTENSIONS_TEXTE, extraire_texte
+
+    for ligne in conn.execute("SELECT id, chemin_fichier FROM documents").fetchall():
+        chemin = Path(str(ligne["chemin_fichier"] or ""))
+        if chemin.suffix.lower() not in EXTENSIONS_TEXTE or not chemin.is_absolute() or not chemin.is_file():
+            continue
+        try:
+            texte = extraire_texte(chemin)[:200_000]
+        except Exception:
+            continue
+        conn.execute("UPDATE documents SET contenu = ? WHERE id = ?", (texte, ligne["id"]))
 
 
 REGLAGES_CV_ANCIENS = ("cv_source", "cv_chemin", "cv_nom_fichier", "cv_texte")
@@ -421,6 +451,12 @@ def _migrer_cv_reglages(conn):
     )
 
 
+def _migrer_evenements_orphelins(conn):
+    """Retire du journal les événements d'une candidature qui n'existe plus : ils
+    ne s'affichent nulle part et fausseraient un contrôle d'intégrité."""
+    conn.execute("DELETE FROM evenements WHERE candidature_id NOT IN (SELECT id FROM candidatures)")
+
+
 def _migrer(conn):
     """Toutes les migrations en une seule transaction : si l'une échoue, aucune
     n'est appliquée (la base reste telle qu'elle était, prête à être migrée à
@@ -434,6 +470,7 @@ def _migrer(conn):
         _migrer_suppression_contacts(conn)
         _migrer_documents_ancienne_forme(conn)
         _migrer_cv_reglages(conn)
+        _migrer_evenements_orphelins(conn)
         conn.execute("RELEASE migration")
     except Exception:
         conn.execute("ROLLBACK TO migration")
