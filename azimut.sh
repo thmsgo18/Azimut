@@ -8,14 +8,35 @@ cd "$(dirname "$0")" || exit 1
 echo "Azimut - suivi de candidatures"
 echo ""
 
+python_convient() {
+    "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1
+}
+
+if [ -x "venv/bin/python" ] && ! python_convient "venv/bin/python"; then
+    echo "✗ L'environnement Python (dossier venv) a été créé avec une version trop ancienne"
+    echo "  (Python 3.9 minimum). Le supprimer (rm -rf venv) puis relancer ce script."
+    read -r -p "Appuyer sur Entrée pour fermer…"
+    exit 1
+fi
+
 if [ ! -x "venv/bin/python" ]; then
     echo "Première installation : création de l'environnement Python…"
     # --system-site-packages : la fenêtre native (GTK/WebKit) passe par le
     # module « gi », fourni par les paquets système (python3-gi…) et non par pip.
-    if ! python3 -m venv --system-site-packages venv; then
+    # python3 est pris tel quel ; à défaut, les versions récentes installées à côté.
+    cree=""
+    for candidat in python3 python3.13 python3.12 python3.11 python3.10 python3.9; do
+        if command -v "$candidat" >/dev/null 2>&1 && python_convient "$candidat" \
+           && "$candidat" -m venv --system-site-packages venv; then
+            cree="oui"
+            break
+        fi
+        rm -rf venv
+    done
+    if [ -z "$cree" ]; then
         echo ""
-        echo "✗ Python 3 est introuvable (ou le paquet python3-venv manque)."
-        echo "  Debian/Ubuntu : sudo apt install python3-venv"
+        echo "✗ Python 3.9 ou plus est introuvable (ou le paquet python3-venv manque)."
+        echo "  Debian/Ubuntu : sudo apt install python3 python3-venv"
         echo "  Fedora        : sudo dnf install python3"
         echo "  Arch          : sudo pacman -S python"
         echo "  puis relancer ce script."
@@ -24,14 +45,18 @@ if [ ! -x "venv/bin/python" ]; then
     fi
 fi
 
-if ! ./venv/bin/python -c "import flask, openpyxl, webview" 2>/dev/null; then
-    echo "Installation des dépendances (flask, openpyxl, pywebview)…"
+# Dépendances : réinstallées dès que requirements.txt a changé depuis la dernière
+# installation - y compris après une mise à jour d'Azimut qui en ajoute de nouvelles.
+if ! cmp -s requirements.txt venv/.requirements-installed 2>/dev/null; then
+    echo "Installation des dépendances (voir requirements.txt)…"
     ./venv/bin/python -m pip install --quiet --upgrade pip
     if ! ./venv/bin/pip install --quiet -r requirements.txt; then
-        echo "✗ Installation impossible (connexion Internet requise au premier lancement)."
+        echo "✗ Installation impossible (connexion Internet requise au premier lancement"
+        echo "  et après une mise à jour d'Azimut)."
         read -r -p "Appuyer sur Entrée pour fermer…"
         exit 1
     fi
+    cp requirements.txt venv/.requirements-installed
 fi
 
 echo "Ouverture de la fenêtre Azimut… (fermer la fenêtre pour quitter)"

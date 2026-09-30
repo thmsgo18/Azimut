@@ -9,6 +9,17 @@ dialogue() {
     /usr/bin/osascript -e "display dialog \"$1\" with title \"Azimut\" buttons {\"OK\"} default button 1 with icon caution" >/dev/null 2>&1
 }
 
+# Python 3.9 minimum (celui d'Apple convient, à condition que pip soit mis à jour
+# d'abord - voir plus bas).
+python_convient() {
+    "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1
+}
+
+if [ -x "venv/bin/python" ] && ! python_convient "venv/bin/python"; then
+    dialogue "L'environnement Python d'Azimut a été créé avec une version trop ancienne (Python 3.9 minimum). Supprimer le dossier « venv » du projet, puis relancer Azimut."
+    exit 1
+fi
+
 # Premier lancement : installation automatique de l'environnement Python.
 # Un Python récent (python.org, Homebrew) est préféré à celui d'Apple
 # (/usr/bin/python3, souvent 3.9), mais ce dernier fonctionne aussi.
@@ -17,24 +28,32 @@ if [ ! -x "venv/bin/python" ]; then
     cree=""
     for candidat in /Library/Frameworks/Python.framework/Versions/Current/bin/python3 \
                     /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
-        if [ -x "$candidat" ] && "$candidat" -m venv venv >>/tmp/azimut-install.log 2>&1; then
+        if [ -x "$candidat" ] && python_convient "$candidat" \
+           && "$candidat" -m venv venv >>/tmp/azimut-install.log 2>&1; then
             cree="oui"
             break
         fi
+        rm -rf venv
     done
     if [ -z "$cree" ]; then
-        dialogue "Python 3 est introuvable. Ouvrir le Terminal, taper python3, accepter l'installation des outils de développement proposée par macOS, puis relancer Azimut."
+        dialogue "Python 3.9 ou plus est introuvable. Installer Python depuis python.org/downloads (ou taper python3 dans le Terminal et accepter l'installation des outils de développement proposée par macOS), puis relancer Azimut."
         exit 1
     fi
 fi
-if ! ./venv/bin/python -c "import flask, openpyxl, webview" >/dev/null 2>&1; then
+
+# Dépendances : (ré)installées dès que requirements.txt a changé depuis la dernière
+# installation - y compris après une mise à jour d'Azimut qui en ajoute de nouvelles
+# (un simple « import flask » réussirait à tort avec un ancien environnement).
+if ! cmp -s requirements.txt venv/.requirements-installed 2>/dev/null; then
+    : >>/tmp/azimut-install.log
     # pip à jour d'abord : l'ancien pip du Python d'Apple ne sait pas
     # installer pyobjc (utilisé par la fenêtre native).
     ./venv/bin/python -m pip install --quiet --upgrade pip >>/tmp/azimut-install.log 2>&1
     if ! ./venv/bin/pip install --quiet -r requirements.txt >>/tmp/azimut-install.log 2>&1; then
-        dialogue "Installation des dépendances impossible. Vérifier la connexion Internet (nécessaire une seule fois, au premier lancement), puis relancer Azimut."
+        dialogue "Installation des dépendances impossible. Vérifier la connexion Internet (nécessaire au premier lancement et après une mise à jour d'Azimut), puis relancer Azimut. Détail : /tmp/azimut-install.log"
         exit 1
     fi
+    cp requirements.txt venv/.requirements-installed
 fi
 
 exec ./venv/bin/python app_bureau.py

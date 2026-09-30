@@ -1,0 +1,9 @@
+# Fins de ligne : chaque fichier garde celles que son système attend, quel que soit
+# le système sur lequel il est extrait ou téléchargé en ZIP.
+# Le lanceur Windows doit rester en CRLF (cmd.exe lit mal un .bat en LF).
+*.bat -text
+# Les scripts de lancement macOS / Linux doivent rester en LF (un CR final casse le « #! »).
+*.sh text eol=lf
+*.command text eol=lf
+Azimut.app/Contents/MacOS/azimut text eol=lf
+suivi text eol=lf
