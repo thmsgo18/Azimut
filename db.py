@@ -1,6 +1,7 @@
 """Connexion à la base de données SQLite, création du schéma et migrations."""
 
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -454,13 +455,39 @@ def _migrer_cv_reglages(conn):
 def _migrer_evenements_orphelins(conn):
     """Retire du journal les événements d'une candidature qui n'existe plus : ils
     ne s'affichent nulle part et fausseraient un contrôle d'intégrité."""
-    conn.execute("DELETE FROM evenements WHERE candidature_id NOT IN (SELECT id FROM candidatures)")
+    if _evenements_orphelins(conn):
+        conn.execute("DELETE FROM evenements WHERE candidature_id NOT IN (SELECT id FROM candidatures)")
+
+
+def _colonnes_a_ajouter(conn):
+    return any(
+        colonne not in _colonnes(conn, table)
+        for table, colonnes in COLONNES_AJOUTEES.items() for colonne in colonnes
+    )
+
+
+def _migration_necessaire(conn):
+    """Vrai s'il reste quelque chose à migrer. Lecture seule : une base à jour ne doit
+    JAMAIS prendre le verrou d'écriture à l'ouverture, sinon les requêtes simultanées d'un
+    chargement de page (chacune ouvre sa connexion) se bloquent entre elles - « database
+    is locked »."""
+    return _migration_destructive_necessaire(conn) or _colonnes_a_ajouter(conn)
+
+
+# Une seule ouverture à la fois passe par la création du schéma et les migrations (les
+# requêtes du serveur s'exécutent dans des threads) : les autres attendent, puis constatent
+# qu'il n'y a plus rien à faire.
+_VERROU_OUVERTURE = threading.Lock()
 
 
 def _migrer(conn):
     """Toutes les migrations en une seule transaction : si l'une échoue, aucune
     n'est appliquée (la base reste telle qu'elle était, prête à être migrée à
-    nouveau une fois le problème réglé) - jamais à moitié migrée."""
+    nouveau une fois le problème réglé) - jamais à moitié migrée. Sans effet (et sans
+    écriture) quand la base est déjà à jour."""
+    if not _migration_necessaire(conn):
+        return
+    conn.execute("BEGIN IMMEDIATE")  # attend son tour plutôt que d'échouer si une autre écriture est en cours
     conn.execute("SAVEPOINT migration")
     try:
         _ajouter_colonnes_manquantes(conn)
@@ -475,6 +502,7 @@ def _migrer(conn):
     except Exception:
         conn.execute("ROLLBACK TO migration")
         conn.execute("RELEASE migration")
+        conn.rollback()
         raise
     conn.commit()
 
@@ -483,12 +511,13 @@ def ouvrir(chemin_db=None):
     """Ouvre une connexion en s'assurant que le schéma existe et est à jour."""
     conn = connexion(chemin_db)
     try:
-        # La copie de sécurité passe avant TOUT le reste (y compris la création
-        # des nouvelles tables) pour rester le reflet exact de la base d'origine.
-        if _migration_destructive_necessaire(conn):
-            _copier_avant_migration(conn)
-        conn.executescript(SCHEMA)
-        _migrer(conn)
+        with _VERROU_OUVERTURE:
+            # La copie de sécurité passe avant TOUT le reste (y compris la création
+            # des nouvelles tables) pour rester le reflet exact de la base d'origine.
+            if _migration_destructive_necessaire(conn):
+                _copier_avant_migration(conn)
+            conn.executescript(SCHEMA)
+            _migrer(conn)
     except Exception:
         conn.close()  # jamais une connexion (et un verrou de fichier sous Windows) laissée ouverte
         raise

@@ -9,6 +9,8 @@ la vraie."""
 import sqlite3
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -277,6 +279,97 @@ class TestSauvegardeRestauree(BaseMigration):
         self.assertEqual(len(liste), 1)
         self.assertEqual((liste[0]["entreprise"], liste[0]["type_document"]), ("Wavestone", "Offre (PDF)"))
         self.assertEqual([c["id"] for c in liste[0]["candidatures"]], [1])
+
+
+class TestOuvertureSansVerrou(unittest.TestCase):
+    """Une base à jour s'ouvre en LECTURE : ouvrir() ne doit jamais attendre (ni échouer) parce
+    qu'une autre connexion écrit. Le chargement d'une page lance plusieurs requêtes à la fois,
+    chacune ouvre sa connexion - vécu : « database is locked » sur la moitié des rubriques."""
+
+    def setUp(self):
+        self.dossier = tempfile.TemporaryDirectory()
+        self.chemin = Path(self.dossier.name) / "base.db"
+        db.initialiser_base(self.chemin)
+
+    def tearDown(self):
+        self.dossier.cleanup()
+
+    def test_ouvrir_pendant_une_ecriture_en_cours_ne_bloque_pas(self):
+        ecrivain = sqlite3.connect(self.chemin, timeout=0)
+        try:
+            ecrivain.execute("BEGIN IMMEDIATE")
+            ecrivain.execute("INSERT INTO entreprises (nom) VALUES ('Acme')")
+            connecter = sqlite3.connect
+            debut = time.monotonic()
+            # zéro attente : le moindre verrou demandé à l'ouverture échouerait tout de suite
+            with patch.object(db.sqlite3, "connect", lambda chemin: connecter(chemin, timeout=0)):
+                conn = db.ouvrir(self.chemin)
+            conn.close()
+            self.assertLess(time.monotonic() - debut, 1)
+        finally:
+            ecrivain.rollback()
+            ecrivain.close()
+
+    def test_des_ouvertures_simultanees_reussissent_toutes(self):
+        erreurs = []
+
+        def ouvrir_souvent():
+            for _ in range(25):
+                try:
+                    db.ouvrir(self.chemin).close()
+                except Exception as erreur:  # noqa: BLE001 - on veut toutes les erreurs
+                    erreurs.append(repr(erreur))
+
+        def ecrire_souvent():
+            for i in range(25):
+                conn = db.ouvrir(self.chemin)
+                conn.execute("INSERT INTO entreprises (nom) VALUES (?)", (f"Ecrite {i}",))
+                conn.commit()
+                conn.close()
+
+        fils = [threading.Thread(target=ouvrir_souvent) for _ in range(8)] + [threading.Thread(target=ecrire_souvent)]
+        for fil in fils:
+            fil.start()
+        for fil in fils:
+            fil.join()
+        self.assertEqual(erreurs, [])
+
+    def test_une_migration_en_attente_se_fait_une_fois_malgre_des_ouvertures_simultanees(self):
+        """Une vieille base ouverte par plusieurs requêtes en même temps : une seule copie de
+        sécurité, une seule migration, aucune erreur."""
+        ancien = Path(self.dossier.name) / "ancienne.db"
+        conn = sqlite3.connect(ancien)
+        conn.executescript(ANCIEN_SCHEMA)
+        conn.execute(
+            "CREATE TABLE evenements (id INTEGER PRIMARY KEY AUTOINCREMENT, candidature_id INTEGER NOT NULL, "
+            "horodatage TEXT NOT NULL, type_evenement TEXT NOT NULL, description TEXT)"
+        )
+        conn.execute(
+            "INSERT INTO evenements (candidature_id, horodatage, type_evenement, description) "
+            "VALUES (99, '2026-01-01T00:00:00', 'creation', 'orpheline')"
+        )
+        conn.commit()
+        conn.close()
+        erreurs = []
+
+        def ouvrir():
+            try:
+                db.ouvrir(ancien).close()
+            except Exception as erreur:  # noqa: BLE001
+                erreurs.append(repr(erreur))
+
+        fils = [threading.Thread(target=ouvrir) for _ in range(8)]
+        for fil in fils:
+            fil.start()
+        for fil in fils:
+            fil.join()
+        self.assertEqual(erreurs, [])
+        self.assertEqual(len(list(ancien.parent.glob("ancienne-avant-migration-*.db"))), 1)
+        conn = sqlite3.connect(ancien)
+        try:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM evenements WHERE candidature_id = 99").fetchone()[0], 0)
+        finally:
+            conn.close()
 
 
 if __name__ == "__main__":
