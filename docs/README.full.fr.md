@@ -180,6 +180,9 @@ python cli.py notes ajouter --candidature-id 12 --titre "Entretien technique" --
 python cli.py notes lister --entreprise "AgentikCo"
 python cli.py notes voir 3
 python cli.py notes pdf 3 --sortie note.pdf   # exporter une note en PDF
+python cli.py sauvegarde complete --sortie sauvegarde.zip   # sauvegarde complète (base + fichiers)
+python cli.py sauvegarde contenu sauvegarde.zip          # ce qu'elle contient
+python cli.py sauvegarde restaurer sauvegarde.zip --oui  # la restaurer (l'état actuel est gardé de côté)
 python cli.py documents importer --entreprise "Wavestone" --poste "Stage IA" --fichier offre.pdf --type "Offre (PDF)"
 python cli.py documents modifier 3 --candidature-id 67 --candidature-id 68   # remplace les offres liées
 python cli.py cv ajouter --nom "CV français" --langue fr --fichier cv.pdf --source ~/Documents/cv-fr
@@ -212,7 +215,11 @@ L'export régénère le fichier complet depuis la base : 4 onglets (« Suivi can
 
 L'import relit un tel fichier et réinjecte les données : les doublons sont ignorés et signalés, les lignes invalides sont rapportées avec leur numéro sans bloquer le reste - pratique comme sauvegarde lisible ou pour fusionner deux bases.
 
-**La sauvegarde intégrale**, c'est une copie du fichier `suivi_candidatures.db` (les textes : candidatures, entreprises, notes, contenu des lettres et fiches) **plus le dossier de données** (documents, lettres, fiches, CV : ce sont des fichiers). L'Excel ne contient ni les mots de passe de portail, ni la clé API - ceux-ci restent en clair dans la base locale, qui ne quitte jamais la machine - ni les fichiers.
+**La sauvegarde complète en un clic** (Réglages → *Sauvegarde complète*, ou `python cli.py sauvegarde complete`) produit un seul `.zip` : une copie cohérente de la base, tous les fichiers du dossier de données (documents, lettres, fiches, CV - chacun avec son empreinte) et un manifeste. La clé API et les mots de passe de portail y sont inclus par défaut (c'est une sauvegarde *complète* : garde-la pour toi), et une case à cocher / `--sans-secrets` les retire. Les *sources* de CV (dossier LaTeX, fichier Word) ne sont pas copiées : Azimut n'en garde que le chemin.
+
+**La restauration** (Réglages → *Restaurer une sauvegarde…*, ou `python cli.py sauvegarde restaurer archive.zip --oui`) est pensée pour ne jamais rien perdre : l'archive est entièrement vérifiée *avant* que quoi que ce soit ne change (structure, empreintes, intégrité de la base, aucun chemin qui sorte de l'archive) ; les fichiers sont écrits à côté de ceux qui existent - jamais écrasés (un fichier identique est réutilisé, un fichier différent de même nom reçoit un numéro) ; la base actuelle est copiée dans `sauvegardes/avant-restauration-<horodatage>.db` et ses fichiers restent en place ; les chemins des fichiers sont réécrits pour cette machine, en gardant le dossier de données choisi ici (et la clé API si la sauvegarde n'en a pas) ; une sauvegarde ancienne est mise au schéma actuel à l'entrée ; et si quoi que ce soit échoue avant le remplacement final, la base actuelle n'a pas bougé. Depuis l'appli, le fichier est d'abord envoyé et vérifié, son contenu est affiché, et seule une confirmation remplace les données. Sans `--oui`, la ligne de commande se contente d'afficher le contenu de l'archive.
+
+À la main, **la sauvegarde intégrale**, c'est une copie du fichier `suivi_candidatures.db` (les textes : candidatures, entreprises, notes, contenu des lettres et fiches) **plus le dossier de données** (documents, lettres, fiches, CV : ce sont des fichiers). L'Excel ne contient ni les mots de passe de portail, ni la clé API - ceux-ci restent en clair dans la base locale, qui ne quitte jamais la machine - ni les fichiers.
 
 ### Récapitulatif d'une candidature
 
@@ -367,6 +374,7 @@ azimut/
   statistiques.py   # entonnoir, délais, sources, courbe hebdomadaire, objectif
   reglages.py       # réglages locaux (clé API masquée, fournisseur IA, dossier, code compagnon)
   sauvegarde.py     # copies datées de la base, rotation
+  sauvegarde_complete.py # sauvegarde complète (base + fichiers) en un .zip, et sa restauration sûre
   agent.py          # analyse d'offres, lettres, fiches - Anthropic ou tout fournisseur compatible OpenAI
   entretien.py      # récapitulatif d'une candidature (Markdown)
   cli.py            # interface en ligne de commande

@@ -194,7 +194,7 @@ Le premier lancement installe les dépendances (1 à 3 minutes), puis la fenêtr
 ### Mettre à jour Azimut sans perdre ses données
 
 - **Avec Git** : dans le dossier d'Azimut, `git pull`, puis relance.
-- **Avec le ZIP** : télécharge le nouveau ZIP et décompresse-le. Copie ton fichier **`suivi_candidatures.db`** de l'ancien dossier vers le nouveau, ainsi que les dossiers `documents`, `lettres`, `fiches`, `cv`, `profil` et `sauvegardes` si tu as gardé l'emplacement par défaut. Supprime ensuite l'ancien dossier. Au premier lancement, la nouvelle version met ta base à jour toute seule, et garde une copie de sécurité de l'ancienne.
+- **Avec le ZIP** : télécharge le nouveau ZIP et décompresse-le. Le plus simple pour emporter tes données : dans l'ancienne version, **Réglages → Sauvegarde complète → Créer**, puis **Restaurer** dans la nouvelle (voir plus bas). Ou copie ton fichier **`suivi_candidatures.db`** de l'ancien dossier vers le nouveau, ainsi que les dossiers `documents`, `lettres`, `fiches`, `cv`, `profil` et `sauvegardes` si tu as gardé l'emplacement par défaut. Supprime ensuite l'ancien dossier. Au premier lancement, la nouvelle version met ta base à jour toute seule, et garde une copie de sécurité de l'ancienne.
 
 ## Fonctionnalités
 
@@ -278,6 +278,7 @@ Une section pour **tes CV** - le français, l'anglais, celui orienté data : le 
 - **Tableau de bord & statistiques** - entonnoir, délais, taux de réponse par source, courbe hebdomadaire, objectif hebdo.
 - **Recherche globale** (<kbd>⌘K</kbd>) - candidatures, entreprises, notes, documents, lettres et fiches, textes compris.
 - **Saisie assistée par IA** (optionnelle, tout fournisseur) - colle une offre, le formulaire se pré-remplit. Rien n'est écrit sans ta confirmation.
+- **Sauvegarde complète et restauration** (Réglages) : une seule archive `.zip` avec la base **et tous les fichiers** (documents, lettres, fiches, CV) - pour changer d'ordinateur ou se remettre d'un pépin. La restauration vérifie l'archive d'abord, n'écrase jamais un fichier et garde ton état précédent de côté.
 - **Export/import Excel**, sauvegardes automatiques de la base (avant toute migration, une copie de sécurité est prise).
 - **100 % local** - rien ne quitte ta machine, sauf export explicite ou activation de l'assistant IA.
 

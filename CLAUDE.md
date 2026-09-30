@@ -210,6 +210,15 @@ generation.generer_fiche(entreprise_nom, candidature_ids, ...) -> (id, avertisse
 # restent importables. Les lettres et fiches sont des fichiers : elles vivent dans le dossier de données.
 exporter_excel(chemin_sortie) / importer_excel(chemin_fichier) -> rapport
 
+# sauvegarde_complete.py - archive ZIP de la base ET des fichiers (documents, lettres, fiches, CV), et sa restauration
+#   (CLI : cli.py sauvegarde complete|contenu|restaurer ; interface : Réglages ; API : /api/sauvegarde-complete)
+creer(chemin_zip, avec_secrets=True) -> résumé      # manifeste + base cohérente + fichiers avec empreintes SHA-256
+lire_manifeste(chemin_zip) -> dict                  # vérifie la structure SANS rien extraire ; ValeurNonAutorisee sinon
+restaurer(chemin_zip) -> résumé                     # vérifie tout d'abord ; n'écrase jamais un fichier ; copie l'ancienne base dans
+    # sauvegardes/avant-restauration-<horodatage>.db ; réécrit les chemins pour cette machine ; conserve le dossier de
+    # données local (et la clé API si l'archive n'en a pas) ; migre une ancienne base ; rien ne bouge si ça échoue avant
+    # le remplacement. Ne jamais extraire une archive avec extractall : entrées listées par le manifeste seulement.
+
 # entretien.py / recherche.py / statistiques.py / sauvegarde.py
 generer_fiche_entretien(candidature_id) -> Markdown   # « Récapitulatif » de la candidature (préparation liée incluse)
 rechercher(texte) -> {candidatures, entreprises, notes, documents, lettres, fiches}

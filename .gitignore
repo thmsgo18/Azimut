@@ -21,6 +21,11 @@ __pycache__/
 # Exports Excel (données personnelles, régénérables depuis la base)
 *.xlsx
 
+# Sauvegardes complètes (base + fichiers, avec clé API et mots de passe par défaut) et
+# dossiers temporaires d'une restauration
+azimut-sauvegarde-*.zip
+.restauration-*/
+
 # Fichiers CSV téléversés le temps d'un import (nettoyés automatiquement)
 /import_temp/
 

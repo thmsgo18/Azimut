@@ -15,6 +15,7 @@ Exemples :
 import argparse
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 import candidatures
@@ -31,6 +32,7 @@ import import_excel
 import lettres
 import notes_entretien
 import notes_pdf
+import reglages
 from exceptions import ErreurSuivi
 
 
@@ -375,6 +377,27 @@ def construire_analyseur():
     supprimer = actions.add_parser("supprimer", help="Supprimer une note d'entretien")
     supprimer.add_argument("id", type=int, help="Numéro de la note")
 
+    # --- sauvegarde complète ---
+    sauvegarde_p = sections.add_parser("sauvegarde", help="Sauvegarde complète (base + fichiers) et restauration")
+    actions = sauvegarde_p.add_subparsers(dest="action", required=True, metavar="action")
+    complete = actions.add_parser("complete", help="Créer une archive ZIP de la base et de tous les fichiers")
+    complete.add_argument(
+        "--sortie",
+        help="Fichier ZIP (ou dossier) où l'écrire (défaut : azimut-sauvegarde-AAAA-MM-JJ.zip dans le dossier sauvegardes/)",
+    )
+    complete.add_argument(
+        "--sans-secrets", action="store_true", help="Retirer la clé API et les mots de passe de portail de l'archive"
+    )
+    contenu = actions.add_parser("contenu", help="Afficher ce que contient une sauvegarde complète")
+    contenu.add_argument("fichier", help="Archive ZIP")
+    restaurer = actions.add_parser(
+        "restaurer", help="Remplacer les données actuelles par celles d'une sauvegarde complète"
+    )
+    restaurer.add_argument("fichier", help="Archive ZIP")
+    restaurer.add_argument(
+        "--oui", action="store_true", help="Confirmer : sans cela, seul le contenu de l'archive est affiché"
+    )
+
     # --- init ---
     sections.add_parser("init", help="Créer la base de données si besoin")
 
@@ -572,6 +595,8 @@ def executer(args):
 
     elif args.section == "notes":
         _executer_notes(args, chemin_db)
+    elif args.section == "sauvegarde":
+        _executer_sauvegarde(args, chemin_db)
 
     elif args.section == "entretien":
         fiche = entretien.generer_fiche_entretien(args.id, chemin_db=chemin_db)
@@ -834,6 +859,58 @@ def _executer_notes(args, chemin_db):
     elif args.action == "supprimer":
         notes_entretien.supprimer_note(args.id, chemin_db=chemin_db)
         print(f"✓ Note n°{args.id} supprimée.")
+
+
+def _resume_sauvegarde(manifeste):
+    compteurs = manifeste.get("compteurs", {})
+    libelles = [
+        ("candidatures", "candidature(s)"), ("entreprises", "entreprise(s)"), ("documents", "document(s)"),
+        ("lettres", "lettre(s)"), ("fiches", "fiche(s)"), ("notes", "note(s)"), ("cv", "CV"),
+    ]
+    detail = ", ".join(f"{compteurs[cle]} {libelle}" for cle, libelle in libelles if compteurs.get(cle))
+    secrets = (
+        "avec la clé API et les mots de passe de portail" if manifeste.get("secrets_inclus", True)
+        else "sans clé API ni mots de passe de portail"
+    )
+    quand = (manifeste.get("cree_le") or "?").replace("T", " à ")
+    return f"Sauvegarde du {quand} : {detail or 'vide'} ; {len(manifeste.get('fichiers', []))} fichier(s), {secrets}."
+
+
+def _executer_sauvegarde(args, chemin_db):
+    import sauvegarde_complete
+
+    if args.action == "complete":
+        nom = f"azimut-sauvegarde-{date.today().isoformat()}.zip"
+        if args.sortie:
+            sortie = Path(args.sortie).expanduser()
+            if sortie.is_dir():
+                sortie = sortie / nom
+        else:  # jamais dans le dossier du projet : elle contient la clé API et sera peut-être partagée par erreur
+            sortie = reglages.dossier_donnees_pour("sauvegardes", chemin_db=chemin_db) / nom
+        resume = sauvegarde_complete.creer(sortie, chemin_db=chemin_db, avec_secrets=not args.sans_secrets)
+        print(f"✓ Sauvegarde complète : {resume['chemin']} ({resume['taille'] // 1024} Ko, {resume['fichiers']} fichier(s)).")
+        if resume["manquants"]:
+            print(f"⚠ {resume['manquants']} fichier(s) mentionné(s) par la base sont introuvables sur le disque - non inclus.")
+        if resume["secrets_inclus"]:
+            print("⚠ L'archive contient la clé API et les mots de passe de portail : ne la partage pas (--sans-secrets pour les retirer).")
+    elif args.action == "contenu":
+        print(_resume_sauvegarde(sauvegarde_complete.lire_manifeste(args.fichier)))
+    elif args.action == "restaurer":
+        manifeste = sauvegarde_complete.lire_manifeste(args.fichier)
+        print(_resume_sauvegarde(manifeste))
+        if not args.oui:
+            raise ErreurSuivi(
+                "Restaurer REMPLACE toutes les données actuelles (l'état actuel est gardé dans le dossier "
+                "sauvegardes/). Relance la commande avec --oui pour confirmer."
+            )
+        resume = sauvegarde_complete.restaurer(args.fichier, chemin_db=chemin_db)
+        print(
+            f"✓ Sauvegarde restaurée : {resume['fichiers_restaures']} fichier(s) remis en place, "
+            f"{resume['fichiers_reutilises']} déjà présent(s)."
+        )
+        if resume["copie_securite"]:
+            print(f"  L'ancien état de la base est conservé : {resume['copie_securite']}")
+        print("  Relance Azimut si l'appli est ouverte.")
 
 
 def principal(arguments=None):

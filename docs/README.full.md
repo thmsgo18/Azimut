@@ -180,6 +180,9 @@ python cli.py notes ajouter --candidature-id 12 --titre "Technical interview" --
 python cli.py notes lister --entreprise "AgentikCo"
 python cli.py notes voir 3
 python cli.py notes pdf 3 --sortie note.pdf   # export a note as a PDF
+python cli.py sauvegarde complete --sortie backup.zip   # full backup (database + files)
+python cli.py sauvegarde contenu backup.zip          # what is inside
+python cli.py sauvegarde restaurer backup.zip --oui  # restore it (the current state is kept aside)
 python cli.py documents importer --entreprise "Wavestone" --poste "Stage IA" --fichier offer.pdf --type "Offre (PDF)"
 python cli.py documents modifier 3 --candidature-id 67 --candidature-id 68   # replaces the linked jobs
 python cli.py cv ajouter --nom "French résumé" --langue fr --fichier cv.pdf --source ~/Documents/cv-fr
@@ -212,7 +215,11 @@ The export regenerates the full file from the database: 4 sheets ("Suivi candida
 
 The import re-reads such a file and re-injects the data: duplicates are skipped and reported, invalid rows are reported with their row number without blocking the rest - handy as a readable backup, or to merge two databases.
 
-**The full backup** is a copy of the `suivi_candidatures.db` file (the text data: applications, companies, notes, the text of letters and sheets) **plus the data folder** (documents, letters, sheets, resume: those are files). The Excel export contains neither portal passwords nor the API key - those stay in cleartext only in the local database, which never leaves the machine - nor the files.
+**The one-click full backup** (Settings → *Full backup*, or `python cli.py sauvegarde complete`) produces a single `.zip`: a consistent copy of the database, every file of the data folder (documents, letters, sheets, résumés - each with its checksum) and a manifest. The API key and portal passwords are included by default (it is a *complete* backup, so keep it private) and a checkbox / `--sans-secrets` leaves them out. Résumé *sources* (LaTeX folder, Word file) are not copied: Azimut only keeps their path.
+
+**Restoring** (Settings → *Restore a backup…*, or `python cli.py sauvegarde restaurer archive.zip --oui`) is designed never to lose anything: the archive is fully checked *before* anything changes (structure, checksums, database integrity, no path escaping the archive); files are written next to the existing ones - never overwritten (an identical file is reused, a different one of the same name gets a number); the current database is copied to `sauvegardes/avant-restauration-<timestamp>.db` and its files stay in place; file paths are rewritten for this machine while the data folder chosen here (and the API key if the backup has none) is kept; an older backup is upgraded to the current schema on the way in; and if anything fails before the final swap, the current database has not moved. From the app, the file is uploaded and verified first, its content is shown, and only a confirmation replaces the data. Without `--oui`, the command line only shows what the archive contains.
+
+By hand, **the full backup** is a copy of the `suivi_candidatures.db` file (the text data: applications, companies, notes, the text of letters and sheets) **plus the data folder** (documents, letters, sheets, resume: those are files). The Excel export contains neither portal passwords nor the API key - those stay in cleartext only in the local database, which never leaves the machine - nor the files.
 
 ### Application summary
 
@@ -367,6 +374,7 @@ azimut/
   statistiques.py   # funnel, delays, sources, weekly chart, weekly goal
   reglages.py       # local settings (masked API key, AI provider, data folder, companion code)
   sauvegarde.py     # dated copies of the database, rotation
+  sauvegarde_complete.py # full backup (database + files) as one .zip, and its safe restore
   agent.py          # posting analysis, letters, sheets - Anthropic or any OpenAI-compatible provider
   entretien.py      # application summary (Markdown)
   cli.py            # command-line interface

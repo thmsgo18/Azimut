@@ -1913,6 +1913,21 @@ async function vueReglages() {
       </div>
 
       <div class="carte">
+        <h2>${t("reglages.complete_titre")}</h2>
+        <p class="sous-titre">${t("reglages.complete_texte")}</p>
+        <label class="case">
+          <input type="checkbox" id="reg-complete-secrets" checked>
+          ${t("reglages.complete_secrets")}
+        </label>
+        <p class="sous-titre" id="reg-complete-secrets-note">${t("reglages.complete_secrets_note")}</p>
+        <div class="actions-reglages">
+          <button class="btn btn-accent" id="reg-complete-creer">${t("reglages.complete_creer")}</button>
+          <button class="btn" id="reg-complete-restaurer">${t("reglages.complete_restaurer")}</button>
+          <input type="file" id="reg-complete-fichier" accept=".zip,application/zip" hidden>
+        </div>
+      </div>
+
+      <div class="carte">
         <h2>${t("statistiques.objectif_hebdomadaire")}</h2>
         <p class="sous-titre">${t("reglages.objectif_texte")}</p>
         <div class="champ" style="margin-top:12px; max-width:160px;">
@@ -2047,6 +2062,8 @@ function activerReglages() {
     }
   });
 
+  brancherSauvegardeComplete();
+
   // Dossier de données : sélecteur natif si l'app de bureau l'expose, sinon
   // saisie manuelle (aussi ce qui s'affiche en aperçu navigateur).
   document.getElementById("reg-choisir-dossier").addEventListener("click", async () => {
@@ -2149,6 +2166,87 @@ function activerReglages() {
       }
     });
   }
+}
+
+/* ------------------------------------------------------------------------
+   Sauvegarde complète (base + fichiers) : création, puis restauration en deux temps -
+   le fichier est envoyé et vérifié, on en montre le contenu, et rien n'est remplacé
+   avant la confirmation.
+   ------------------------------------------------------------------------ */
+
+function brancherSauvegardeComplete() {
+  const secrets = document.getElementById("reg-complete-secrets");
+  const noteSecrets = document.getElementById("reg-complete-secrets-note");
+  secrets.addEventListener("change", () => { noteSecrets.hidden = !secrets.checked; });
+  document.getElementById("reg-complete-creer").addEventListener("click", () => {
+    telechargerFichier(
+      `/api/sauvegarde-complete${secrets.checked ? "" : "?secrets=0"}`,
+      `azimut-sauvegarde-${aujourdHuiISO()}.zip`
+    );
+  });
+  const entree = document.getElementById("reg-complete-fichier");
+  document.getElementById("reg-complete-restaurer").addEventListener("click", () => entree.click());
+  entree.addEventListener("change", async () => {
+    const fichier = entree.files[0];
+    entree.value = "";
+    if (fichier) await proposerRestauration(fichier);
+  });
+}
+
+async function proposerRestauration(fichier) {
+  const formulaire = new FormData();
+  formulaire.append("fichier", fichier);
+  let resume;
+  try {
+    const reponse = await fetch("/api/sauvegarde-complete/preparer", { method: "POST", body: formulaire });
+    const donnees = await reponse.json();
+    if (!reponse.ok) throw new Error(donnees.erreur || t("commun.erreur_inattendue"));
+    resume = donnees;
+  } catch (erreur) {
+    toast(erreur.message, true);
+    return;
+  }
+  const c = resume.compteurs || {};
+  const contenu = t("reglages.restaurer_contenu", {
+    candidatures: c.candidatures ?? 0, entreprises: c.entreprises ?? 0, documents: c.documents ?? 0,
+    lettres: c.lettres ?? 0, fiches: c.fiches ?? 0, notes: c.notes ?? 0, cv: c.cv ?? 0,
+  });
+  const quand = resume.cree_le ? `${dateFr(resume.cree_le.slice(0, 10))} ${resume.cree_le.slice(11, 16)}` : "?";
+  let confirmee = false;
+  const zone = ouvrirModale(
+    t("reglages.restaurer_titre"),
+    `<p><strong>${echapper(t("reglages.restaurer_du", { date: quand }))}</strong><br>${echapper(contenu)} - ${echapper(pluriel("reglages.restaurer_fichiers", resume.nb_fichiers))}</p>
+     <p>${t("reglages.restaurer_remplace")}</p>
+     <p class="sous-titre">${t("reglages.restaurer_conserve")}</p>
+     ${resume.secrets_inclus ? "" : `<p class="sous-titre">${t("reglages.restaurer_sans_secrets")}</p>`}
+     ${resume.manquants ? `<p class="sous-titre">${t("reglages.restaurer_manquants", { n: resume.manquants })}</p>` : ""}`,
+    `<button class="btn" id="btn-restaurer-annuler">${t("commun.annuler")}</button>
+     <button class="btn btn-accent" id="btn-restaurer-confirmer">${t("reglages.restaurer_confirmer")}</button>`,
+    false, false,
+    {
+      surFermeture: () => {
+        // Fermée sans confirmer : le fichier envoyé n'a plus de raison d'être gardé.
+        if (!confirmee) api("/api/sauvegarde-complete/annuler", { methode: "POST" }).catch(() => {});
+      },
+    }
+  );
+  zone.racine.querySelector("#btn-restaurer-annuler").addEventListener("click", () => fermerModale(zone));
+  const bouton = zone.racine.querySelector("#btn-restaurer-confirmer");
+  bouton.addEventListener("click", async () => {
+    bouton.disabled = true;
+    confirmee = true;
+    try {
+      await api("/api/sauvegarde-complete/restaurer", { methode: "POST", corps: { jeton: resume.jeton } });
+      fermerModale(zone);
+      toast(t("reglages.restaurer_fait"));
+      setTimeout(() => location.reload(), 900); // tout l'affichage repart des données restaurées
+    } catch (erreur) {
+      confirmee = false;
+      bouton.disabled = false;
+      fermerModale(zone);
+      toast(erreur.message, true);
+    }
+  });
 }
 
 /* ========================================================================

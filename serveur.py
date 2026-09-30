@@ -10,9 +10,11 @@ Lancement : ./venv/bin/python serveur.py  puis  http://localhost:8765
 
 import io
 import json
+import os
 import re
 import secrets
 import tempfile
+import threading
 import time
 import mimetypes
 import unicodedata
@@ -41,6 +43,7 @@ import rapide
 import recherche
 import reglages
 import sauvegarde
+import sauvegarde_complete
 import statistiques
 import verification_liens
 from exceptions import EntiteIntrouvable, ErreurSuivi, ValeurNonAutorisee
@@ -785,6 +788,111 @@ def api_sauvegarde():
     if chemin is None:
         raise ValeurNonAutorisee("La base est vide ou introuvable - rien à sauvegarder.")
     return jsonify({"chemin": chemin, "sauvegardes": sauvegarde.lister_sauvegardes()[:5]})
+
+
+# --- sauvegarde complète (base + fichiers) et restauration ---
+
+# Une restauration se fait en deux temps : le fichier est téléversé et VÉRIFIÉ (on en montre le
+# contenu), puis restauré en présentant le jeton reçu. Le jeton, imprévisible et lisible seulement
+# par la page qui a téléversé, empêche qu'une autre page web fasse remplacer les données à l'insu de
+# l'utilisateur.
+_RESTAURATIONS = {}
+_VERROU_RESTAURATIONS = threading.Lock()
+TAILLE_MAX_SAUVEGARDE = 4 * 1024 * 1024 * 1024
+
+
+def _oublier_restaurations():
+    with _VERROU_RESTAURATIONS:
+        chemins = list(_RESTAURATIONS.values())
+        _RESTAURATIONS.clear()
+    for chemin in chemins:
+        Path(chemin).unlink(missing_ok=True)
+
+
+class _FichierTemporaire:
+    """Le contenu d'un fichier temporaire, envoyé par morceaux ; le fichier est supprimé quand la réponse
+    est finie ou abandonnée (le serveur appelle alors close()). send_file + call_on_close ne suffit pas :
+    Flask renvoie ce genre de réponse telle quelle, sans passer par close()."""
+
+    def __init__(self, chemin):
+        self.chemin = chemin
+        self.fichier = open(chemin, "rb")
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        bloc = self.fichier.read(1024 * 1024)
+        if not bloc:
+            self.close()
+            raise StopIteration
+        return bloc
+
+    def close(self):
+        self.fichier.close()
+        Path(self.chemin).unlink(missing_ok=True)
+
+
+@app.route("/api/sauvegarde-complete")
+def api_sauvegarde_complete():
+    """L'archive ZIP (base + fichiers) à télécharger. `?secrets=0` en retire la clé API et les mots de passe."""
+    descripteur, chemin = tempfile.mkstemp(prefix="azimut-sauvegarde-", suffix=".zip")
+    os.close(descripteur)
+    try:
+        sauvegarde_complete.creer(chemin, avec_secrets=request.args.get("secrets", "1") != "0")
+    except BaseException:
+        Path(chemin).unlink(missing_ok=True)
+        raise
+    reponse = Response(
+        _FichierTemporaire(chemin), mimetype="application/zip",
+        headers={"Content-Length": str(Path(chemin).stat().st_size)},
+    )
+    reponse.headers.set("Content-Disposition", "attachment", filename=f"azimut-sauvegarde-{date.today().isoformat()}.zip")
+    return reponse
+
+
+@app.route("/api/sauvegarde-complete/preparer", methods=["POST"])
+def api_sauvegarde_complete_preparer():
+    request.max_content_length = TAILLE_MAX_SAUVEGARDE  # bien plus que les 60 Mo des autres imports
+    fichier = request.files.get("fichier")
+    if fichier is None or not fichier.filename:
+        raise ValeurNonAutorisee("Aucun fichier reçu - choisir une sauvegarde complète d'Azimut (.zip).")
+    _oublier_restaurations()
+    descripteur, chemin = tempfile.mkstemp(prefix="azimut-restauration-", suffix=".zip")
+    os.close(descripteur)
+    try:
+        fichier.save(chemin)
+        manifeste = sauvegarde_complete.lire_manifeste(chemin)
+    except BaseException:
+        Path(chemin).unlink(missing_ok=True)
+        raise
+    jeton = secrets.token_urlsafe(16)
+    with _VERROU_RESTAURATIONS:
+        _RESTAURATIONS[jeton] = chemin
+    return jsonify({
+        "jeton": jeton, "cree_le": manifeste.get("cree_le"), "compteurs": manifeste.get("compteurs", {}),
+        "secrets_inclus": bool(manifeste.get("secrets_inclus", True)),
+        "nb_fichiers": len(manifeste["fichiers"]), "manquants": manifeste.get("manquants", 0),
+    })
+
+
+@app.route("/api/sauvegarde-complete/restaurer", methods=["POST"])
+def api_sauvegarde_complete_restaurer():
+    jeton = (request.get_json(silent=True) or {}).get("jeton")
+    with _VERROU_RESTAURATIONS:
+        chemin = _RESTAURATIONS.pop(jeton, None) if isinstance(jeton, str) else None
+    if chemin is None:
+        raise ValeurNonAutorisee("Cette restauration a expiré : choisis de nouveau le fichier de sauvegarde.")
+    try:
+        return jsonify(sauvegarde_complete.restaurer(chemin))
+    finally:
+        Path(chemin).unlink(missing_ok=True)
+
+
+@app.route("/api/sauvegarde-complete/annuler", methods=["POST"])
+def api_sauvegarde_complete_annuler():
+    _oublier_restaurations()
+    return jsonify({"message": "Restauration annulée."})
 
 
 @app.route("/api/import/excel", methods=["POST"])

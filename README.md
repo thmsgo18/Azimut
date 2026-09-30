@@ -194,7 +194,7 @@ The first launch installs the dependencies (1 to 3 minutes), then the window ope
 ### Updating Azimut without losing your data
 
 - **With Git**: in the Azimut folder, run `git pull`, then relaunch.
-- **With the ZIP**: download the new ZIP and extract it. Copy your **`suivi_candidatures.db`** file from the old folder into the new one, along with the `documents`, `lettres`, `fiches`, `cv`, `profil` and `sauvegardes` folders if you kept the default location. Then delete the old folder. On first launch, the new version upgrades your database by itself, and keeps a safety copy of the old one.
+- **With the ZIP**: download the new ZIP and extract it. The simplest way to carry your data over: in the old version, **Settings → Full backup → Create**, then **Restore** in the new one (see below). Or copy your **`suivi_candidatures.db`** file from the old folder into the new one, along with the `documents`, `lettres`, `fiches`, `cv`, `profil` and `sauvegardes` folders if you kept the default location. Then delete the old folder. On first launch, the new version upgrades your database by itself, and keeps a safety copy of the old one.
 
 ## Features
 
@@ -278,6 +278,7 @@ A section for **your résumés** - the French one, the English one, the data-ori
 - **Dashboard & statistics** - funnel, delays, response rate by source, weekly chart, weekly goal.
 - **Global search** (<kbd>⌘K</kbd>) - applications, companies, notes, documents, letters and sheets, text included.
 - **AI-assisted entry** (optional, any provider) - paste a job posting, the form pre-fills. Nothing written without you confirming.
+- **Full backup and restore** (Settings): one `.zip` with the database **and every file** (documents, letters, sheets, résumés) - to change computer or recover from a mishap. Restoring checks the archive first, never overwrites a file, and keeps your previous state aside.
 - **Excel export/import**, automatic database backups (a safety copy is taken before any migration).
 - **100% local** - nothing leaves your machine unless you explicitly export or turn on the AI assistant.
 
