@@ -56,6 +56,11 @@ Aucun compte, aucun cloud, aucun abonnement. Tout vit dans un seul fichier, sur 
 
 <p align="center"><sub>Captures de l'application réelle, remplie de données de démonstration.</sub></p>
 
+## Démo
+
+https://github.com/user-attachments/assets/8f1ee4a9-4092-4855-9e73-5d9be9ca3e88
+
+
 ## Installation
 
 Azimut s'installe en trois temps, quel que soit ton ordinateur : **1.** avoir Python, **2.** télécharger Azimut, **3.** double-cliquer sur le lanceur. Le premier lancement installe tout le reste tout seul. Il faut une connexion Internet cette fois-là uniquement, et compter 1 à 3 minutes.
