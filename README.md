@@ -56,6 +56,11 @@ No account, no cloud, no subscription. Everything lives in one file on your mach
 
 <p align="center"><sub>Screenshots of the real app, filled with demo data.</sub></p>
 
+## See it in action
+
+https://github.com/user-attachments/assets/8f1ee4a9-4092-4855-9e73-5d9be9ca3e88
+
+
 ## Install
 
 Getting Azimut running takes three steps on any computer: **1.** have Python, **2.** download Azimut, **3.** double-click the launcher. The first launch installs everything else by itself. It needs an internet connection that one time only, and takes 1 to 3 minutes.
