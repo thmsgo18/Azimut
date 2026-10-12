@@ -60,6 +60,9 @@ Aucun compte, aucun cloud, aucun abonnement. Tout vit dans un seul fichier, sur 
 
 https://github.com/user-attachments/assets/8f1ee4a9-4092-4855-9e73-5d9be9ca3e88
 
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=xZzg1N_ij7s"><img src="https://img.shields.io/badge/YouTube-Voir%20la%20vid%C3%A9o-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Voir la vidéo sur YouTube"></a>
+</p>
 
 ## Installation
 

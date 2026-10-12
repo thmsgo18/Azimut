@@ -60,6 +60,9 @@ No account, no cloud, no subscription. Everything lives in one file on your mach
 
 https://github.com/user-attachments/assets/8f1ee4a9-4092-4855-9e73-5d9be9ca3e88
 
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=xZzg1N_ij7s"><img src="https://img.shields.io/badge/YouTube-Watch%20the%20video-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch the video on YouTube"></a>
+</p>
 
 ## Install
 
