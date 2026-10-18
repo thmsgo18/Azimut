@@ -11,6 +11,7 @@ from candidatures import recuperer_candidature
 from evenements import lister_evenements
 from evenements import texte as texte_evenement
 from fiches import lister_fiches
+from entretiens import lister_entretiens
 from langues import normaliser_langue, traduire_valeur
 from lettres import lister_lettres
 from notes_entretien import lister_notes
@@ -19,7 +20,9 @@ LIBELLES = {
     "fr": {
         "titre": "# Préparation d'entretien - {entreprise}",
         "poste": "**Poste :** {poste}",
-        "date_entretien": "**Date de l'entretien :** {date}",
+        "entretiens": "**Entretiens :** {liste}",
+        "aucun_entretien": "aucun pour l'instant",
+        "date_a_preciser": "date à préciser",
         "non_renseignee": "non renseignée",
         "lieu": "**Lieu / mode :** {lieu}",
         "non_renseigne": "non renseigné",
@@ -56,7 +59,9 @@ LIBELLES = {
     "en": {
         "titre": "# Interview preparation - {entreprise}",
         "poste": "**Role:** {poste}",
-        "date_entretien": "**Interview date:** {date}",
+        "entretiens": "**Interviews:** {liste}",
+        "aucun_entretien": "none yet",
+        "date_a_preciser": "date to be confirmed",
         "non_renseignee": "not specified",
         "lieu": "**Location / mode:** {lieu}",
         "non_renseigne": "not specified",
@@ -116,7 +121,15 @@ def generer_fiche_entretien(candidature_id, chemin_db=None, langue="fr"):
     lignes.append(lib["titre"].format(entreprise=cand["entreprise"]))
     lignes.append("")
     lignes.append(lib["poste"].format(poste=cand["poste"]))
-    lignes.append(lib["date_entretien"].format(date=_date_fr(cand["date_entretien"]) or lib["non_renseignee"]))
+    planifies = []
+    for rendez_vous in lister_entretiens(candidature_id=candidature_id, chemin_db=chemin_db):
+        texte = _date_fr(rendez_vous["date_entretien"]) or lib["date_a_preciser"]
+        if rendez_vous["heure"]:
+            texte += f" {rendez_vous['heure']}"
+        if rendez_vous["type_entretien"]:
+            texte += f" ({traduire_valeur(rendez_vous['type_entretien'], langue)})"
+        planifies.append(texte)
+    lignes.append(lib["entretiens"].format(liste=", ".join(planifies) or lib["aucun_entretien"]))
     lieu = " / ".join(
         v for v in (cand["ville"], traduire_valeur(cand["mode_travail"], langue)) if v
     )

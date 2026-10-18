@@ -12,6 +12,7 @@ from datetime import date
 import agent
 import candidatures
 import entreprises
+import entretiens
 import fiches
 import lettres
 import cvs
@@ -59,13 +60,31 @@ def generer_lettre(
     nom, offres, ids = _cible(entreprise_nom, candidature_ids, chemin_db)
     cv_texte = cvs.obtenir_cv_texte(cv_id, chemin_db=chemin_db)
     contenu = agent.generer_lettre_motivation(
-        nom, cv_texte, offres=offres, langue=langue, generale=bool(generale), chemin_db=chemin_db
+        nom, cv_texte, offres=offres, langue=langue, generale=bool(generale),
+        contexte=_fiche_entreprise(nom, chemin_db).get("contexte_actus"), chemin_db=chemin_db,
     )
     return lettres.ajouter_lettre(
         nom, contenu, candidature_ids=ids or None, langue=langue, generale=generale,
         source="api", modele_ia=reglages.obtenir_reglage("modele_ia", chemin_db=chemin_db),
         chemin_db=chemin_db,
     )
+
+
+def _fiche_entreprise(nom, chemin_db):
+    """La fiche de l'entreprise (ses notes, `contexte_actus`, sont transmises à l'IA)."""
+    return next(
+        (e for e in entreprises.lister_entreprises(chemin_db=chemin_db) if e["nom"] == nom), {}
+    )
+
+
+def _prochain_entretien(ids, chemin_db):
+    """Date du prochain entretien de ces offres (sinon du dernier passé), ou None."""
+    dates = sorted(
+        e["date_entretien"] for i in ids
+        for e in entretiens.lister_entretiens(candidature_id=i, chemin_db=chemin_db) if e["date_entretien"]
+    )
+    a_venir = [d for d in dates if d >= date.today().isoformat()]
+    return a_venir[0] if a_venir else (dates[-1] if dates else None)
 
 
 def _liens_en_ligne(offres):
@@ -113,9 +132,7 @@ def generer_fiche(
         recherche = None
         avertissements.append(f"Recherche web sur l'entreprise non effectuée : {erreur}")
 
-    entreprise = next(
-        (e for e in entreprises.lister_entreprises(chemin_db=chemin_db) if e["nom"] == nom), {}
-    )
+    entreprise = _fiche_entreprise(nom, chemin_db)
     donnees = agent.generer_fiche_entretien(
         nom, offres, cv_texte=cv_texte, recherche=recherche,
         contexte=entreprise.get("contexte_actus"), langue=langue, chemin_db=chemin_db,
@@ -132,7 +149,7 @@ def generer_fiche(
 
     jour = (
         normaliser_date(date_entretien, "date_entretien") if date_entretien
-        else next((o["date_entretien"] for o in offres if o.get("date_entretien")), None)
+        else _prochain_entretien(ids, chemin_db)
     )
     jour_long = _date_longue(jour) if jour else None
     meta = donnees["meta"]

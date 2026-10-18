@@ -16,6 +16,7 @@ import candidatures
 import cli
 import db
 import entretien
+import entretiens
 import evenements
 import fiches
 import fiches_pdf
@@ -71,6 +72,7 @@ class TestLangues(BaseTemporaire):
         listes = (
             valeurs.STATUTS, valeurs.SOUS_DOMAINES, valeurs.TYPES_CANDIDATURE, valeurs.MODES_TRAVAIL,
             valeurs.CONVENTIONS, valeurs.SOURCES_CANDIDATURE, valeurs.TYPES_DOCUMENT,
+            valeurs.TYPES_ENTRETIEN,
         )
         manquantes = [v for liste in listes for v in liste if v not in langues.VALEURS_EN]
         self.assertEqual(manquantes, [])
@@ -93,8 +95,11 @@ class TestJournal(BaseTemporaire):
             "AgentikCo", "Stage agents IA", statut="Envoyée", chemin_db=self.chemin_db
         )
         candidatures.modifier_candidature(
-            numero, chemin_db=self.chemin_db, statut="Entretien",
-            date_reponse="2026-10-01", date_entretien="12/10/2026",
+            numero, chemin_db=self.chemin_db, statut="Entretien", date_reponse="2026-10-01",
+        )
+        entretiens.ajouter_entretien([numero], date_entretien="12/10/2026", chemin_db=self.chemin_db)
+        entretiens.ajouter_entretien(
+            [numero], date_entretien="20/10/2026", type_entretien="Technique", chemin_db=self.chemin_db
         )
         journal = self._journal(numero)
         self.assertEqual([e["description"] for e in journal], [
@@ -102,13 +107,16 @@ class TestJournal(BaseTemporaire):
             "Statut : Envoyée → Entretien",
             "Réponse reçue le 01/10/2026",
             "Entretien planifié le 12/10/2026",
+            "Entretien « Technique » planifié le 20/10/2026",
         ])
         self.assertEqual([(e["code"], e["parametres"]) for e in journal], [
             ("creation", {"statut": "Envoyée"}),
             ("statut", {"avant": "Envoyée", "apres": "Entretien"}),
             ("reponse", {"date": "2026-10-01"}),
             ("entretien", {"date": "2026-10-12"}),
+            ("entretien_type", {"type": "Technique", "date": "2026-10-20"}),
         ])
+        self.assertEqual(evenements.texte(journal[-1], "en"), "Technical interview scheduled on 20/10/2026")
 
     def test_texte_en_anglais(self):
         numero = candidatures.ajouter_candidature("AgentikCo", "Stage", chemin_db=self.chemin_db)
@@ -237,7 +245,8 @@ class TestNotes(BaseTemporaire):
         est déplacée, pas doublée (et son titre ne change pas)."""
         offre = self._offre(date_entretien="2026-10-12")
         self._anglais()
-        candidatures.modifier_candidature(offre, chemin_db=self.chemin_db, date_entretien="2026-10-20")
+        (rendez_vous,) = entretiens.lister_entretiens(candidature_id=offre, chemin_db=self.chemin_db)
+        entretiens.modifier_entretien(rendez_vous["id"], date_entretien="2026-10-20", chemin_db=self.chemin_db)
         (note,) = self._notes_de(offre)
         self.assertEqual((note["titre"], note["date_entretien"]), ("Entretien - Stage agents IA", "2026-10-20"))
 
@@ -263,7 +272,7 @@ class TestRecapitulatif(BaseTemporaire):
         recap = entretien.generer_fiche_entretien(self._offre(), chemin_db=self.chemin_db, langue="en")
         for attendu in (
             "# Interview preparation - AgentikCo", "**Role:** Stage agents IA",
-            "**Interview date:** not specified", "**Location / mode:** Paris / Hybrid",
+            "**Interviews:** none yet", "**Location / mode:** Paris / Hybrid",
             "## Company context", "## The job posting", "## Preparation",
             "- Current status: Interview", "- Application sent on 01/09/2026 (via Company website)",
             "stipend €1400/month", "## Log", "Status: Sent → Interview",

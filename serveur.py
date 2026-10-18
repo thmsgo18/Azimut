@@ -30,6 +30,7 @@ import documents
 import doublons
 import entreprises
 import entretien
+import entretiens
 import evenements
 import export_excel
 import fiches
@@ -54,8 +55,11 @@ from valeurs import (
     SOURCES_CANDIDATURE,
     SOUS_DOMAINES,
     STATUTS,
+    SITES_OFFRES,
+    STATUTS_AVEC_REPONSE,
     TYPES_CANDIDATURE,
     TYPES_DOCUMENT,
+    TYPES_ENTRETIEN,
 )
 
 PORT = 8765
@@ -142,6 +146,9 @@ def api_valeurs():
             "conventions": CONVENTIONS,
             "sources_candidature": SOURCES_CANDIDATURE,
             "types_document": TYPES_DOCUMENT,
+            "types_entretien": TYPES_ENTRETIEN,
+            # domaine -> source : le formulaire propose la source d'après le lien de l'offre
+            "sites_offres": SITES_OFFRES,
         }
     )
 
@@ -198,6 +205,46 @@ def api_candidatures_similaires():
             lien_offre=request.args.get("lien_offre") or None,
         )
     )
+
+
+# --- entretiens (plusieurs par candidature, chacun avec son type) ---
+
+@app.route("/api/entretiens")
+def api_entretiens_lister():
+    def entier(nom):
+        valeur = request.args.get(nom)
+        return int(valeur) if valeur and valeur.isdigit() else None
+
+    return jsonify(
+        entretiens.lister_entretiens(
+            entreprise_id=entier("entreprise_id"),
+            candidature_id=entier("candidature_id"),
+            a_venir=request.args.get("a_venir") in ("1", "true", "oui"),
+        )
+    )
+
+
+@app.route("/api/entretiens", methods=["POST"])
+def api_entretiens_ajouter():
+    donnees = request.get_json(silent=True) or {}
+    numero = entretiens.ajouter_entretien(
+        donnees.get("candidature_ids") or [],
+        date_entretien=donnees.get("date_entretien"),
+        type_entretien=donnees.get("type_entretien"),
+        heure=donnees.get("heure"),
+    )
+    return jsonify(entretiens.recuperer_entretien(numero)), 201
+
+
+@app.route("/api/entretiens/<int:numero>", methods=["PATCH"])
+def api_entretiens_modifier(numero):
+    return jsonify(entretiens.modifier_entretien(numero, **_champs_json()))
+
+
+@app.route("/api/entretiens/<int:numero>", methods=["DELETE"])
+def api_entretiens_supprimer(numero):
+    entretiens.supprimer_entretien(numero)
+    return jsonify({"message": f"Entretien n°{numero} supprimé."})
 
 
 # --- entreprises ---
@@ -271,7 +318,6 @@ def api_entreprises_fusionner():
 @app.route("/api/stats")
 def api_stats():
     liste = candidatures.lister_candidatures()
-    aujourd_hui = date.today().isoformat()
 
     par_statut = {s: 0 for s in STATUTS}
     par_domaine = {}
@@ -281,13 +327,9 @@ def api_stats():
         if cand["sous_domaine"]:
             par_domaine[cand["sous_domaine"]] = par_domaine.get(cand["sous_domaine"], 0) + 1
 
-    avec_reponse = sum(
-        par_statut[s] for s in ("Réponse reçue", "Entretien", "Refus", "Accepté")
-    )
-    entretiens_a_venir = sorted(
-        (c for c in liste if c["date_entretien"] and c["date_entretien"] >= aujourd_hui),
-        key=lambda c: c["date_entretien"],
-    )
+    avec_reponse = sum(par_statut[s] for s in STATUTS_AVEC_REPONSE)
+    # Un entretien commun à plusieurs offres n'apparaît qu'une fois (avec ses offres).
+    entretiens_a_venir = entretiens.lister_entretiens(a_venir=True)
     return jsonify(
         {
             "total": len(liste),
@@ -299,6 +341,7 @@ def api_stats():
             "taux_reponse": round(avec_reponse / len(liste) * 100) if liste else 0,
             "en_cours": sum(par_statut[s] for s in ("Envoyée", "Réponse reçue")),
             "entretiens_a_venir": entretiens_a_venir[:5],
+            "nb_entretiens_a_venir": len(entretiens_a_venir),
         }
     )
 

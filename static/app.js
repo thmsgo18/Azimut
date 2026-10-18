@@ -316,12 +316,12 @@ async function vueBord() {
 
   const entretiens = stats.entretiens_a_venir
     .map(
-      (cand) => `
-      <div class="echeance" onclick="ouvrirDetailCandidature(${cand.id})">
-        <span class="echeance-date">${dateFr(cand.date_entretien)}</span>
+      (e) => `
+      <div class="echeance" onclick="ouvrirDetailCandidature(${e.candidatures[0]?.id})">
+        <span class="echeance-date">${dateFr(e.date_entretien)}${e.heure ? `<br>${echapper(e.heure)}` : ""}</span>
         <div class="echeance-texte">
-          <div class="principal">${echapper(cand.entreprise)}</div>
-          <div class="secondaire">${echapper(cand.poste)}</div>
+          <div class="principal">${echapper(e.entreprise)}${e.type_entretien ? ` <span class="puce puce-type-entretien">${echapper(tv(e.type_entretien))}</span>` : ""}</div>
+          <div class="secondaire">${e.candidatures.map((o) => echapper(o.poste)).join(" · ")}</div>
         </div>
       </div>`
     )
@@ -347,7 +347,7 @@ async function vueBord() {
       </div>
       <div class="tuile">
         <div class="tuile-libelle">${t("bord.kpi_entretiens")}</div>
-        <div class="tuile-valeur">${stats.entretiens_a_venir.length}</div>
+        <div class="tuile-valeur">${stats.nb_entretiens_a_venir}</div>
         <div class="tuile-detail">${t("bord.kpi_entretiens_detail", { n: stats.par_statut["Entretien"] })}</div>
       </div>
       <div class="tuile">
@@ -392,6 +392,9 @@ function carteCandidature(cand) {
   const puces = [];
   if (cand.sous_domaine) {
     puces.push(`<span class="puce">${echapper(tv(cand.sous_domaine))}</span>`);
+  }
+  if (cand.prochain_entretien) {
+    puces.push(`<span class="puce puce-type-entretien">${t("entretiens_planifies.carte", { date: dateFr(cand.prochain_entretien) })}</span>`);
   }
   return `
     <article class="carte-cand" data-id="${cand.id}">
@@ -668,7 +671,7 @@ function criteresComparateur() {
     ["convention_envoyee", t("comparateur.convention_envoyee")],
     ["source", t("comparateur.source")],
     ["date_envoi", t("candidatures.col_envoyee_le")],
-    ["date_entretien", t("comparateur.entretien_le")],
+    ["prochain_entretien", t("entretiens_planifies.prochain")],
   ];
 }
 
@@ -689,7 +692,7 @@ async function vueComparateur() {
   const formater = (cle, valeur) => {
     if (valeur === null || valeur === undefined || valeur === "") return "-";
     if (cle === "gratification") return `${valeur} €/mois`;
-    if (cle.startsWith("date_")) return dateFr(valeur);
+    if (cle.startsWith("date_") || cle === "prochain_entretien") return dateFr(valeur);
     if (CHAMPS_COMPARATEUR_ENUM.has(cle)) return echapper(tv(valeur));
     return echapper(valeur);
   };
@@ -795,6 +798,21 @@ function lireFormulaire(conteneur) {
    configurée, le pré-remplissage à partir du texte d'une offre)
    ------------------------------------------------------------------------ */
 
+/* Même règle que valeurs.source_depuis_lien (le serveur fournit la table des sites). */
+function sourceDepuisLien(lien) {
+  let hote;
+  try {
+    hote = new URL(String(lien || "").trim()).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  if (!hote) return null;
+  for (const [domaine, source] of Object.entries(etat.valeurs.sites_offres || {})) {
+    if (hote === domaine || hote.endsWith("." + domaine)) return source;
+  }
+  return "Site entreprise";
+}
+
 async function ouvrirFormCandidature() {
   const v = etat.valeurs;
   const listeEntreprises = await api("/api/entreprises");
@@ -818,6 +836,7 @@ async function ouvrirFormCandidature() {
       ${champTexte("date_envoi", t("formulaire.date_envoi"), "", "date")}
       ${champTexte("date_reponse", t("formulaire.reponse_recue_le"), "", "date")}
       ${champTexte("date_entretien", t("comparateur.entretien_le"), "", "date")}
+      ${champSelect("type_entretien", t("entretiens_planifies.type_premier"), v.types_entretien, null)}
       ${champTexte("date_debut_souhaitee", t("comparateur.debut_souhaite"), "", "date")}
       ${champTexte("duree", t("comparateur.duree"), "")}
       ${champTexte("gratification", t("comparateur.gratification"), "", "number")}
@@ -868,6 +887,18 @@ async function ouvrirFormCandidature() {
   );
 
   etat.propositionEntreprise = null;
+  // La source se propose d'après le lien de l'offre (Hellowork, JobTeaser... ou le site de
+  // l'entreprise), tant qu'aucune n'a été choisie à la main.
+  const champLien = document.querySelector('#form-candidature [name="lien_offre"]');
+  const champSource = document.querySelector('#form-candidature [name="source"]');
+  let sourceDeduite = false;
+  champLien.addEventListener("change", () => {
+    if (champSource.value && !sourceDeduite) return;
+    const source = sourceDepuisLien(champLien.value);
+    champSource.value = source || "";
+    sourceDeduite = Boolean(source);
+  });
+  champSource.addEventListener("change", () => { sourceDeduite = false; });
   const boutonAnalyser = document.getElementById("btn-analyser");
   if (boutonAnalyser) {
     boutonAnalyser.addEventListener("click", async () => {
@@ -1082,11 +1113,103 @@ function pastilleStatutDetail(statut) {
 function texteEvenement(evenement) {
   if (!evenement.code) return evenement.description;
   const parametres = { ...evenement.parametres };
-  for (const cle of ["statut", "avant", "apres"]) {
+  for (const cle of ["statut", "avant", "apres", "type"]) {
     if (parametres[cle]) parametres[cle] = tv(parametres[cle]);
   }
   if (parametres.date) parametres.date = dateFr(parametres.date);
   return t(`historique.${evenement.code}`, parametres);
+}
+
+/* Les entretiens d'une candidature (fenêtre de détail) : type, date et heure, et les autres
+   offres de l'entreprise concernées par le même entretien. */
+function listeEntretiensHTML(liste, numero) {
+  const aujourdHui = aujourdHuiISO();
+  const lignes = liste.map((e) => {
+    const autres = e.candidatures.filter((o) => o.id !== numero);
+    const passe = e.date_entretien && e.date_entretien < aujourdHui;
+    return `
+      <div class="ligne-entretien${passe ? " passe" : ""}">
+        <span class="puce puce-type-entretien">${echapper(e.type_entretien ? tv(e.type_entretien) : t("entretiens_planifies.sans_type"))}</span>
+        <span class="cellule-principale">${e.date_entretien ? dateFr(e.date_entretien) : t("entretiens_planifies.date_a_preciser")}${e.heure ? ` · ${echapper(e.heure)}` : ""}</span>
+        <span class="cellule-secondaire">${autres.length ? t("entretiens_planifies.aussi", { postes: autres.map((o) => echapper(o.poste)).join(", ") }) : ""}</span>
+        <span class="actions-ligne">
+          <button type="button" class="btn btn-mini" data-entretien-modifier="${e.id}">${t("commun.modifier")}</button>
+          <button type="button" class="btn btn-mini btn-discret" data-entretien-supprimer="${e.id}">${t("commun.supprimer")}</button>
+        </span>
+      </div>`;
+  }).join("");
+  return `
+    ${lignes ? `<div class="liste-liee">${lignes}</div>` : `<p class="sous-titre">${t("entretiens_planifies.aucun")}</p>`}
+    <div class="actions-reglages"><button type="button" class="btn btn-ajouter-entretien">${t("entretiens_planifies.ajouter")}</button></div>`;
+}
+
+/* Planifier (ou modifier) un entretien : type, date, heure, et les offres de la même entreprise
+   qu'il concerne (celle d'où l'on vient est cochée d'office). */
+async function ouvrirFormEntretien(cand, entretien, apres) {
+  let offres;
+  try {
+    offres = (await api("/api/candidatures")).filter((c) => c.entreprise_id === cand.entreprise_id);
+  } catch (erreur) {
+    toast(erreur.message, true);
+    return;
+  }
+  const cochees = new Set(entretien ? entretien.candidatures.map((o) => o.id) : [cand.id]);
+  const types = etat.valeurs.types_entretien
+    .map((v) => `<option value="${echapperAttribut(v)}"${entretien && entretien.type_entretien === v ? " selected" : ""}>${echapper(tv(v))}</option>`)
+    .join("");
+  const cases = offres.map((o) => `
+    <label class="case case-offre">
+      <input type="checkbox" value="${o.id}"${cochees.has(o.id) ? " checked" : ""}>
+      <span>${echapper(o.poste)} <span class="cellule-secondaire">· ${echapper(tv(o.statut))}</span></span>
+    </label>`).join("");
+  const zone = ouvrirModale(
+    entretien ? t("entretiens_planifies.modifier_titre") : t("entretiens_planifies.ajouter_titre"),
+    `<form class="grille-form" id="form-entretien" onsubmit="return false;">
+      <div class="champ">
+        <label for="entretien-type">${t("entretiens_planifies.type")}</label>
+        <select id="entretien-type"><option value="">${t("entretiens_planifies.type_non_precise")}</option>${types}</select>
+      </div>
+      <div class="champ">
+        <label for="entretien-date">${t("entretiens_planifies.date")}</label>
+        <input type="date" id="entretien-date" value="${echapperAttribut(entretien?.date_entretien || "")}">
+      </div>
+      <div class="champ">
+        <label for="entretien-heure">${t("entretiens_planifies.heure")}</label>
+        <input type="time" id="entretien-heure" value="${echapperAttribut(entretien?.heure || "")}">
+      </div>
+      ${offres.length > 1 ? `
+      <div class="champ pleine-largeur">
+        <label>${t("entretiens_planifies.offres_concernees", { entreprise: echapper(cand.entreprise) })}</label>
+        <div class="liste-cases">${cases}</div>
+      </div>` : ""}
+    </form>`,
+    `<button class="btn" onclick="fermerModale()">${t("commun.annuler")}</button>
+     <button class="btn btn-accent" id="btn-enregistrer-entretien">${t("commun.enregistrer")}</button>`,
+    true
+  );
+  zone.racine.querySelector("#btn-enregistrer-entretien").addEventListener("click", async () => {
+    const ids = offres.length > 1
+      ? [...zone.racine.querySelectorAll(".case-offre input:checked")].map((c) => Number(c.value))
+      : [cand.id];
+    if (!ids.length) { toast(t("entretiens_planifies.choisir_offre"), true); return; }
+    const corps = {
+      type_entretien: zone.racine.querySelector("#entretien-type").value || null,
+      date_entretien: zone.racine.querySelector("#entretien-date").value || null,
+      heure: zone.racine.querySelector("#entretien-heure").value || null,
+      candidature_ids: ids,
+    };
+    try {
+      if (entretien) {
+        await api(`/api/entretiens/${entretien.id}`, { methode: "PATCH", corps });
+      } else {
+        await api("/api/entretiens", { methode: "POST", corps });
+      }
+      fermerModale(zone);
+      await apres(t(entretien ? "entretiens_planifies.modifie" : "entretiens_planifies.planifie"));
+    } catch (erreur) {
+      toast(erreur.message, true);
+    }
+  });
 }
 
 function annexesCandidature(numero, lettresLiees, fichesLiees, notesLiees, docs, journal) {
@@ -1147,12 +1270,14 @@ async function ouvrirDetailCandidature(numero) {
       <div class="grille-detail">
         ${champDetail("date_envoi", t("formulaire.date_envoi"), cand.date_envoi, "date")}
         ${champDetail("date_reponse", t("formulaire.reponse_recue_le"), cand.date_reponse, "date")}
-        ${champDetail("date_entretien", t("comparateur.entretien_le"), cand.date_entretien, "date")}
         ${champDetail("date_debut_souhaitee", t("comparateur.debut_souhaite"), cand.date_debut_souhaitee, "date")}
         ${selectDetail("source", t("comparateur.source"), v.sources_candidature, cand.source)}
         ${selectDetail("type_candidature", t("formulaire.type_candidature"), v.types_candidature, cand.type_candidature)}
         ${selectDetail("convention_envoyee", t("comparateur.convention_envoyee"), v.conventions, cand.convention_envoyee || "Non", false)}
       </div>
+
+      <h3 class="section-panneau">${t("entretiens_planifies.titre")}</h3>
+      <div id="detail-entretiens"></div>
 
       <h3 class="section-panneau">${t("formulaire.section_poste")}</h3>
       <div class="grille-detail">
@@ -1218,14 +1343,46 @@ async function ouvrirDetailCandidature(numero) {
         await rafraichirAnnexes();
       }
       if (nom === "lien_offre") zone.racine.querySelector("#detail-lien-actions").innerHTML = lienOffre();
-      if (nom === "date_entretien") {
-        // Azimut crée (ou déplace) tout seul la note d'entretien de cette date.
-        const avant = nbNotes;
-        await rafraichirAnnexes();
-        if (nbNotes > avant) toast(t("candidatures.note_entretien_creee"));
-      }
     },
   });
+
+  // Entretiens : plusieurs, chacun son type ; Azimut crée (ou reporte) tout seul la note de chacun,
+  // et une offre encore « Envoyée » passe au statut « Entretien ».
+  async function rafraichirEntretiens() {
+    const conteneur = zone.racine.querySelector("#detail-entretiens");
+    if (!conteneur) return;
+    const liste = await api(`/api/entretiens?candidature_id=${numero}`);
+    conteneur.innerHTML = listeEntretiensHTML(liste, numero);
+    conteneur.querySelector(".btn-ajouter-entretien").addEventListener("click", () => ouvrirFormEntretien(cand, null, apresEntretien));
+    conteneur.querySelectorAll("[data-entretien-modifier]").forEach((bouton) => {
+      const entretien = liste.find((e) => e.id === Number(bouton.dataset.entretienModifier));
+      bouton.addEventListener("click", () => ouvrirFormEntretien(cand, entretien, apresEntretien));
+    });
+    conteneur.querySelectorAll("[data-entretien-supprimer]").forEach((bouton) => {
+      bouton.addEventListener("click", async () => {
+        if (!(await confirmer(t("entretiens_planifies.supprimer_titre"), t("entretiens_planifies.supprimer_texte")))) return;
+        try {
+          await api(`/api/entretiens/${bouton.dataset.entretienSupprimer}`, { methode: "DELETE" });
+          await apresEntretien(t("entretiens_planifies.supprime"));
+        } catch (erreur) {
+          toast(erreur.message, true);
+        }
+      });
+    });
+  }
+
+  async function apresEntretien(message) {
+    const avant = nbNotes;
+    const frais = await api(`/api/candidatures/${numero}`);
+    cand = { ...cand, statut: frais.statut, date_reponse: frais.date_reponse };
+    zone.racine.querySelector("#detail-statut").innerHTML = pastilleStatutDetail(cand.statut);
+    const champReponse = zone.racine.querySelector("#detail-date_reponse");
+    if (champReponse) champReponse.value = cand.date_reponse || "";
+    await rafraichirEntretiens();
+    await rafraichirAnnexes();
+    edition.marquerModifie();
+    toast(nbNotes > avant ? t("entretiens_planifies.note_creee") : message);
+  }
 
   async function rafraichirAnnexes() {
     const conteneur = zone.racine.querySelector("#detail-annexes");
@@ -1250,6 +1407,7 @@ async function ouvrirDetailCandidature(numero) {
     ouvrirDetailEntreprise(cand.entreprise_id);
   });
   brancherAnnexes();
+  await rafraichirEntretiens();
 
   zone.racine.querySelector("#btn-recap").addEventListener("click", () => ouvrirRecapitulatif(numero));
   zone.racine.querySelector("#btn-supprimer").addEventListener("click", async () => {
@@ -1367,7 +1525,7 @@ async function ouvrirFusionEntreprises() {
         toast(
           t("entreprises.fusion_effectuee", {
             cand: resultat.candidatures_deplacees,
-            prep: resultat.documents_deplaces + resultat.lettres_deplacees + resultat.fiches_deplacees + resultat.notes_deplacees,
+            prep: resultat.documents_deplaces + resultat.lettres_deplacees + resultat.fiches_deplacees + resultat.notes_deplacees + resultat.entretiens_deplaces,
             nom: resultat.nom,
           })
         );
@@ -1597,6 +1755,11 @@ function graphiqueHebdomadaire(serie) {
     </svg>`;
 }
 
+/* Un taux arrondi à 0 % alors qu'il y a des cas (1 sur 234) s'affiche « <1 % ». */
+function pourcentage(nombre, taux) {
+  return nombre > 0 && taux === 0 ? "<1%" : `${taux}%`;
+}
+
 async function vueStats() {
   const stats = await api("/api/stats/avancees");
   const liens = await api("/api/liens/etat");
@@ -1617,7 +1780,7 @@ async function vueStats() {
       <div class="ligne-barre">
         <span class="libelle">${echapper(tv(etape.etape))}</span>
         <div class="piste"><div class="remplissage${etape.nombre === 0 ? " vide" : ""}" style="width:${(etape.nombre / maximum) * 100}%"></div></div>
-        <span class="valeur">${etape.nombre}<span class="taux-detail"> · ${etape.taux}%</span></span>
+        <span class="valeur">${etape.nombre}<span class="taux-detail"> · ${pourcentage(etape.nombre, etape.taux)}</span></span>
       </div>`
     )
     .join("");
@@ -1631,7 +1794,7 @@ async function vueStats() {
         <td>
           <div class="ligne-barre ligne-barre-compacte">
             <div class="piste"><div class="remplissage${source.taux === 0 ? " vide" : ""}" style="width:${source.taux}%"></div></div>
-            <span class="valeur">${source.taux}%</span>
+            <span class="valeur">${pourcentage(source.reponses, source.taux)}</span>
           </div>
         </td>
       </tr>`

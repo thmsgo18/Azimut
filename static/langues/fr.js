@@ -82,7 +82,6 @@ window.LANGUES.fr = {
     col_offre: "Offre",
     voir_offre: "Voir l'offre",
     changer_statut: "Changer le statut",
-    note_entretien_creee: "Note d'entretien créée pour cette date.",
     lien_mort_titre: "Le lien de l'offre ne répond plus",
     lien_mort: "Lien mort",
     selectionnees: "{n} candidatures sélectionnées",
@@ -609,6 +608,33 @@ window.LANGUES.fr = {
     telecharger_md: "Télécharger en .md",
   },
 
+
+  /* Entretiens planifiés d'une candidature (plusieurs, chacun avec son type). */
+  entretiens_planifies: {
+    titre: "Entretiens",
+    aucun: "Aucun entretien planifié.",
+    ajouter: "Ajouter un entretien",
+    ajouter_titre: "Planifier un entretien",
+    modifier_titre: "Modifier l'entretien",
+    type: "Type d'entretien",
+    type_premier: "Type de cet entretien",
+    sans_type: "Entretien",
+    type_non_precise: "Type non précisé",
+    date: "Date",
+    heure: "Heure",
+    date_a_preciser: "Date à préciser",
+    offres_concernees: "Offres concernées chez {entreprise}",
+    choisir_offre: "Cocher au moins une offre.",
+    aussi: "aussi : {postes}",
+    planifie: "Entretien planifié.",
+    modifie: "Entretien modifié.",
+    supprime: "Entretien supprimé.",
+    note_creee: "Entretien enregistré - sa note d'entretien est prête.",
+    supprimer_titre: "Supprimer cet entretien ?",
+    supprimer_texte: "Sa note reste si tu y as déjà écrit quelque chose ; une note vide part avec lui.",
+    prochain: "Prochain entretien",
+    carte: "Entretien {date}",
+  },
   /* Phrases du journal d'une candidature : les mêmes modèles que PHRASES dans
      evenements.py (vérifié par les tests). Les statuts passent par tv(). */
   historique: {
@@ -616,6 +642,7 @@ window.LANGUES.fr = {
     statut: "Statut : {avant} → {apres}",
     reponse: "Réponse reçue le {date}",
     entretien: "Entretien planifié le {date}",
+    entretien_type: "Entretien « {type} » planifié le {date}",
     relance: "Relance effectuée (n°{numero})",
   },
 

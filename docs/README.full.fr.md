@@ -87,7 +87,7 @@ Le déroulé du quotidien, en bref :
 
 1. **Ajouter une candidature** - clique sur **+ Ajouter** depuis Candidatures (ou **Nouvelle candidature** dans la barre latérale). Colle le texte de l'offre dans la zone IA si une clé est configurée, ou remplis simplement le formulaire. L'entreprise est créée automatiquement si elle est nouvelle.
 2. **La faire avancer dans le pipeline** - glisse une carte d'une colonne à l'autre en vue kanban pour changer son statut, ou change-le d'un clic sur sa pastille.
-3. **Tout modifier sur place** - un clic sur une candidature ouvre sa fenêtre : date de réponse, date d'entretien, source, liens, notes… se modifient directement et s'enregistrent tout seuls (« Enregistré »), sans bouton « Modifier ».
+3. **Tout modifier sur place** - un clic sur une candidature ouvre sa fenêtre : date de réponse, source, liens, notes… se modifient directement ; ses **entretiens** (plusieurs, chacun avec son type : RH, technique, cas pratique, manager, final) s'y ajoutent et s'enregistrent tout seuls (« Enregistré »), sans bouton « Modifier ».
 4. **Ouvrir une entreprise pour tout y retrouver** - sa fiche liste ses candidatures, ses documents, lettres, fiches et notes d'entretien, chacun à un clic de distance.
 5. **Changer un statut sans ouvrir la fiche** - en vue liste, clique sur la puce de statut d'une ligne et choisis le nouveau ; le bouton « Voir l'offre » ouvre l'annonce directement.
 6. **Chercher n'importe quoi avec ⌘K** - un intitulé, une note, une phrase d'une offre collée, un mot d'une lettre ou d'une note d'entretien.
@@ -104,7 +104,7 @@ Cinq sections servent à préparer et à garder trace de tout ce qui entoure une
 - **Aperçu en fenêtre** : cliquer une ligne ouvre une fenêtre - jamais la page entière - avec le PDF (ou l'image) et, quand il y en a un, un onglet **Texte** (à copier, ou à télécharger en `.md`). On peut y modifier le titre, le type (documents) ou les offres liées, ou supprimer. Supprimer une offre ne supprime jamais ses documents, lettres, fiches ni notes : seul le lien est retiré.
 - **Téléchargements** : un lien direct vers un PDF ferait naviguer la fenêtre native vers le fichier sans retour possible ; Azimut passe donc par la boîte « Enregistrer sous » du système (et par un téléchargement normal dans un navigateur).
 
-**Entretiens** est une prise de notes : une note par entretien, sur **une entreprise ou une offre précise** (au choix, jamais les deux), avec un titre, une date et un grand champ de texte **enregistré au fil de la frappe** (et à la sortie de la page). Le texte s'écrit en **Markdown avec rendu en direct** : titres, gras, italique, barré, listes à puces ou numérotées (qui se poursuivent avec Entrée, Tab pour les imbriquer), **cases à cocher** cliquables dans le rendu, citations, code, liens, tableaux. Une barre d'outils et les raccourcis ⌘B / ⌘I (Ctrl+B / Ctrl+I) aident ; trois affichages (*Écrire*, *Côte à côte*, *Aperçu*) et un panneau de contexte (l'entreprise, l'offre, les documents, lettres et fiches prêts) se règlent une fois pour toutes. Tout ce qui est tapé est échappé avant d'être mis en forme : aucune balise HTML ne s'exécute. **Exporter en PDF** transforme une note en document propre (mêmes règles de mise en page, numéros de page) via la fenêtre native « Enregistrer sous » - `python cli.py notes pdf 3` fait pareil depuis un terminal. **La note se crée toute seule** : dès qu'une offre reçoit une date d'entretien (dans sa fenêtre, la CLI, l'API), une note vide « Entretien - poste », datée de ce jour, lui est liée ; si l'entretien est décalé et que la note est restée vide, elle suit ; ce que tu as écrit n'est jamais touché.
+**Entretiens** est une prise de notes : une note par entretien, sur **une entreprise ou une offre précise** (au choix, jamais les deux), avec un titre, une date et un grand champ de texte **enregistré au fil de la frappe** (et à la sortie de la page). Le texte s'écrit en **Markdown avec rendu en direct** : titres, gras, italique, barré, listes à puces ou numérotées (qui se poursuivent avec Entrée, Tab pour les imbriquer), **cases à cocher** cliquables dans le rendu, citations, code, liens, tableaux. Une barre d'outils et les raccourcis ⌘B / ⌘I (Ctrl+B / Ctrl+I) aident ; trois affichages (*Écrire*, *Côte à côte*, *Aperçu*) et un panneau de contexte (l'entreprise, l'offre, les documents, lettres et fiches prêts) se règlent une fois pour toutes. Tout ce qui est tapé est échappé avant d'être mis en forme : aucune balise HTML ne s'exécute. **Exporter en PDF** transforme une note en document propre (mêmes règles de mise en page, numéros de page) via la fenêtre native « Enregistrer sous » - `python cli.py notes pdf 3` fait pareil depuis un terminal. **La note se crée toute seule** : dès qu'un entretien est planifié (dans la fenêtre de l'offre, la CLI, l'API), une note vide « Entretien (RH) - poste », datée de ce jour, lui est liée - au nom de l'entreprise si l'entretien couvre plusieurs offres ; si l'entretien est décalé ou change de type et que la note est restée vide, elle suit ; ce que tu as écrit n'est jamais touché.
 
 **CV** rassemble **tes CV**. Chacun peut avoir un **fichier** (PDF, Word ou texte : à télécharger, à envoyer ; son texte se copie en un clic), une **source modifiable** sur ton ordinateur - le dossier d'un projet LaTeX, un fichier `.tex` ou un fichier Word - et un texte collé. Azimut ne touche **jamais** à la source : il garde le chemin (à copier, ou à ouvrir depuis l'appli), relit le texte à chaque fois - le CV évolue entre deux lettres - et dit à l'IA où le lire et où le modifier. Le **CV principal** est celui que l'IA lit par défaut ; on peut en choisir un autre à chaque génération. Si la source n'est plus accessible (autre machine, dossier déplacé), le texte du fichier prend le relais.
 
@@ -148,7 +148,7 @@ python cli.py candidatures modifier 12 --statut "Réponse reçue" --date-reponse
 python cli.py candidatures voir 12
 ```
 
-Options d'ajout / modification : `--date-envoi`, `--sous-domaine`, `--lien-offre`, `--texte-offre` (texte intégral de l'offre, archivé si l'annonce disparaît), `--type`, `--statut`, `--date-reponse`, `--date-entretien`, `--date-debut-souhaitee`, `--duree`, `--gratification` (€/mois), `--ville`, `--mode-travail`, `--convention-envoyee`, `--source`, `--notes`, `--portail-url`, `--portail-identifiant`, `--portail-mdp`.
+Options d'ajout / modification : `--date-envoi`, `--sous-domaine`, `--lien-offre`, `--texte-offre` (texte intégral de l'offre, archivé si l'annonce disparaît), `--type`, `--statut`, `--date-reponse`, `--date-entretien` et `--type-entretien` (à l'ajout : un premier entretien), `--date-debut-souhaitee`, `--duree`, `--gratification` (€/mois), `--ville`, `--mode-travail`, `--convention-envoyee`, `--source`, `--notes`, `--portail-url`, `--portail-identifiant`, `--portail-mdp`.
 
 Les dates s'écrivent `JJ/MM/AAAA` ou `AAAA-MM-JJ` (stockées en ISO).
 
@@ -297,6 +297,11 @@ modifier_candidature(id, **champs)
 lister_candidatures(statut=None, sous_domaine=None) -> liste de dicts
 recuperer_candidature(id) -> dict
 
+# entretiens.py - plusieurs par candidature, chacun avec son type (RH, Technique, Cas pratique / Test, Manager,
+# Final, Autre), une date et une heure ; un entretien peut couvrir plusieurs offres d'une même entreprise
+ajouter_entretien(candidature_ids, date_entretien=None, type_entretien=None, heure=None) -> id
+modifier_entretien(id, **champs) / supprimer_entretien(id) / lister_entretiens(candidature_id=None, a_venir=False)
+
 # doublons.py - quasi-doublons (avertissement, jamais un blocage)
 candidatures_similaires(entreprise, poste, lien_offre=None) -> [{id, score, raisons}, ...]
 paires_entreprises_suspectes() -> [{a, b, score}, ...]
@@ -311,7 +316,7 @@ ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiche
 # notes_entretien.py - liées à une entreprise OU à une offre précise
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
-assurer_note_entretien(candidature_id) -> id | None   # la note de la date d'entretien de l'offre (créée automatiquement, voir plus bas)
+assurer_note_entretien(entretien_id) -> id | None   # la note d'un entretien daté (créée automatiquement, voir plus haut)
 notes_pdf.generer_pdf(note, chemin_sortie=None, langue=None) -> octets   # export PDF d'une note ; CLI : cli.py notes pdf ID
 
 # documents.py - tout fichier, lié à UNE entreprise et à UNE OU PLUSIEURS de ses offres

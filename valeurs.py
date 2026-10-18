@@ -16,12 +16,22 @@ SOUS_DOMAINES = [
     "Agents conversationnels",
     "Robotique / Agents physiques",
     "MLOps pour agents",
+    # IA au sens large (la recherche ne se limite plus à l'agentique)
+    "IA générative / LLM",
+    "Machine learning / Data science",
+    "Vision par ordinateur",
+    "Data engineering / Analyse",
+    "Conseil / Gestion de projet IA",
+    "Développement logiciel",
     "Autre",
 ]
 
 TYPES_CANDIDATURE = ["Offre publiée", "Candidature spontanée", "Cooptation / Réseau"]
 
 STATUTS = ["À préparer", "Envoyée", "Réponse reçue", "Entretien", "Refus", "Accepté"]
+
+# Statuts qui signifient que l'entreprise a répondu (le premier passage à l'un d'eux date la réponse).
+STATUTS_AVEC_REPONSE = ("Réponse reçue", "Entretien", "Refus", "Accepté")
 
 MODES_TRAVAIL = ["Présentiel", "Hybride", "Full remote"]
 
@@ -30,6 +40,8 @@ CONVENTIONS = ["Oui", "Non", "N/A"]
 SOURCES_CANDIDATURE = [
     "LinkedIn",
     "Indeed",
+    "Hellowork",
+    "JobTeaser",
     "Site entreprise",
     "Welcome to the Jungle",
     "Réseau",
@@ -38,6 +50,34 @@ SOURCES_CANDIDATURE = [
 ]
 
 TYPES_DOCUMENT = ["CV", "Lettre de motivation", "Offre (PDF)", "Portfolio", "Autre"]
+
+# Types d'entretien (entretiens.py) - un entretien peut aussi rester sans type précisé.
+TYPES_ENTRETIEN = ["RH", "Technique", "Cas pratique / Test", "Manager", "Final", "Autre"]
+
+# Sites d'offres reconnus au domaine du lien ; tout autre lien mène au site de l'entreprise
+# (ou à son outil de recrutement : Workday, Teamtailor...).
+SITES_OFFRES = {
+    "linkedin.com": "LinkedIn",
+    "indeed.com": "Indeed",
+    "hellowork.com": "Hellowork",
+    "jobteaser.com": "JobTeaser",
+    "welcometothejungle.com": "Welcome to the Jungle",
+    "talents-handicap.com": "Forum / Salon",
+    "jeunesdavenirs-recrut.fr": "Forum / Salon",
+}
+
+
+def source_depuis_lien(lien):
+    """La source d'une offre déduite du domaine de son lien (voir SITES_OFFRES), None sans lien."""
+    from urllib.parse import urlparse
+
+    hote = (urlparse(str(lien or "").strip()).hostname or "").lower()
+    if not hote:
+        return None
+    for domaine, source in SITES_OFFRES.items():
+        if hote == domaine or hote.endswith("." + domaine):
+            return source
+    return "Site entreprise"
 
 # Listes autorisées par table et par champ.
 LISTES_AUTORISEES = {
@@ -65,7 +105,6 @@ CHAMPS_MODIFIABLES = {
         "type_candidature",
         "statut",
         "date_reponse",
-        "date_entretien",
         "date_debut_souhaitee",
         "duree",
         "gratification",
@@ -85,7 +124,6 @@ CHAMPS_DATE = {
     "candidatures": [
         "date_envoi",
         "date_reponse",
-        "date_entretien",
         "date_debut_souhaitee",
     ],
 }

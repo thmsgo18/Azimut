@@ -883,8 +883,8 @@ async function ouvrirNouvelleFiche() {
     bouton.title = choix.offreIds.length ? "" : t("fiches.choisir_une_offre");
     const champDate = zone.racine.querySelector("#fiche-date");
     if (champDate && !champDate.value) {
-      const avecDate = choix.offres.find((o) => o.date_entretien);
-      if (avecDate) champDate.value = avecDate.date_entretien;
+      const avecDate = choix.offres.find((o) => o.prochain_entretien);
+      if (avecDate) champDate.value = avecDate.prochain_entretien;
     }
   });
   bouton.addEventListener("click", () => {

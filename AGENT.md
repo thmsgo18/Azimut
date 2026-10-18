@@ -48,9 +48,11 @@ rempli. Si aucune date n'est donnée ou déductible de l'offre ou du contexte,
 utilise **la date du jour** (format `AAAA-MM-JJ`), plutôt que de la laisser
 vide.
 
-Les autres champs de type date (`date_reponse`, `date_entretien`,
-`date_debut_souhaitee`) suivent la règle générale :
-vide si l'offre ne le précise pas — pas de date du jour par défaut pour eux.
+Les autres champs de type date (`date_reponse`, `date_debut_souhaitee`) suivent la
+règle générale : vide si l'offre ne le précise pas — pas de date du jour par défaut
+pour eux. Un entretien (plusieurs possibles par candidature, chacun avec son type :
+RH, Technique...) se planifie avec `cli.py entretiens ajouter`, jamais par un champ
+de la candidature.
 
 ## Mapping champ ↔ information de l'offre
 

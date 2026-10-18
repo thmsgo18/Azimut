@@ -8,7 +8,7 @@ Tout ce qu'une IA doit savoir pour travailler ici sans rien casser.
 1. **La base SQLite `suivi_candidatures.db` est la SEULE source de vérité.**
    Les fichiers Excel sont des exports régénérables - ne jamais les éditer.
 2. **JAMAIS de SQL direct.** Toute lecture/écriture passe par les fonctions
-   Python des modules (`candidatures.py`, `entreprises.py`, `lettres.py`,
+   Python des modules (`candidatures.py`, `entreprises.py`, `entretiens.py`, `lettres.py`,
    `fiches.py`, `notes_entretien.py`, `documents.py`, `cvs.py`, `reglages.py`) ou
    par la CLI `cli.py`. Elles valident les
    valeurs autorisées et détectent les doublons - c'est ce qui protège la base.
@@ -53,6 +53,10 @@ if verifier_doublon_candidature("AgentikCo", "Stage agents IA") is None:
     )
 ```
 
+Le texte de l'offre va dans `texte_offre`, jamais dans `notes` (réservé à ce que Thomas sait en
+plus : contact, échange...). L'IA lit les deux pour une lettre ou une fiche, mais seul
+`texte_offre` est archivé comme l'offre (vécu : 222 offres sur 234 collées dans `notes`).
+
 Ou en CLI (équivalent) :
 
 ```bash
@@ -71,12 +75,18 @@ Définies dans `valeurs.py` (la casse et les accents sont tolérés en entrée) 
 - `statut` : À préparer, Envoyée, Réponse reçue, Entretien, Refus, Accepté
 - `sous_domaine` : Agents de codage, Orchestration multi-agents,
   RAG / Agents de recherche, Agents conversationnels, Robotique / Agents physiques,
-  MLOps pour agents, Autre
+  MLOps pour agents, IA générative / LLM, Machine learning / Data science,
+  Vision par ordinateur, Data engineering / Analyse, Conseil / Gestion de projet IA,
+  Développement logiciel, Autre
 - `type_candidature` : Offre publiée, Candidature spontanée, Cooptation / Réseau
 - `mode_travail` : Présentiel, Hybride, Full remote
 - `convention_envoyee` : Oui, Non, N/A
-- `source` (candidature) : LinkedIn, Indeed, Site entreprise, Welcome to the Jungle,
-  Réseau, Forum / Salon, Autre
+- `source` (candidature) : LinkedIn, Indeed, Hellowork, JobTeaser, Site entreprise,
+  Welcome to the Jungle, Réseau, Forum / Salon, Autre - `valeurs.source_depuis_lien(lien)` la
+  déduit du domaine du lien (Hellowork, JobTeaser... sinon « Site entreprise ») : s'en servir
+  plutôt que « Autre »
+- `type_entretien` (entretien) : RH, Technique, Cas pratique / Test, Manager, Final, Autre
+  (ou aucun : type non précisé)
 - Pièces de préparation : `source` d'une lettre ou d'une fiche = `manuelle` (fichier
   ajouté par l'utilisateur), `api` (générée par l'IA d'Azimut) ou `claude_code`
   (l'interface ne l'affiche plus : seule la CLI le liste).
@@ -101,16 +111,33 @@ entreprises_similaires(nom, exclure_id=None) / paires_entreprises_suspectes()
 
 # candidatures.py - alimente automatiquement le journal (evenements.py)
 verifier_doublon_candidature(entreprise_nom, poste) -> id | None
-ajouter_candidature(entreprise_nom, poste, note_entretien=True, **champs) -> id   # avec date_entretien : note créée aussi
+ajouter_candidature(entreprise_nom, poste, note_entretien=True, date_entretien=None, type_entretien=None,
+                    **champs) -> id   # raccourci : date_entretien planifie un 1er entretien (statut inchangé) + sa note
 # déclenche aussi sauvegarde.sauvegarder_base() tous les INTERVALLE_SAUVEGARDE_AUTO
 # (4) candidatures - best effort, ne lève jamais si la sauvegarde échoue
-modifier_candidature(id, **champs)         # changement de statut → événement journalisé ; une date_entretien
-                                           # nouvelle crée la note d'entretien de ce jour (note_entretien=False pour l'éviter)
+modifier_candidature(id, **champs)         # changement de statut → événement journalisé ; le 1er passage à un statut
+                                           # de réponse (valeurs.STATUTS_AVEC_REPONSE) remplit date_reponse si vide.
+                                           # date_entretien n'est PLUS un champ : ChampInconnu -> voir entretiens.py
 supprimer_candidature(id)                  # supprime son journal ; les documents, lettres, fiches
                                            # et notes qui la visaient sont CONSERVÉS (lien retiré)
-lister_candidatures(statut=None, sous_domaine=None)
+lister_candidatures(statut=None, sous_domaine=None)   # + `prochain_entretien` (date, calculée)
 recuperer_candidature(id)
+rattraper_dates_reponse(appliquer=False) / rattraper_sources(appliquer=False)   # anciennes données : date de
+    # réponse relue dans le journal, source déduite du lien (« Autre » seulement) ; CLI : candidatures completer
 enregistrer_etat_lien(id, etat)            # "actif"/"mort"/"inconnu" - usage interne (voir ci-dessous)
+
+# entretiens.py - plusieurs entretiens par candidature, chacun : type (ou aucun), date, heure facultative ;
+# un entretien est lié à UNE entreprise et à une ou plusieurs de ses offres (entretien commun à 3 offres =
+# UN entretien, une seule note). CLI : cli.py entretiens ajouter|lister|modifier|supprimer
+ajouter_entretien(candidature_ids, date_entretien=None, type_entretien=None, heure=None, note=True,
+                  mettre_a_jour_statut=True) -> id   # journalisé ; offres « À préparer/Envoyée/Réponse reçue »
+                                           # -> « Entretien » ; note d'entretien vide créée pour ce jour
+modifier_entretien(id, type_entretien=, date_entretien=, heure=, candidature_ids=) -> entretien  # la note restée
+                                           # vide suit (report, nouveau type) ; une note écrite ne bouge jamais
+supprimer_entretien(id)                    # sa note vide part avec lui, une note écrite reste
+lister_entretiens(entreprise_id=None, candidature_id=None, a_venir=False) / recuperer_entretien(id)
+    # chaque entretien porte `entreprise` et `candidatures` [{id, poste, statut}]
+resume(entretien) -> « 19/10/2026 14:30 - RH »
 
 # verification_liens.py - ping HTTP conservateur des liens d'offres (jamais de faux positif)
 verifier_lien(url) -> (etat, code_http)              # "actif" / "mort" (404/410 seulement) / "inconnu"
@@ -177,13 +204,15 @@ modifier_fiche(...) / supprimer_fiche(id)          # `donnees` = dict décrit da
 # « English »… -> anglais, vide ou autre -> français. Le PDF est fabriqué une fois, à la création.
 
 # notes_entretien.py - prise de notes liée à une entreprise OU à une offre précise (plusieurs par cible)
-ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
+ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None,
+             entretien_id=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / recuperer_note(id)
+    # candidature_id : ses notes ET celles de ses entretiens (un entretien commun a sa note au nom de l'entreprise)
 modifier_note(id, titre=, contenu=, date_entretien=, entreprise=, candidature_id=) / supprimer_note(id)
-assurer_note_entretien(candidature_id) -> id | None   # la note de la date d'entretien de l'offre : créée (vide,
-    # « Entretien - poste », « Interview - poste » si l'interface est en anglais), ou l'ancienne note restée vide
-    # déplacée à la nouvelle date ; jamais de doublon, jamais une note remplie déplacée. Appelée toute seule par
-    # ajouter_candidature / modifier_candidature (voir plus bas).
+assurer_note_entretien(entretien_id, creer=True) -> id | None   # la note d'un entretien daté : créée (vide,
+    # « Entretien (RH) - poste », « Interview (HR) - poste » en anglais ; au nom de l'entreprise s'il couvre plusieurs
+    # offres), ou sa note restée vide déplacée à la nouvelle date, ou une note de ce jour rattachée ; jamais de
+    # doublon, jamais une note remplie déplacée. Appelée toute seule par entretiens.py.
 
 # notes_pdf.py - export PDF d'une note (reportlab, pur Python) : le Markdown est mis en page comme à l'écran
 notes_pdf.generer_pdf(note, chemin_sortie=None, langue=None) -> octets   # `note` = recuperer_note(id) ;
@@ -194,6 +223,8 @@ agent.generer_lettre_motivation(entreprise_nom, cv_texte, offres=None, langue=No
 agent.generer_fiche_entretien(entreprise_nom, offres, cv_texte=None, recherche=None, contexte=None) -> dict
 generation.generer_lettre(entreprise_nom, candidature_ids, langue=None, generale=None) -> id
 generation.generer_fiche(entreprise_nom, candidature_ids, ...) -> (id, avertissements)
+# L'IA reçoit, pour chaque offre, son texte (`texte_offre`) ET ses notes (`notes`), plus les notes de la
+# fiche entreprise (`contexte_actus`) - pour une lettre comme pour une fiche.
 # generation.py vérifie TOUT (offres de la même entreprise, CV, au moins une offre pour une fiche) AVANT
 # d'appeler l'IA, et n'enregistre rien si l'appel échoue. Un lien d'offre n'entre dans une fiche que s'il
 # répond encore (verification_liens.verifier_lien == "actif").
@@ -210,7 +241,8 @@ generation.generer_fiche(entreprise_nom, candidature_ids, ...) -> (id, avertisse
 # le glisser-déposer de l'interface ; cli.py fiches ajouter --json rend un PDF depuis des données JSON.
 
 # export_excel.py / import_excel.py - sauvegarde lisible (sans secrets, sans fichiers) : candidatures,
-# entreprises, notes d'entretien. Les anciens exports (onglet Contacts, colonne « Notes entretien »)
+# entreprises, entretiens (onglet « Entretiens » : une offre par ligne de cellule), notes d'entretien.
+# Un ancien export (colonne « Date d'entretien ») donne un entretien sans type par candidature. Les anciens exports (onglet Contacts, colonne « Notes entretien »)
 # restent importables. Les lettres et fiches sont des fichiers : elles vivent dans le dossier de données.
 exporter_excel(chemin_sortie) / importer_excel(chemin_fichier) -> rapport
 
@@ -252,7 +284,9 @@ Toutes les migrations d'une ouverture s'exécutent dans UNE transaction (tout ou
 la base reste telle qu'elle était et une connexion n'est jamais laissée ouverte). Elles couvrent : la
 section Contacts retirée (table `contacts`), les notes d'entretien de la candidature (ancienne colonne
 `notes_entretien`) devenues des notes de la section Entretiens, les lettres à fichier principal unique
-(`chemin_fichier`), les **documents** (ancienne table liée à UNE candidature → entreprise + une ou
+(`chemin_fichier`), la **date d'entretien unique** de la candidature (colonne `date_entretien`) devenue la
+table `entretiens` (offres d'une même entreprise le même jour = un entretien commun, notes de ce jour rattachées),
+les **documents** (ancienne table liée à UNE candidature → entreprise + une ou
 plusieurs candidatures, mêmes identifiants et mêmes fichiers, texte extrait pour la recherche) et le **CV** unique des réglages
 (`cv_source`…) devenu le CV principal de la table `cvs`. Toute modification du schéma passe par là,
 avec un test dans `tests/test_migrations.py` sur une base « à l'ancienne ». Les lignes de journal d'une candidature disparue

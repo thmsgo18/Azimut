@@ -58,7 +58,7 @@ class TestFicheEntretien(unittest.TestCase):
         # 1. En-tête
         self.assertIn("# Préparation d'entretien - AgentikCo", fiche)
         self.assertIn("**Poste :** Stage agents IA", fiche)
-        self.assertIn("**Date de l'entretien :** 05/09/2026", fiche)
+        self.assertIn("**Entretiens :** 05/09/2026", fiche)
         self.assertIn("Paris / Hybride", fiche)
         # 2. Contexte entreprise
         self.assertIn("## Contexte entreprise", fiche)
@@ -80,7 +80,7 @@ class TestFicheEntretien(unittest.TestCase):
     def test_fiche_minimale(self):
         numero = ajouter_candidature("Mistral AI", "Stage RAG", chemin_db=self.chemin_db)
         fiche = generer_fiche_entretien(numero, chemin_db=self.chemin_db)
-        self.assertIn("non renseignée", fiche)  # date d'entretien absente
+        self.assertIn("**Entretiens :** aucun pour l'instant", fiche)
         self.assertIn("Aucun contexte enregistré", fiche)
         self.assertIn("Ni texte ni lien d'offre", fiche)
         self.assertIn("Aucune lettre, fiche ni note d'entretien liée", fiche)

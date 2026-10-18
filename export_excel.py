@@ -2,8 +2,8 @@
 
 Reproduit le style du fichier « suivi candidatures.xlsx » existant (en-têtes
 bleu foncé, Arial, bordures grises, ligne d'exemple jaune, tableau de bord à
-formules) étendu aux 4 onglets : Suivi candidatures, Entreprises, Notes
-d'entretien, Tableau de bord. Les lettres et fiches d'entretien sont des
+formules) étendu aux 5 onglets : Suivi candidatures, Entreprises, Entretiens,
+Notes d'entretien, Tableau de bord. Les lettres et fiches d'entretien sont des
 fichiers : elles ne figurent pas dans l'export (elles vivent dans le dossier de
 données). La base reste la seule source de vérité : l'export peut être relancé
 à tout moment.
@@ -19,6 +19,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from candidatures import lister_candidatures
 from entreprises import lister_entreprises
+from entretiens import lister_entretiens, resume
 from notes_entretien import lister_notes
 from valeurs import (
     CONVENTIONS,
@@ -27,6 +28,7 @@ from valeurs import (
     SOUS_DOMAINES,
     STATUTS,
     TYPES_CANDIDATURE,
+    TYPES_ENTRETIEN,
 )
 
 # Palette et styles repris du fichier Excel existant.
@@ -114,7 +116,7 @@ def _ajouter_validation(ws, colonne, valeurs, premiere_ligne, ligne_max):
     dv.add(f"{colonne}{premiere_ligne}:{colonne}{ligne_max}")
 
 
-def _onglet_suivi(wb, liste, ligne_max):
+def _onglet_suivi(wb, liste, ligne_max, par_candidature):
     ws = wb.active
     ws.title = "Suivi candidatures"
     titres = [
@@ -127,7 +129,7 @@ def _onglet_suivi(wb, liste, ligne_max):
         "Type de candidature",
         "Statut",
         "Date de réponse",
-        "Date d'entretien",
+        "Entretiens",
         "Date de début souhaitée",
         "Durée",
         "Gratification (€/mois)",
@@ -181,7 +183,8 @@ def _onglet_suivi(wb, liste, ligne_max):
             cand["type_candidature"],
             cand["statut"],
             _date_fr(cand["date_reponse"]),
-            _date_fr(cand["date_entretien"]),
+            # résumé lisible ; l'onglet « Entretiens » est celui que l'import relit
+            "\n".join(resume(e) for e in par_candidature.get(cand["id"], [])) or None,
             _date_fr(cand["date_debut_souhaitee"]),
             cand["duree"],
             cand["gratification"],
@@ -254,6 +257,30 @@ def _onglet_entreprises(wb, liste, ligne_max, ligne_max_suivi):
             ),
         )
         lien.font = POLICE_LIEN
+    return ws
+
+
+def _onglet_entretiens(wb, liste, ligne_max):
+    ws = wb.create_sheet("Entretiens")
+    titres = ["Entreprise", "Offres", "Type", "Date", "Heure"]
+    largeurs = [22, 50, 20, 14, 10]
+    _preparer_onglet(ws, titres, largeurs, ligne_max, ligne_donnees=2)
+    for i, entretien in enumerate(liste):
+        ligne = 2 + i
+        for col, valeur in enumerate(
+            [
+                entretien["entreprise"],
+                "\n".join(o["poste"] for o in entretien["candidatures"]),  # une offre par ligne
+                entretien["type_entretien"],
+                _date_fr(entretien["date_entretien"]),
+                entretien["heure"],
+            ],
+            start=1,
+        ):
+            cellule = ws.cell(row=ligne, column=col, value=valeur)
+            if col == 2:
+                cellule.alignment = Alignment(vertical="center", wrap_text=True)
+    _ajouter_validation(ws, "C", TYPES_ENTRETIEN, 2, ligne_max)
     return ws
 
 
@@ -361,14 +388,20 @@ def exporter_excel(chemin_sortie, chemin_db=None):
     liste_candidatures = lister_candidatures(chemin_db=chemin_db)
     liste_entreprises = lister_entreprises(chemin_db=chemin_db)
     liste_notes = lister_notes(chemin_db=chemin_db)
+    liste_entretiens = lister_entretiens(chemin_db=chemin_db)
+    par_candidature = {}
+    for entretien in liste_entretiens:
+        for offre in entretien["candidatures"]:
+            par_candidature.setdefault(offre["id"], []).append(entretien)
 
     ligne_max_suivi = max(LIGNE_MAX_MINI, len(liste_candidatures) + 2)
     ligne_max_entreprises = max(LIGNE_MAX_MINI, len(liste_entreprises) + 1)
     ligne_max_notes = max(LIGNE_MAX_MINI, len(liste_notes) + 1)
 
     wb = Workbook()
-    _onglet_suivi(wb, liste_candidatures, ligne_max_suivi)
+    _onglet_suivi(wb, liste_candidatures, ligne_max_suivi, par_candidature)
     _onglet_entreprises(wb, liste_entreprises, ligne_max_entreprises, ligne_max_suivi)
+    _onglet_entretiens(wb, liste_entretiens, max(LIGNE_MAX_MINI, len(liste_entretiens) + 1))
     _onglet_notes(wb, liste_notes, ligne_max_notes)
     _onglet_tableau_de_bord(wb, ligne_max_suivi)
 

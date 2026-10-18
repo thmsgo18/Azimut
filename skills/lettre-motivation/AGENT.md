@@ -41,7 +41,9 @@ seule la CLI range le fichier au bon endroit **et** l'indexe dans la base.
    commande échoue (aucun CV), le dire et proposer de l'ajouter dans la
    section **CV** d'Azimut ; en conversation, on peut aussi demander le CV
    directement. Ne jamais écrire une lettre à partir d'hypothèses sur le profil.
-2. **L'offre.** Si un numéro de candidature est connu : `candidatures voir <n°>`.
+2. **L'offre.** Si un numéro de candidature est connu : `candidatures voir <n°>` - lire
+   le texte de l'offre ET les notes de la candidature (le texte de l'offre y est
+   parfois collé, et elles disent ce que le candidat sait en plus).
    Sinon demander l'entreprise ou le lien/texte de l'offre (ce dernier peut être
    collé ; si c'est un lien, aller le lire). En extraire l'intitulé, la mission,
    la stack, le contexte (équipe, localisation). Une lettre peut aussi porter sur

@@ -36,13 +36,15 @@ class TestModulesNouveautes(unittest.TestCase):
         numero = self._candidature(statut="Envoyée")
         modifier_candidature(numero, chemin_db=self.chemin_db, statut="Réponse reçue")
         modifier_candidature(numero, chemin_db=self.chemin_db, date_reponse="2026-08-25")
-        modifier_candidature(numero, chemin_db=self.chemin_db, date_entretien="05/09/2026")
+        import entretiens
+
+        entretiens.ajouter_entretien([numero], date_entretien="05/09/2026", chemin_db=self.chemin_db)
+        entretiens.ajouter_entretien([numero], date_entretien="12/09/2026", type_entretien="RH", chemin_db=self.chemin_db)
         types = [e["type_evenement"] for e in lister_evenements(numero, chemin_db=self.chemin_db)]
-        self.assertEqual(len(types), 4)
-        self.assertIn("creation", types)
-        self.assertIn("statut", types)
-        self.assertIn("reponse", types)
-        self.assertIn("entretien", types)
+        # création, Envoyée → Réponse reçue, réponse datée, 2 entretiens, Réponse reçue → Entretien
+        self.assertEqual(len(types), 6)
+        for attendu in ("creation", "statut", "reponse", "entretien", "entretien_type"):
+            self.assertIn(attendu, types)
 
     def test_journal_pas_devenement_sans_changement(self):
         from candidatures import modifier_candidature

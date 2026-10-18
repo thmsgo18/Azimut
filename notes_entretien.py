@@ -57,10 +57,11 @@ def _date(valeur):
 
 def ajouter_note(
     entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None,
-    chemin_db=None,
+    entretien_id=None, chemin_db=None,
 ):
     """Crée une note d'entretien et retourne son id. Le contenu peut être vide :
-    la note se remplit ensuite, au fil de la prise de notes."""
+    la note se remplit ensuite, au fil de la prise de notes. `entretien_id` : l'entretien
+    (entretiens.py) dont c'est la note."""
     date_normalisee = _date(date_entretien)  # validée avant de créer quoi que ce soit
     conn = db.ouvrir(chemin_db)
     try:
@@ -70,10 +71,10 @@ def ajouter_note(
         titre_final = (str(titre).strip() if titre else "") or f"Notes - {poste or nom}"
         maintenant = _maintenant()
         curseur = conn.execute(
-            "INSERT INTO notes_entretien (entreprise_id, candidature_id, titre, contenu, "
-            "date_entretien, date_creation, date_modification) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO notes_entretien (entreprise_id, candidature_id, entretien_id, titre, contenu, "
+            "date_entretien, date_creation, date_modification) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
-                entreprise_id, candidature, titre_final, str(contenu or ""),
+                entreprise_id, candidature, entretien_id, titre_final, str(contenu or ""),
                 date_normalisee, maintenant, maintenant,
             ),
         )
@@ -90,55 +91,146 @@ _SELECTION = (
 )
 
 
-TITRES_NOTE_ENTRETIEN = {"fr": "Entretien - {poste}", "en": "Interview - {poste}"}
+TITRES_NOTE_ENTRETIEN = {"fr": "Entretien - {cible}", "en": "Interview - {cible}"}
+TITRES_NOTE_ENTRETIEN_TYPE = {"fr": "Entretien ({type}) - {cible}", "en": "Interview ({type}) - {cible}"}
 
 
-def titre_note_entretien(poste, langue="fr"):
-    """Le titre des notes créées automatiquement pour la date d'un entretien."""
-    return TITRES_NOTE_ENTRETIEN[langues.normaliser_langue(langue)].format(poste=poste)
+def titre_note_entretien(cible, langue="fr", type_entretien=None):
+    """Le titre des notes créées automatiquement pour un entretien : « Entretien - poste », ou
+    « Entretien (RH) - poste » avec un type ; la cible est l'entreprise quand l'entretien couvre
+    plusieurs offres."""
+    langue = langues.normaliser_langue(langue)
+    if type_entretien:
+        return TITRES_NOTE_ENTRETIEN_TYPE[langue].format(
+            type=langues.traduire_valeur(type_entretien, langue), cible=cible
+        )
+    return TITRES_NOTE_ENTRETIEN[langue].format(cible=cible)
 
 
-def assurer_note_entretien(candidature_id, chemin_db=None):
-    """Une note d'entretien existe pour la date d'entretien de cette offre.
+def _cible_entretien(entretien):
+    """(candidature_id ou None, libellé) de la note d'un entretien : l'offre s'il n'en couvre
+    qu'une, sinon l'entreprise."""
+    offres = entretien["candidatures"]
+    if len(offres) == 1:
+        return offres[0]["id"], offres[0]["poste"]
+    return None, entretien["entreprise"]
 
-    - pas de date d'entretien, ou une note de l'offre porte déjà cette date : rien à faire ;
-    - une note créée automatiquement et jamais remplie (titre « Entretien - poste », vide)
-      existe pour une ancienne date : elle prend la nouvelle (entretien reporté) ;
-    - sinon : une nouvelle note vide, datée du jour de l'entretien, liée à l'offre, titrée dans
-      la langue de l'interface (« Interview - poste » en anglais).
 
-    Ce que l'utilisateur a écrit n'est jamais déplacé ni supprimé. Retourne l'id de la note
-    créée ou déplacée, ou None."""
+def _titres_automatiques(entretien):
+    """Tous les titres automatiques possibles d'un entretien : toutes langues (celle de
+    l'interface a pu changer depuis la création de la note), avec ou sans son type, au nom de
+    l'entreprise ou de chacune de ses offres (une note d'avant les entretiens multiples porte
+    « Entretien - poste »)."""
+    cibles = {entretien["entreprise"], *(o["poste"] for o in entretien["candidatures"])}
+    return {
+        titre_note_entretien(cible, langue, type_entretien)
+        for cible in cibles for langue in langues.LANGUES
+        for type_entretien in {None, entretien["type_entretien"]}
+    }
+
+
+def _notes_de_l_entretien(entretien_id, chemin_db):
     conn = db.ouvrir(chemin_db)
     try:
-        ligne = conn.execute(
-            "SELECT poste, date_entretien FROM candidatures WHERE id = ?", (candidature_id,)
-        ).fetchone()
+        return [
+            dict(l) for l in conn.execute(
+                "SELECT * FROM notes_entretien WHERE entretien_id = ? ORDER BY id", (entretien_id,)
+            )
+        ]
     finally:
         conn.close()
-    if ligne is None:
-        raise EntiteIntrouvable(f"Aucune candidature avec l'id {candidature_id}.")
-    date = ligne["date_entretien"]
-    if not date:
+
+
+def assurer_note_entretien(entretien_id, creer=True, chemin_db=None):
+    """Une note d'entretien existe pour la date de cet entretien (entretiens.py).
+
+    - pas de date, ou une note de l'entretien porte déjà cette date : rien à faire ;
+    - sa note restée vide porte une ancienne date : elle prend la nouvelle (entretien reporté) ;
+    - une note des mêmes offres (ou de l'entreprise) déjà datée de ce jour lui est rattachée ;
+    - sinon : une nouvelle note vide, datée du jour de l'entretien, titrée dans la langue de
+      l'interface (« Entretien (RH) - poste », « Interview (HR) - poste » en anglais).
+
+    Ce que l'utilisateur a écrit n'est jamais déplacé ni supprimé. `creer=False` (imports) :
+    rattache seulement une note existante, n'en crée aucune. Retourne l'id de la note créée ou
+    déplacée, ou None."""
+    import entretiens
+
+    entretien = entretiens.recuperer_entretien(entretien_id, chemin_db=chemin_db)
+    jour = entretien["date_entretien"]
+    if not jour:
         return None
-    existantes = lister_notes(candidature_id=candidature_id, chemin_db=chemin_db)
-    if any(n["date_entretien"] == date for n in existantes):
+    liees = _notes_de_l_entretien(entretien_id, chemin_db)
+    if any(n["date_entretien"] == jour for n in liees):
         return None
-    # La note automatique se reconnaît dans toutes les langues : la langue de l'interface a pu
-    # changer depuis sa création.
-    titres_auto = {titre_note_entretien(ligne["poste"], langue) for langue in langues.LANGUES}
-    for note in existantes:
-        if note["titre"] in titres_auto and not (note["contenu"] or "").strip():
-            modifier_note(note["id"], date_entretien=date, chemin_db=chemin_db)
+    for note in liees:
+        if not (note["contenu"] or "").strip():
+            modifier_note(note["id"], date_entretien=jour, chemin_db=chemin_db)
             return note["id"]
-    titre = titre_note_entretien(ligne["poste"], langues.langue_interface(chemin_db))
-    return ajouter_note(candidature_id=candidature_id, titre=titre, date_entretien=date, chemin_db=chemin_db)
+    ids = {o["id"] for o in entretien["candidatures"]}
+    conn = db.ouvrir(chemin_db)
+    try:
+        deja = next(
+            (
+                n for n in conn.execute(
+                    "SELECT id, candidature_id FROM notes_entretien WHERE entreprise_id = ? "
+                    "AND date_entretien = ? AND entretien_id IS NULL ORDER BY id",
+                    (entretien["entreprise_id"], jour),
+                )
+                if n["candidature_id"] is None or n["candidature_id"] in ids
+            ),
+            None,
+        )
+        if deja is not None:
+            conn.execute("UPDATE notes_entretien SET entretien_id = ? WHERE id = ?", (entretien_id, deja["id"]))
+            conn.commit()
+            return None
+    finally:
+        conn.close()
+    if not creer:
+        return None
+    candidature_id, cible = _cible_entretien(entretien)
+    titre = titre_note_entretien(cible, langues.langue_interface(chemin_db), entretien["type_entretien"])
+    return ajouter_note(
+        entreprise_nom=entretien["entreprise"], candidature_id=candidature_id, titre=titre,
+        date_entretien=jour, entretien_id=entretien_id, chemin_db=chemin_db,
+    )
+
+
+def suivre_entretien(entretien_id, avant, chemin_db=None):
+    """Après une modification d'entretien (`avant` = l'entretien tel qu'il était) : sa note
+    restée vide prend le nouveau titre (type, offres) et la nouvelle date. Une note écrite ne
+    bouge jamais (un entretien reporté en reçoit alors une nouvelle, vide)."""
+    import entretiens
+
+    apres = entretiens.recuperer_entretien(entretien_id, chemin_db=chemin_db)
+    meme_cible = (
+        apres["type_entretien"] == avant["type_entretien"]
+        and [o["id"] for o in apres["candidatures"]] == [o["id"] for o in avant["candidatures"]]
+    )
+    # Le titre ne change qu'avec le type ou les offres (pas avec la langue de l'interface).
+    anciens_titres = set() if meme_cible else _titres_automatiques(avant)
+    candidature_id, cible = _cible_entretien(apres)
+    titre = titre_note_entretien(cible, langues.langue_interface(chemin_db), apres["type_entretien"])
+    for note in _notes_de_l_entretien(entretien_id, chemin_db):
+        if not (note["contenu"] or "").strip() and note["titre"] in anciens_titres:
+            conn = db.ouvrir(chemin_db)
+            try:
+                conn.execute(
+                    "UPDATE notes_entretien SET titre = ?, candidature_id = ?, date_modification = ? WHERE id = ?",
+                    (titre, candidature_id, _maintenant(), note["id"]),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+    if apres["date_entretien"] == avant["date_entretien"]:
+        return None  # même jour : une note supprimée par l'utilisateur n'est pas recréée
+    return assurer_note_entretien(entretien_id, chemin_db=chemin_db)
 
 
 def lister_notes(entreprise_id=None, candidature_id=None, recherche=None, chemin_db=None):
     """Notes les plus récentes d'abord (date d'entretien si renseignée, sinon
     date de création). `entreprise_id` inclut les notes de ses offres ;
-    `candidature_id` ne retourne que celles de cette offre. `recherche` :
+    `candidature_id` retourne celles de cette offre et de ses entretiens. `recherche` :
     titre, contenu, entreprise, poste - insensible à la casse et aux accents."""
     conn = db.ouvrir(chemin_db)
     try:
@@ -147,8 +239,13 @@ def lister_notes(entreprise_id=None, candidature_id=None, recherche=None, chemin
             conditions.append("n.entreprise_id = ?")
             parametres.append(entreprise_id)
         if candidature_id is not None:
-            conditions.append("n.candidature_id = ?")
-            parametres.append(candidature_id)
+            # ses notes, et celles des entretiens qui la concernent (un entretien commun à
+            # plusieurs offres a sa note au nom de l'entreprise)
+            conditions.append(
+                "(n.candidature_id = ? OR n.entretien_id IN "
+                "(SELECT entretien_id FROM entretiens_candidatures WHERE candidature_id = ?))"
+            )
+            parametres.extend([candidature_id, candidature_id])
         requete = _SELECTION
         if conditions:
             requete += " WHERE " + " AND ".join(conditions)

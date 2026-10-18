@@ -122,12 +122,13 @@ RATTACHEMENTS = (
     ("lettres_motivation", "lettre(s) de motivation"),
     ("fiches_entretien", "fiche(s) d'entretien"),
     ("notes_entretien", "note(s) d'entretien"),
+    ("entretiens", "entretien(s)"),
 )
 
 
 def supprimer_entreprise(id_entreprise, chemin_db=None):
     """Supprime une entreprise, refusé tant qu'il lui reste des candidatures,
-    documents, lettres, fiches ou notes d'entretien."""
+    documents, lettres, fiches, notes d'entretien ou entretiens."""
     conn = db.ouvrir(chemin_db)
     try:
         actuelle = conn.execute(
@@ -196,6 +197,7 @@ def fusionner_entreprises(id_conserver, id_supprimer, chemin_db=None):
             ("lettres_motivation", "lettres_deplacees"),
             ("fiches_entretien", "fiches_deplacees"),
             ("notes_entretien", "notes_deplacees"),
+            ("entretiens", "entretiens_deplaces"),
         ):
             deplaces[cle] = conn.execute(
                 f"UPDATE {table} SET entreprise_id = ? WHERE entreprise_id = ?",

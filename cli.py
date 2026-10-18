@@ -4,6 +4,7 @@ Exemples :
     python cli.py candidatures ajouter --entreprise "AgentikCo" --poste "Stage agents IA" --statut Envoyée
     python cli.py candidatures lister --statut Entretien
     python cli.py candidatures modifier 12 --statut "Réponse reçue"
+    python cli.py entretiens ajouter --candidature 12 13 --date 19/10/2026 --heure 14:30 --type RH
     python cli.py lettres importer --entreprise "AgentikCo" --fichier ma-lettre.pdf
     python cli.py documents importer --entreprise "AgentikCo" --fichier offre.pdf --type "Offre (PDF)"
     python cli.py cv voir
@@ -25,6 +26,7 @@ import documents
 import doublons
 import entreprises
 import entretien
+import entretiens
 import export_excel
 import fiches
 import import_csv
@@ -96,7 +98,6 @@ CHAMPS_CANDIDATURE = {
     "type_candidature": "type_candidature",
     "statut": "statut",
     "date_reponse": "date_reponse",
-    "date_entretien": "date_entretien",
     "date_debut_souhaitee": "date_debut_souhaitee",
     "duree": "duree",
     "gratification": "gratification",
@@ -129,7 +130,10 @@ def _options_candidature(parseur, avec_poste_option):
     parseur.add_argument("--type", dest="type_candidature", help="Type de candidature")
     parseur.add_argument("--statut", help="Statut de la candidature")
     parseur.add_argument("--date-reponse", dest="date_reponse", help="Date de réponse")
-    parseur.add_argument("--date-entretien", dest="date_entretien", help="Date de l'entretien")
+    if not avec_poste_option:  # à la création seulement : ensuite, section « entretiens »
+        parseur.add_argument("--date-entretien", dest="date_entretien", help="Date d'un premier entretien")
+        parseur.add_argument("--type-entretien", dest="type_entretien",
+                             help="Type de ce premier entretien (RH, Technique, Cas pratique / Test, Manager, Final, Autre)")
     parseur.add_argument("--date-debut-souhaitee", dest="date_debut_souhaitee", help="Date de début souhaitée")
     parseur.add_argument("--duree", help="Durée du stage (ex. « 6 mois »)")
     parseur.add_argument("--gratification", help="Gratification en €/mois")
@@ -170,6 +174,42 @@ def construire_analyseur():
 
     voir = actions.add_parser("voir", help="Afficher le détail d'une candidature")
     voir.add_argument("id", type=int, help="Numéro de la candidature")
+
+    completer = actions.add_parser(
+        "completer",
+        help="Dater les réponses depuis le journal et déduire la source du lien d'offre "
+             "(affiche seulement, sauf --appliquer)",
+    )
+    completer.add_argument("--appliquer", action="store_true", help="Enregistrer ce qui est proposé")
+
+    # --- entretiens ---
+    ent_p = sections.add_parser(
+        "entretiens", help="Gérer les entretiens (plusieurs par candidature : RH, technique...)"
+    )
+    actions = ent_p.add_subparsers(dest="action", required=True, metavar="action")
+    ajouter = actions.add_parser("ajouter", help="Planifier un entretien pour une ou plusieurs offres")
+    ajouter.add_argument("--candidature", dest="candidature_ids", type=int, nargs="+", required=True,
+                         help="Numéro(s) des offres concernées (une même entreprise)")
+    ajouter.add_argument("--date", dest="date_entretien", help="Date (JJ/MM/AAAA ou AAAA-MM-JJ)")
+    ajouter.add_argument("--heure", help="Heure (HH:MM)")
+    ajouter.add_argument("--type", dest="type_entretien",
+                         help="RH, Technique, Cas pratique / Test, Manager, Final ou Autre")
+    ajouter.add_argument("--sans-note", dest="sans_note", action="store_true",
+                         help="Ne pas créer la note d'entretien vide de ce jour")
+    ajouter.add_argument("--garder-statut", dest="garder_statut", action="store_true",
+                         help="Ne pas passer les offres au statut « Entretien »")
+    lister = actions.add_parser("lister", help="Lister les entretiens")
+    lister.add_argument("--candidature", dest="candidature_id", type=int, help="Ceux d'une offre")
+    lister.add_argument("--a-venir", dest="a_venir", action="store_true", help="Aujourd'hui et après seulement")
+    modifier = actions.add_parser("modifier", help="Modifier un entretien (date, heure, type, offres)")
+    modifier.add_argument("id", type=int, help="Numéro de l'entretien")
+    modifier.add_argument("--date", dest="date_entretien", help="Nouvelle date (vide pour l'effacer)")
+    modifier.add_argument("--heure", help="Nouvelle heure (vide pour l'effacer)")
+    modifier.add_argument("--type", dest="type_entretien", help="Nouveau type (vide pour l'effacer)")
+    modifier.add_argument("--candidature", dest="candidature_ids", type=int, nargs="+",
+                          help="Remplace les offres concernées")
+    supprimer = actions.add_parser("supprimer", help="Supprimer un entretien (une note écrite est conservée)")
+    supprimer.add_argument("id", type=int, help="Numéro de l'entretien")
 
     # --- entreprises ---
     ent = sections.add_parser("entreprises", help="Gérer les entreprises")
@@ -437,7 +477,8 @@ def executer(args):
                     file=sys.stderr,
                 )
             numero = candidatures.ajouter_candidature(
-                args.entreprise, args.poste, chemin_db=chemin_db, **champs
+                args.entreprise, args.poste, chemin_db=chemin_db,
+                date_entretien=args.date_entretien, type_entretien=args.type_entretien, **champs
             )
             print(f"✓ Candidature n°{numero} ajoutée : « {args.poste} » chez {args.entreprise}.")
         elif args.action == "lister":
@@ -471,7 +512,10 @@ def executer(args):
                 ("Type", cand["type_candidature"]),
                 ("Envoyée le", _date_fr(cand["date_envoi"])),
                 ("Réponse le", _date_fr(cand["date_reponse"])),
-                ("Entretien le", _date_fr(cand["date_entretien"])),
+                ("Entretiens", ", ".join(
+                    f"{entretiens.resume(e)} (n°{e['id']})"
+                    for e in entretiens.lister_entretiens(candidature_id=cand["id"], chemin_db=chemin_db)
+                )),
                 ("Début souhaité", _date_fr(cand["date_debut_souhaitee"])),
                 ("Durée", cand["duree"]),
                 ("Gratification", f"{cand['gratification']} €/mois" if cand["gratification"] else None),
@@ -490,6 +534,68 @@ def executer(args):
                 print("  Texte de l'offre :")
                 for ligne in str(cand["texte_offre"]).splitlines():
                     print(f"    {ligne}")
+        elif args.action == "completer":
+            dates = candidatures.rattraper_dates_reponse(chemin_db=chemin_db, appliquer=args.appliquer)
+            sources = candidatures.rattraper_sources(chemin_db=chemin_db, appliquer=args.appliquer)
+            if not dates and not sources:
+                print("Rien à compléter.")
+                return
+            if dates:
+                print("Dates de réponse (premier changement de statut vers une réponse, d'après le journal) :")
+                _afficher_table(
+                    [("N°", 5), ("Entreprise", 22), ("Poste", 36), ("Réponse le", 10)],
+                    [(p["id"], p["entreprise"], p["poste"], _date_fr(p["date_reponse"])) for p in dates],
+                )
+                print()
+            if sources:
+                print("Sources (déduites du lien de l'offre) :")
+                _afficher_table(
+                    [("N°", 5), ("Entreprise", 22), ("Poste", 36), ("Source", 22)],
+                    [(p["id"], p["entreprise"], p["poste"], p["source"]) for p in sources],
+                )
+                print()
+            if args.appliquer:
+                print(f"✓ {len(dates)} date(s) de réponse et {len(sources)} source(s) enregistrée(s).")
+            else:
+                print(f"{len(dates)} date(s) de réponse et {len(sources)} source(s) proposée(s) - "
+                      "relancer avec --appliquer pour les enregistrer.")
+
+    elif args.section == "entretiens":
+        if args.action == "ajouter":
+            numero = entretiens.ajouter_entretien(
+                args.candidature_ids, date_entretien=args.date_entretien,
+                type_entretien=args.type_entretien, heure=args.heure, note=not args.sans_note,
+                mettre_a_jour_statut=not args.garder_statut, chemin_db=chemin_db,
+            )
+            cree = entretiens.recuperer_entretien(numero, chemin_db=chemin_db)
+            print(f"✓ Entretien n°{numero} planifié : {entretiens.resume(cree)} chez {cree['entreprise']}.")
+        elif args.action == "lister":
+            liste = entretiens.lister_entretiens(
+                candidature_id=args.candidature_id, a_venir=args.a_venir, chemin_db=chemin_db
+            )
+            if not liste:
+                print("Aucun entretien.")
+                return
+            _afficher_table(
+                [("N°", 5), ("Date", 10), ("Heure", 5), ("Type", 20), ("Entreprise", 22), ("Offres", 50)],
+                [
+                    (e["id"], _date_fr(e["date_entretien"]), e["heure"], e["type_entretien"], e["entreprise"],
+                     " / ".join(f"n°{o['id']} {o['poste']}" for o in e["candidatures"]))
+                    for e in liste
+                ],
+            )
+            print(f"\n{len(liste)} entretien(s).")
+        elif args.action == "modifier":
+            champs = {
+                cle: getattr(args, cle)
+                for cle in ("date_entretien", "heure", "type_entretien", "candidature_ids")
+                if getattr(args, cle) is not None
+            }
+            entretiens.modifier_entretien(args.id, chemin_db=chemin_db, **champs)
+            print(f"✓ Entretien n°{args.id} modifié ({', '.join(champs)}).")
+        elif args.action == "supprimer":
+            entretiens.supprimer_entretien(args.id, chemin_db=chemin_db)
+            print(f"✓ Entretien n°{args.id} supprimé.")
 
     elif args.section == "entreprises":
         if args.action == "ajouter":
@@ -536,7 +642,8 @@ def executer(args):
                 f"{resultat['documents_deplaces']} document(s), "
                 f"{resultat['lettres_deplacees']} lettre(s), "
                 f"{resultat['fiches_deplacees']} fiche(s), "
-                f"{resultat['notes_deplacees']} note(s) d'entretien déplacé(s)"
+                f"{resultat['notes_deplacees']} note(s) d'entretien, "
+                f"{resultat['entretiens_deplaces']} entretien(s) déplacé(s)"
                 + (f", champs complétés : {', '.join(resultat['champs_completes'])}"
                    if resultat["champs_completes"] else "")
                 + "."

@@ -10,14 +10,18 @@ Règles :
 - les identifiants/mots de passe de portail ne figurent pas dans les exports :
   la sauvegarde complète reste le fichier suivi_candidatures.db ;
 - les anciens exports restent lisibles : l'onglet « Contacts » (section retirée)
-  est ignoré, et la colonne « Notes entretien » devient une note d'entretien.
+  est ignoré, la colonne « Notes entretien » devient une note d'entretien et la
+  colonne « Date d'entretien » (une seule date par candidature) un entretien sans type.
+  Les exports actuels décrivent les entretiens dans leur onglet « Entretiens ».
 """
 
 from pathlib import Path
 
 import openpyxl
 
-from candidatures import ajouter_candidature, verifier_doublon_candidature
+import entretiens
+import notes_entretien
+from candidatures import ajouter_candidature, recuperer_candidature, verifier_doublon_candidature
 from entreprises import ajouter_ou_recuperer_entreprise, lister_entreprises, modifier_entreprise
 from exceptions import ConflitMiseAJour, ErreurSuivi, ValeurNonAutorisee
 from notes_entretien import ajouter_note, lister_notes
@@ -54,6 +58,14 @@ COLONNES_ENTREPRISES = {
     "Site web": "site_web",
     "Contexte / Actus": "contexte_actus",
     "Dernière recherche": "derniere_recherche",
+}
+
+COLONNES_ENTRETIENS = {
+    "Entreprise": "entreprise",
+    "Offres": "offres",
+    "Type": "type_entretien",
+    "Date": "date_entretien",
+    "Heure": "heure",
 }
 
 COLONNES_NOTES = {
@@ -136,6 +148,7 @@ def importer_excel(chemin_fichier, chemin_db=None):
         "entreprises_ajoutees": 0,
         "candidatures_ajoutees": 0,
         "notes_ajoutees": 0,
+        "entretiens_ajoutes": 0,
         "ignores": [],
         "erreurs": [],
     }
@@ -203,7 +216,50 @@ def importer_excel(chemin_fichier, chemin_db=None):
         except ErreurSuivi as erreur:
             rapport["erreurs"].append(f"Candidatures ligne {numero} : {erreur}")
 
-    # 3. Notes d'entretien (données dès la ligne 2). L'onglet manque dans les
+    # 3. Entretiens (données dès la ligne 2) : sans leur note automatique, l'onglet des notes
+    #    apporte les siennes (rattachées juste après). Absent des anciens exports.
+    nouveaux_entretiens = []
+    if "Entretiens" in wb.sheetnames:
+        existants = {
+            (e["entreprise_id"], e["type_entretien"], e["date_entretien"], e["heure"],
+             tuple(o["id"] for o in e["candidatures"]))
+            for e in entretiens.lister_entretiens(chemin_db=chemin_db)
+        }
+        for numero, valeurs in _lignes(wb["Entretiens"], COLONNES_ENTRETIENS, 2):
+            valeurs = _nettoyer(valeurs)
+            entreprise = valeurs.get("entreprise")
+            postes = [p.strip() for p in str(valeurs.get("offres") or "").splitlines() if p.strip()]
+            try:
+                if not entreprise or not postes:
+                    raise ValeurNonAutorisee("entreprise ou offres manquantes - ligne ignorée.")
+                ids = []
+                for poste in postes:
+                    numero_offre = verifier_doublon_candidature(entreprise, poste, chemin_db=chemin_db)
+                    if numero_offre is None:
+                        raise ValeurNonAutorisee(f"l'offre « {poste} » chez {entreprise} n'existe pas dans la base.")
+                    ids.append(numero_offre)
+                heure = valeurs.get("heure")
+                if hasattr(heure, "strftime"):
+                    heure = heure.strftime("%H:%M")
+                type_valide, jour, heure_valide = entretiens.valider(
+                    valeurs.get("type_entretien"), valeurs.get("date_entretien"), heure
+                )
+                entreprise_id = recuperer_candidature(ids[0], chemin_db=chemin_db)["entreprise_id"]
+                cle = (entreprise_id, type_valide, jour, heure_valide, tuple(sorted(set(ids))))
+                if cle in existants:
+                    rapport["ignores"].append(f"Entretiens ligne {numero} : cet entretien existe déjà.")
+                    continue
+                id_entretien = entretiens.ajouter_entretien(
+                    ids, date_entretien=jour, type_entretien=type_valide, heure=heure_valide,
+                    note=False, mettre_a_jour_statut=False, chemin_db=chemin_db,
+                )
+                existants.add(cle)
+                nouveaux_entretiens.append(id_entretien)
+                rapport["entretiens_ajoutes"] += 1
+            except ErreurSuivi as erreur:
+                rapport["erreurs"].append(f"Entretiens ligne {numero} : {erreur}")
+
+    # 4. Notes d'entretien (données dès la ligne 2). L'onglet manque dans les
     #    anciens exports : rien à faire dans ce cas.
     if "Notes d'entretien" in wb.sheetnames:
         deja = {
@@ -244,5 +300,9 @@ def importer_excel(chemin_fichier, chemin_db=None):
                 rapport["notes_ajoutees"] += 1
             except ErreurSuivi as erreur:
                 rapport["erreurs"].append(f"Notes d'entretien ligne {numero} : {erreur}")
+
+    # 5. Chaque entretien importé retrouve sa note (celle de ses offres datée de ce jour).
+    for id_entretien in nouveaux_entretiens:
+        notes_entretien.assurer_note_entretien(id_entretien, creer=False, chemin_db=chemin_db)
 
     return rapport

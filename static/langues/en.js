@@ -82,7 +82,6 @@ window.LANGUES.en = {
     col_offre: "Job posting",
     voir_offre: "Open posting",
     changer_statut: "Change status",
-    note_entretien_creee: "Interview note created for that date.",
     lien_mort_titre: "The job link is no longer responding",
     lien_mort: "Dead link",
     selectionnees: "{n} applications selected",
@@ -609,6 +608,33 @@ window.LANGUES.en = {
     telecharger_md: "Download as .md",
   },
 
+
+  /* An application's scheduled interviews (several, each with its type). */
+  entretiens_planifies: {
+    titre: "Interviews",
+    aucun: "No interview scheduled.",
+    ajouter: "Add an interview",
+    ajouter_titre: "Schedule an interview",
+    modifier_titre: "Edit the interview",
+    type: "Interview type",
+    type_premier: "Type of this interview",
+    sans_type: "Interview",
+    type_non_precise: "Type not specified",
+    date: "Date",
+    heure: "Time",
+    date_a_preciser: "Date to be confirmed",
+    offres_concernees: "Jobs covered at {entreprise}",
+    choisir_offre: "Tick at least one job.",
+    aussi: "also: {postes}",
+    planifie: "Interview scheduled.",
+    modifie: "Interview updated.",
+    supprime: "Interview deleted.",
+    note_creee: "Interview saved - its interview note is ready.",
+    supprimer_titre: "Delete this interview?",
+    supprimer_texte: "Its note stays if you already wrote in it; an empty note goes with it.",
+    prochain: "Next interview",
+    carte: "Interview {date}",
+  },
   /* Application history: same templates as PHRASES in evenements.py
      (checked by the tests). Statuses go through tv(). */
   historique: {
@@ -616,6 +642,7 @@ window.LANGUES.en = {
     statut: "Status: {avant} → {apres}",
     reponse: "Reply received on {date}",
     entretien: "Interview scheduled on {date}",
+    entretien_type: "{type} interview scheduled on {date}",
     relance: "Follow-up sent (#{numero})",
   },
 
@@ -680,6 +707,12 @@ window.LANGUES.en = {
     "Agents conversationnels": "Conversational agents",
     "Robotique / Agents physiques": "Robotics / Physical agents",
     "MLOps pour agents": "MLOps for agents",
+    "IA générative / LLM": "Generative AI / LLM",
+    "Machine learning / Data science": "Machine learning / Data science",
+    "Vision par ordinateur": "Computer vision",
+    "Data engineering / Analyse": "Data engineering / Analytics",
+    "Conseil / Gestion de projet IA": "AI consulting / Project management",
+    "Développement logiciel": "Software development",
     "Autre": "Other",
     // type_candidature
     "Offre publiée": "Posted listing",
@@ -696,10 +729,18 @@ window.LANGUES.en = {
     // source (candidature) - "Autre" already listed above
     "LinkedIn": "LinkedIn",
     "Indeed": "Indeed",
+    "Hellowork": "Hellowork",
+    "JobTeaser": "JobTeaser",
     "Site entreprise": "Company website",
     "Welcome to the Jungle": "Welcome to the Jungle",
     "Réseau": "Network",
     "Forum / Salon": "Job fair / Forum",
+    // type d'entretien ("Autre" already listed above)
+    "RH": "HR",
+    "Technique": "Technical",
+    "Cas pratique / Test": "Case study / Test",
+    "Manager": "Manager",
+    "Final": "Final",
     // statut_contact
     "À contacter": "To contact",
     "Contacté": "Contacted",

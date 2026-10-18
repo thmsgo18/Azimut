@@ -250,8 +250,19 @@ def _rechercher_contexte_anthropic(config, nom_entreprise):
     return "\n".join(morceaux).strip()
 
 
+def _texte_et_notes_offre(offre):
+    """Ce que l'IA lit d'une offre : son texte archivé ET les notes de la candidature (le texte
+    de l'offre y a souvent été collé, et elles portent ce que le candidat sait en plus)."""
+    texte = (offre.get("texte_offre") or "").strip()
+    notes = (offre.get("notes") or "").strip()
+    bloc = f"Texte de l'offre :\n{texte[:8000] if texte else '(non archivé)'}"
+    if notes and notes != texte:
+        bloc += f"\nNotes du candidat sur cette offre :\n{notes[:8000]}"
+    return bloc
+
+
 def generer_lettre_motivation(
-    entreprise_nom, cv_texte, offres=None, langue=None, generale=False, chemin_db=None
+    entreprise_nom, cv_texte, offres=None, langue=None, generale=False, contexte=None, chemin_db=None
 ):
     """Rédige une lettre de motivation complète via l'API, avec pour consigne
     système les règles du guide skills/lettre-motivation/AGENT.md (voir
@@ -264,6 +275,8 @@ def generer_lettre_motivation(
     ou None/vide pour une lettre générale liée seulement à l'entreprise.
     `generale` : avec des offres, la lettre doit aussi valoriser l'entreprise en
     général (et pas seulement ces postes).
+    `contexte` : les notes déjà enregistrées sur l'entreprise (fiche entreprise).
+    Chaque offre est transmise avec son texte ET les notes de la candidature.
     Retourne le texte complet de la lettre (jamais écrit en base ici - voir
     lettres.ajouter_lettre)."""
     if not entreprise_nom or not str(entreprise_nom).strip():
@@ -284,11 +297,13 @@ def generer_lettre_motivation(
             f"Ville : {offre.get('ville') or 'non précisée'}\n"
             f"Mode de travail : {offre.get('mode_travail') or 'non précisé'}\n"
             f"Lien : {offre.get('lien_offre') or 'aucun'}\n"
-            f"Texte de l'offre :\n{(offre.get('texte_offre') or '(non archivé)')[:8000]}"
+            f"{_texte_et_notes_offre(offre)}"
         )
     contenu = (
         f"CV du candidat :\n{str(cv_texte).strip()[:40000]}\n\n"
         f"Entreprise visée : {str(entreprise_nom).strip()}"
+        + (f"\n\nNotes déjà enregistrées sur l'entreprise :\n{str(contexte).strip()[:4000]}"
+           if contexte and str(contexte).strip() else "")
         + (f"\n\nLangue demandée : {langue}" if langue else "")
         + (bloc_offres or "\n\n(Aucune offre précise - lettre de candidature générale pour cette entreprise.)")
         + ("\n\nLa lettre doit aussi porter sur l'entreprise en général (son projet, sa "
@@ -491,7 +506,7 @@ def _contenu_fiche(entreprise_nom, offres, cv_texte, recherche, contexte, langue
             f"Ville : {offre.get('ville') or 'non précisée'} · Mode : {offre.get('mode_travail') or 'non précisé'}"
             f" · Durée : {offre.get('duree') or 'non précisée'}\n"
             f"Sous-domaine : {offre.get('sous_domaine') or 'non précisé'}\n"
-            f"Texte de l'offre :\n{(offre.get('texte_offre') or '(non archivé)')[:8000]}"
+            f"{_texte_et_notes_offre(offre)}"
         )
     blocs.append("Rédige directement le contenu de la fiche au format demandé. Ne pose aucune question.")
     return "\n\n".join(blocs)

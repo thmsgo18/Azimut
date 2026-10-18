@@ -27,6 +27,7 @@ PHRASES = {
         "statut": "Statut : {avant} → {apres}",
         "reponse": "Réponse reçue le {date}",
         "entretien": "Entretien planifié le {date}",
+        "entretien_type": "Entretien « {type} » planifié le {date}",
         "relance": "Relance effectuée (n°{numero})",
     },
     "en": {
@@ -34,13 +35,14 @@ PHRASES = {
         "statut": "Status: {avant} → {apres}",
         "reponse": "Reply received on {date}",
         "entretien": "Interview scheduled on {date}",
+        "entretien_type": "{type} interview scheduled on {date}",
         "relance": "Follow-up sent (#{numero})",
     },
 }
 
 # Paramètres qui portent une valeur stockée (traduite à l'affichage) ou une date
 # (ISO dans les paramètres, JJ/MM/AAAA dans la phrase).
-PARAMETRES_VALEUR = ("statut", "avant", "apres")
+PARAMETRES_VALEUR = ("statut", "avant", "apres", "type")
 PARAMETRES_DATE = ("date",)
 
 

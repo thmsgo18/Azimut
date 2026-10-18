@@ -5,8 +5,8 @@ from datetime import date, timedelta
 
 import reglages
 from candidatures import lister_candidatures
-
-STATUTS_AVEC_REPONSE = {"Réponse reçue", "Entretien", "Refus", "Accepté"}
+from entretiens import premier_entretien_par_candidature
+from valeurs import STATUTS_AVEC_REPONSE
 
 
 def _jours_entre(debut, fin):
@@ -23,11 +23,12 @@ def _a_recu_reponse(cand):
 
 def stats_avancees(chemin_db=None):
     liste = lister_candidatures(chemin_db=chemin_db)
+    premiers_entretiens = premier_entretien_par_candidature(chemin_db=chemin_db)
 
     envoyees = [c for c in liste if c["statut"] != "À préparer"]
     reponses = [c for c in envoyees if _a_recu_reponse(c)]
     entretiens = [
-        c for c in envoyees if c["date_entretien"] or c["statut"] in ("Entretien", "Accepté")
+        c for c in envoyees if c["id"] in premiers_entretiens or c["statut"] in ("Entretien", "Accepté")
     ]
     acceptees = [c for c in liste if c["statut"] == "Accepté"]
 
@@ -45,7 +46,8 @@ def stats_avancees(chemin_db=None):
         d for c in liste if (d := _jours_entre(c["date_envoi"], c["date_reponse"])) is not None
     ]
     delais_entretien = [
-        d for c in liste if (d := _jours_entre(c["date_envoi"], c["date_entretien"])) is not None
+        d for c in liste
+        if (d := _jours_entre(c["date_envoi"], premiers_entretiens.get(c["id"]))) is not None
     ]
 
     par_source = {}

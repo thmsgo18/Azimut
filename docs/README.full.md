@@ -87,7 +87,7 @@ A short walkthrough of the everyday flow:
 
 1. **Add an application** - click **+ Ajouter** from Candidatures (or **Nouvelle candidature** in the sidebar). Paste the job posting text into the AI box if you've configured a key, or just fill the form. The company is created automatically if it's new.
 2. **Move it through the pipeline** - drag a card between columns in the Kanban view to update its status, or change it in one click on its pill.
-3. **Edit everything in place** - a click on an application opens its window: reply date, interview date, source, links, notes… are edited directly and saved by themselves ("Enregistré"), with no "Modify" button.
+3. **Edit everything in place** - a click on an application opens its window: reply date, source, links, notes… are edited directly; its **interviews** (several, each with its type: HR, technical, case study, manager, final) are added there and saved by themselves ("Enregistré"), with no "Modify" button.
 4. **Open a company to find everything there** - its sheet lists its applications, documents, letters, interview sheets and notes, each one click away.
 5. **Change a status without opening the sheet** - in the list view, click a row's status pill and pick the new one; the "Open posting" button opens the job ad directly.
 6. **Search anything with ⌘K** - a title, a note, a phrase from a pasted job posting, a word from a letter or an interview note.
@@ -104,7 +104,7 @@ Five sections help you prepare and keep track of everything around a job: **Docu
 - **Preview in a window**: clicking a row opens a window - never the whole page - with the PDF (or the image) and, when there is one, a **Text** tab (to copy, or to download as `.md`). You can edit the title, the type (documents) or the linked jobs there, or delete. Deleting a job never deletes its documents, letters, sheets or notes: only the link is removed.
 - **Downloads**: a direct link to a PDF would make the native window navigate to the file with no way back; Azimut goes through the system's "Save as" box instead (and a regular download in a browser).
 
-**Interviews** is note-taking: one note per interview, on **a company or one specific job** (one or the other, never both), with a title, a date and a large text field **saved as you type** (and when you leave the page). The text is written in **Markdown with live rendering**: headings, bold, italic, strikethrough, bullet or numbered lists (which continue with Enter, Tab to nest them), clickable **checkboxes** in the rendering, quotes, code, links, tables. A toolbar and the ⌘B / ⌘I (Ctrl+B / Ctrl+I) shortcuts help; three layouts (*Write*, *Side by side*, *Preview*) and a context panel (the company, the job, ready documents, letters and sheets) are remembered. Whatever you type is escaped before being formatted: no HTML tag ever runs. **Export as PDF** turns a note into a clean document (same layout rules, page numbers) through the native "Save as" window - `python cli.py notes pdf 3` does the same from a terminal. **The note creates itself**: as soon as a job gets an interview date (in its window, the CLI, the API), an empty note titled "Interview - job", dated that day, is linked to it; if the interview moves and the note is still empty, it moves too, and anything you wrote is never touched.
+**Interviews** is note-taking: one note per interview, on **a company or one specific job** (one or the other, never both), with a title, a date and a large text field **saved as you type** (and when you leave the page). The text is written in **Markdown with live rendering**: headings, bold, italic, strikethrough, bullet or numbered lists (which continue with Enter, Tab to nest them), clickable **checkboxes** in the rendering, quotes, code, links, tables. A toolbar and the ⌘B / ⌘I (Ctrl+B / Ctrl+I) shortcuts help; three layouts (*Write*, *Side by side*, *Preview*) and a context panel (the company, the job, ready documents, letters and sheets) are remembered. Whatever you type is escaped before being formatted: no HTML tag ever runs. **Export as PDF** turns a note into a clean document (same layout rules, page numbers) through the native "Save as" window - `python cli.py notes pdf 3` does the same from a terminal. **The note creates itself**: as soon as an interview is scheduled (in the job's window, the CLI, the API), an empty note titled "Interview (HR) - job", dated that day, is linked to it - in the company's name if the interview covers several jobs; if the interview moves or changes type and the note is still empty, it follows, and anything you wrote is never touched.
 
 **Résumé** gathers **your résumés**. Each can have a **file** (PDF, Word or text: to download, to send; its text copies in one click), an **editable source** on your computer - a LaTeX project's folder, a `.tex` file or a Word file - and a pasted text. Azimut **never** touches the source: it keeps the path (to copy, or to open from the app), re-reads the text every time - the résumé evolves between two letters - and tells the AI where to read it and where to edit it. The **main résumé** is the one the AI reads by default; you can pick another for each generation. If the source is no longer reachable (another machine, a moved folder), the file's text takes over.
 
@@ -148,7 +148,7 @@ python cli.py candidatures modifier 12 --statut "Réponse reçue" --date-reponse
 python cli.py candidatures voir 12
 ```
 
-Add/update options: `--date-envoi`, `--sous-domaine`, `--lien-offre`, `--texte-offre` (the full posting text, archived in case the listing disappears), `--type`, `--statut`, `--date-reponse`, `--date-entretien`, `--date-debut-souhaitee`, `--duree`, `--gratification` (€/month), `--ville`, `--mode-travail`, `--convention-envoyee`, `--source`, `--notes`, `--portail-url`, `--portail-identifiant`, `--portail-mdp`.
+Add/update options: `--date-envoi`, `--sous-domaine`, `--lien-offre`, `--texte-offre` (the full posting text, archived in case the listing disappears), `--type`, `--statut`, `--date-reponse`, `--date-entretien` and `--type-entretien` (when adding: a first interview), `--date-debut-souhaitee`, `--duree`, `--gratification` (€/month), `--ville`, `--mode-travail`, `--convention-envoyee`, `--source`, `--notes`, `--portail-url`, `--portail-identifiant`, `--portail-mdp`.
 
 Dates are written `DD/MM/YYYY` or `YYYY-MM-DD` (stored as ISO).
 
@@ -297,6 +297,11 @@ modifier_candidature(id, **champs)
 lister_candidatures(statut=None, sous_domaine=None) -> list of dicts
 recuperer_candidature(id) -> dict
 
+# entretiens.py - several per application, each with its type (RH, Technique, Cas pratique / Test, Manager,
+# Final, Autre), a date and a time; one interview can cover several jobs at the same company
+ajouter_entretien(candidature_ids, date_entretien=None, type_entretien=None, heure=None) -> id
+modifier_entretien(id, **champs) / supprimer_entretien(id) / lister_entretiens(candidature_id=None, a_venir=False)
+
 # doublons.py - near-duplicates (a warning, never a block)
 candidatures_similaires(entreprise, poste, lien_offre=None) -> [{id, score, raisons}, ...]
 paires_entreprises_suspectes() -> [{a, b, score}, ...]
@@ -311,7 +316,7 @@ ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiche
 # notes_entretien.py - linked to a company OR one specific job
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
-assurer_note_entretien(candidature_id) -> id | None   # the note for the job's interview date (created automatically, see below)
+assurer_note_entretien(entretien_id) -> id | None   # the note for an interview's date (created automatically, see below)
 notes_pdf.generer_pdf(note, chemin_sortie=None, langue=None) -> bytes   # PDF export of a note; CLI: cli.py notes pdf ID
 
 # documents.py - any file, linked to ONE company and to ONE OR MORE of its jobs

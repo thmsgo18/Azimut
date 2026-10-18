@@ -49,7 +49,6 @@ CREATE TABLE IF NOT EXISTS candidatures (
     type_candidature TEXT,
     statut TEXT DEFAULT 'À préparer',
     date_reponse DATE,
-    date_entretien DATE,
     date_debut_souhaitee DATE,
     duree TEXT,
     gratification INTEGER,
@@ -123,12 +122,32 @@ CREATE TABLE IF NOT EXISTS fiches_entretien_candidatures (
     PRIMARY KEY (fiche_id, candidature_id)
 );
 
+-- Entretiens : un type (valeurs.TYPES_ENTRETIEN, ou aucun), une date, une heure facultative.
+-- Rattaché à UNE entreprise et à une ou plusieurs de ses candidatures (un même entretien
+-- couvre souvent plusieurs offres). Plusieurs entretiens par candidature : RH, technique...
+CREATE TABLE IF NOT EXISTS entretiens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entreprise_id INTEGER NOT NULL REFERENCES entreprises(id),
+    type_entretien TEXT,
+    date_entretien DATE,
+    heure TEXT,
+    date_creation TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS entretiens_candidatures (
+    entretien_id INTEGER NOT NULL REFERENCES entretiens(id),
+    candidature_id INTEGER NOT NULL REFERENCES candidatures(id),
+    PRIMARY KEY (entretien_id, candidature_id)
+);
+
 -- Notes prises pendant ou après un entretien : liées à une entreprise, et
--- éventuellement à une offre précise de cette entreprise.
+-- éventuellement à une offre précise de cette entreprise, et/ou à un entretien
+-- (la note créée automatiquement pour chaque entretien daté).
 CREATE TABLE IF NOT EXISTS notes_entretien (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     entreprise_id INTEGER NOT NULL REFERENCES entreprises(id),
     candidature_id INTEGER REFERENCES candidatures(id),
+    entretien_id INTEGER REFERENCES entretiens(id),
     titre TEXT,
     contenu TEXT NOT NULL DEFAULT '',
     date_entretien DATE,
@@ -198,6 +217,9 @@ COLONNES_AJOUTEES = {
         "nom_fichier": "TEXT",
         "generale": "INTEGER NOT NULL DEFAULT 0",
     },
+    "notes_entretien": {
+        "entretien_id": "INTEGER REFERENCES entretiens(id)",
+    },
 }
 
 # Colonnes abandonnées (relances et priorité retirées de l'application).
@@ -254,6 +276,7 @@ def _migration_destructive_necessaire(conn):
     return (
         _table_existe(conn, "contacts")
         or "notes_entretien" in colonnes_candidatures
+        or "date_entretien" in colonnes_candidatures
         or any(c in colonnes_candidatures for c in COLONNES_SUPPRIMEES["candidatures"])
         or "chemin_texte" in _colonnes(conn, "lettres_motivation")
         or "candidature_id" in _colonnes(conn, "documents")
@@ -337,6 +360,39 @@ def _migrer_notes_entretien(conn):
             ),
         )
     conn.execute("ALTER TABLE candidatures DROP COLUMN notes_entretien")
+
+
+def _migrer_dates_entretien(conn):
+    """Une candidature n'avait qu'UNE date d'entretien (colonne date_entretien). Les entretiens
+    ont désormais leur table (plusieurs par candidature, chacun avec son type) : chaque date
+    devient un entretien sans type précisé. Les offres d'une même entreprise passées en
+    entretien le même jour partagent un seul entretien (un entretien commun à plusieurs offres),
+    et les notes de ces offres datées de ce jour lui sont rattachées. La colonne est ensuite
+    supprimée (son contenu reste dans la copie de sécurité prise avant)."""
+    if "date_entretien" not in _colonnes(conn, "candidatures"):
+        return
+    maintenant = datetime.now().isoformat(timespec="seconds")
+    groupes = {}
+    for ligne in conn.execute(
+        "SELECT id, entreprise_id, date_entretien FROM candidatures "
+        "WHERE date_entretien IS NOT NULL AND date_entretien <> '' ORDER BY id"
+    ).fetchall():
+        groupes.setdefault((ligne["entreprise_id"], ligne["date_entretien"]), []).append(ligne["id"])
+    for (entreprise_id, jour), ids in groupes.items():
+        entretien_id = conn.execute(
+            "INSERT INTO entretiens (entreprise_id, date_entretien, date_creation) VALUES (?, ?, ?)",
+            (entreprise_id, jour, maintenant),
+        ).lastrowid
+        conn.executemany(
+            "INSERT INTO entretiens_candidatures (entretien_id, candidature_id) VALUES (?, ?)",
+            [(entretien_id, numero) for numero in ids],
+        )
+        conn.execute(
+            "UPDATE notes_entretien SET entretien_id = ? WHERE entretien_id IS NULL AND date_entretien = ? "
+            f"AND candidature_id IN ({', '.join('?' for _ in ids)})",
+            (entretien_id, jour, *ids),
+        )
+    conn.execute("ALTER TABLE candidatures DROP COLUMN date_entretien")
 
 
 def _migrer_suppression_contacts(conn):
@@ -494,6 +550,7 @@ def _migrer(conn):
         _migrer_suppression_relances(conn)
         _migrer_lettres_ancienne_forme(conn)
         _migrer_notes_entretien(conn)
+        _migrer_dates_entretien(conn)
         _migrer_suppression_contacts(conn)
         _migrer_documents_ancienne_forme(conn)
         _migrer_cv_reglages(conn)

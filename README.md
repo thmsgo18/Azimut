@@ -231,7 +231,7 @@ An application is **one job at one company**. It moves through a simple cycle, a
 
 1. You spot a job at Mistral AI: **Nouvelle candidature**. Paste the posting's text (with an API key the form pre-fills itself; otherwise, fill it in). The company is created for you, and a duplicate is flagged before it's created.
 2. You send your application: set it to **Envoyée** (status pill, or drag the card in the pipeline). The sent date and the history fill in.
-3. Mistral replies: in the job's window, fill in **Réponse reçue le**, set the status to **Réponse reçue**, then **Entretien** with the **interview date**: it shows up in the dashboard's "upcoming interviews".
+3. Mistral replies: in the job's window, set the status to **Réponse reçue** (the reply date fills itself in), then **Add an interview**: its type (HR, technical, case study…), date and time, and the company's other jobs it covers. The job moves to **Entretien** and the interview shows up in the dashboard's "upcoming interviews"; a second round is added the same way.
 4. You prepare: an **interview sheet** for the job, your **notes** during the call (see below), the **résumé** and **letter** you sent filed in the job's **documents**.
 5. The answer comes: **Accepté** or **Refus**. The statistics (funnel, delays, response rate by source) update.
 
@@ -273,7 +273,7 @@ A sheet prepares an interview for **one or more jobs at the same company**: comp
 
 ### Interview notes
 
-Real note-taking, on **a company or one specific job**, in **Markdown with live rendering**: write on the left, the result shows on the right. Bold, italic, headings, bullet or numbered lists (which continue when you press Enter), clickable **checkboxes**, quotes, links, tables. A toolbar and the <kbd>⌘B</kbd> / <kbd>⌘I</kbd> shortcuts help if you don't know the syntax. Three layouts: *Write*, *Side by side*, *Preview*; the job's context (text, letters, sheets) can show alongside. Saving is automatic, a note **exports as a PDF** in one click, and **it creates itself**: give a job an interview date and an empty note dated that day is waiting for you (it follows the date if the interview moves).
+Real note-taking, on **a company or one specific job**, in **Markdown with live rendering**: write on the left, the result shows on the right. Bold, italic, headings, bullet or numbered lists (which continue when you press Enter), clickable **checkboxes**, quotes, links, tables. A toolbar and the <kbd>⌘B</kbd> / <kbd>⌘I</kbd> shortcuts help if you don't know the syntax. Three layouts: *Write*, *Side by side*, *Preview*; the job's context (text, letters, sheets) can show alongside. Saving is automatic, a note **exports as a PDF** in one click, and **it creates itself**: schedule an interview (HR, technical…) and an empty note dated that day is waiting for you (it follows the interview if it moves).
 
 <p align="center"><img src="docs/screenshot-entretien.png" width="760" alt="Interview note in Markdown with live rendering"></p>
 

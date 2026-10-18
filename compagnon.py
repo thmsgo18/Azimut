@@ -20,8 +20,8 @@ import socket
 from flask import Flask, Response, jsonify, request
 
 import candidatures
+import entretiens
 import reglages
-from datetime import date
 from exceptions import EntiteIntrouvable
 
 PORT_COMPAGNON = 8767
@@ -34,7 +34,7 @@ CHAMPS_CANDIDATURE_PUBLICS = (
     "ville",
     "mode_travail",
     "date_envoi",
-    "date_entretien",
+    "prochain_entretien",
     "lien_offre",
 )
 
@@ -76,15 +76,13 @@ def verifier_acces():
 
 @app_compagnon.route("/api/compagnon/tableau")
 def api_tableau():
-    aujourd_hui = date.today().isoformat()
-    entretiens_a_venir = sorted(
-        (
-            {"date": c["date_entretien"], "entreprise": c["entreprise"], "poste": c["poste"]}
-            for c in candidatures.lister_candidatures()
-            if c["date_entretien"] and c["date_entretien"] >= aujourd_hui
-        ),
-        key=lambda e: e["date"],
-    )
+    entretiens_a_venir = [
+        {
+            "date": e["date_entretien"], "heure": e["heure"], "type": e["type_entretien"],
+            "entreprise": e["entreprise"], "poste": " / ".join(o["poste"] for o in e["candidatures"]),
+        }
+        for e in entretiens.lister_entretiens(a_venir=True)
+    ]
     return jsonify(
         {
             "entretiens_a_venir": entretiens_a_venir[:5],
@@ -196,7 +194,7 @@ async function charger() {
     const tableau = await api("/api/compagnon/tableau");
     const entretiens = tableau.entretiens_a_venir;
     document.getElementById("entretiens-a-venir").innerHTML = entretiens.length
-      ? entretiens.map((e) => `<div class="ligne"><div><div class="principal">${echapper(e.entreprise)}</div><div class="secondaire">${echapper(e.poste)}</div></div><span class="puce">${dateFr(e.date)}</span></div>`).join("")
+      ? entretiens.map((e) => `<div class="ligne"><div><div class="principal">${echapper(e.entreprise)}</div><div class="secondaire">${echapper(e.poste)}${e.type ? " · " + echapper(e.type) : ""}</div></div><span class="puce">${dateFr(e.date)}${e.heure ? " " + echapper(e.heure) : ""}</span></div>`).join("")
       : `<div class="vide">Aucun entretien planifié.</div>`;
     const liste = await api("/api/compagnon/candidatures");
     document.getElementById("liste-candidatures").innerHTML = liste.length

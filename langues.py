@@ -36,6 +36,12 @@ VALEURS_EN = {
     "Agents conversationnels": "Conversational agents",
     "Robotique / Agents physiques": "Robotics / Physical agents",
     "MLOps pour agents": "MLOps for agents",
+    "IA générative / LLM": "Generative AI / LLM",
+    "Machine learning / Data science": "Machine learning / Data science",
+    "Vision par ordinateur": "Computer vision",
+    "Data engineering / Analyse": "Data engineering / Analytics",
+    "Conseil / Gestion de projet IA": "AI consulting / Project management",
+    "Développement logiciel": "Software development",
     "Autre": "Other",
     # type_candidature
     "Offre publiée": "Posted listing",
@@ -52,6 +58,8 @@ VALEURS_EN = {
     # source (candidature)
     "LinkedIn": "LinkedIn",
     "Indeed": "Indeed",
+    "Hellowork": "Hellowork",
+    "JobTeaser": "JobTeaser",
     "Site entreprise": "Company website",
     "Welcome to the Jungle": "Welcome to the Jungle",
     "Réseau": "Network",
@@ -61,6 +69,12 @@ VALEURS_EN = {
     "Lettre de motivation": "Cover letter",
     "Offre (PDF)": "Job posting (PDF)",
     "Portfolio": "Portfolio",
+    # type d'entretien (« Autre » plus haut)
+    "RH": "HR",
+    "Technique": "Technical",
+    "Cas pratique / Test": "Case study / Test",
+    "Manager": "Manager",
+    "Final": "Final",
 }
 
 

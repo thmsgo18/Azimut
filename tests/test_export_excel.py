@@ -61,10 +61,10 @@ class TestExportExcel(unittest.TestCase):
     def tearDownClass(cls):
         cls.dossier.cleanup()
 
-    def test_quatre_onglets(self):
+    def test_cinq_onglets(self):
         self.assertEqual(
             self.wb.sheetnames,
-            ["Suivi candidatures", "Entreprises", "Notes d'entretien", "Tableau de bord"],
+            ["Suivi candidatures", "Entreprises", "Entretiens", "Notes d'entretien", "Tableau de bord"],
         )
 
     def test_onglet_suivi_contenu(self):

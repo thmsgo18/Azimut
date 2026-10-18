@@ -308,6 +308,36 @@ class TestLettreAgentGenerale(unittest.TestCase):
         self.assertIn("Aucune offre précise", appels[2])
         self.assertNotIn("aussi porter sur l'entreprise en général", appels[2])
 
+    def test_la_lettre_lit_le_texte_de_l_offre_ses_notes_et_celles_de_l_entreprise(self):
+        """Vécu : le texte des offres avait été collé dans les notes (222 candidatures sur 234),
+        et l'IA ne recevait que « (non archivé) »."""
+        appels = []
+        with patch.object(agent, "_generer_lettre_anthropic", side_effect=lambda c, contenu: appels.append(contenu) or "L."):
+            agent.generer_lettre_motivation(
+                "Acme", "CV",
+                offres=[{"poste": "Stage IA", "texte_offre": "MISSIONS DU POSTE", "notes": "RECRUTEUSE : Léa"}],
+                contexte="FONDÉE EN 2019", chemin_db=self.chemin_db,
+            )
+            agent.generer_lettre_motivation(
+                "Acme", "CV", offres=[{"poste": "Stage IA", "notes": "OFFRE COLLÉE ICI"}], chemin_db=self.chemin_db,
+            )
+        self.assertIn("MISSIONS DU POSTE", appels[0])
+        self.assertIn("RECRUTEUSE : Léa", appels[0])
+        self.assertIn("FONDÉE EN 2019", appels[0])
+        self.assertIn("OFFRE COLLÉE ICI", appels[1])
+
+    def test_la_fiche_lit_aussi_les_notes_de_l_offre(self):
+        contenu = agent._contenu_fiche(
+            "Acme", [{"id": 1, "poste": "Stage IA", "texte_offre": "MISSIONS", "notes": "ENTRETIEN AVEC LE CTO"}],
+            None, None, None, None,
+        )
+        self.assertIn("MISSIONS", contenu)
+        self.assertIn("ENTRETIEN AVEC LE CTO", contenu)
+
+    def test_des_notes_identiques_au_texte_ne_sont_pas_envoyees_deux_fois(self):
+        bloc = agent._texte_et_notes_offre({"texte_offre": "MÊME TEXTE", "notes": "MÊME TEXTE"})
+        self.assertEqual(bloc.count("MÊME TEXTE"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

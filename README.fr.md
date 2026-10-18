@@ -231,7 +231,7 @@ Une candidature, c'est **une offre chez une entreprise**. Elle avance dans un cy
 
 1. Tu repères une offre chez Mistral AI : **Nouvelle candidature**. Colle le texte de l'offre (avec une clé API, le formulaire se pré-remplit ; sinon, remplis-le). L'entreprise est créée toute seule, et un doublon est signalé avant d'être créé.
 2. Tu envoies ta candidature : passe-la en **Envoyée** (pastille de statut, ou glisse la carte dans le pipeline). La date d'envoi et l'historique se remplissent.
-3. Mistral répond : dans la fenêtre de l'offre, renseigne **Réponse reçue le**, passe le statut en **Réponse reçue**, puis en **Entretien** avec la **date d'entretien** : elle apparaît dans « Entretiens à venir » du tableau de bord.
+3. Mistral répond : dans la fenêtre de l'offre, passe le statut en **Réponse reçue** (la date de réponse se remplit toute seule), puis **Ajouter un entretien** : son type (RH, technique, cas pratique…), sa date et son heure, et les autres offres de l'entreprise qu'il concerne. L'offre passe en **Entretien** et il apparaît dans « Entretiens à venir » du tableau de bord ; un deuxième tour s'ajoute de la même façon.
 4. Tu prépares l'entretien : une **fiche d'entretien** pour l'offre, tes **notes** pendant l'échange (voir plus bas), le **CV** et la **lettre** envoyés rangés dans les **documents** de l'offre.
 5. La réponse tombe : **Accepté** ou **Refus**. Les statistiques (entonnoir, délais, taux de réponse par source) se mettent à jour.
 
@@ -273,7 +273,7 @@ Une fiche prépare un entretien pour **une ou plusieurs offres d'une même entre
 
 ### Notes d'entretien
 
-Une vraie prise de notes, sur **une entreprise ou une offre précise**, en **Markdown avec rendu en direct** : écris à gauche, le résultat s'affiche à droite. Gras, italique, titres, listes à puces ou numérotées (qui se poursuivent quand tu appuies sur Entrée), **cases à cocher** cliquables, citations, liens, tableaux. Une barre d'outils et les raccourcis <kbd>⌘B</kbd> / <kbd>⌘I</kbd> aident si tu ne connais pas la syntaxe. Trois affichages : *Écrire*, *Côte à côte*, *Aperçu* ; le contexte de l'offre (texte, lettres, fiches) s'affiche à côté si tu le souhaites. L'enregistrement est automatique, une note s'**exporte en PDF** en un clic, et **elle se crée toute seule** : donne une date d'entretien à une offre et une note vide, datée de ce jour, t'attend (elle suit la date si l'entretien est décalé).
+Une vraie prise de notes, sur **une entreprise ou une offre précise**, en **Markdown avec rendu en direct** : écris à gauche, le résultat s'affiche à droite. Gras, italique, titres, listes à puces ou numérotées (qui se poursuivent quand tu appuies sur Entrée), **cases à cocher** cliquables, citations, liens, tableaux. Une barre d'outils et les raccourcis <kbd>⌘B</kbd> / <kbd>⌘I</kbd> aident si tu ne connais pas la syntaxe. Trois affichages : *Écrire*, *Côte à côte*, *Aperçu* ; le contexte de l'offre (texte, lettres, fiches) s'affiche à côté si tu le souhaites. L'enregistrement est automatique, une note s'**exporte en PDF** en un clic, et **elle se crée toute seule** : planifie un entretien (RH, technique…) et une note vide, datée de ce jour, t'attend (elle suit l'entretien s'il est décalé).
 
 <p align="center"><img src="docs/screenshot-entretien.png" width="760" alt="Note d'entretien en Markdown avec rendu en direct"></p>
 
