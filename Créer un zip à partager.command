@@ -10,7 +10,7 @@ DESTINATION="$HOME/Desktop/azimut-suivi-candidatures.zip"
 rm -f "$DESTINATION"
 
 zip -r -q "$DESTINATION" . \
-    -x "venv/*" \
+    -x "venv" -x "venv/*" -x "venv.nosync/*" \
     -x "*.db" \
     -x "*.xlsx" \
     -x "documents/*" \

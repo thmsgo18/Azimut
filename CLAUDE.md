@@ -280,7 +280,10 @@ Même code partout, un lanceur différent par OS (`Azimut.app` / `Azimut.bat` /
 `azimut.sh`), tous sur le même principe auto-installant : ils créent le venv (Python 3.9 minimum,
 vérifié) et réinstallent `requirements.txt` dès qu'il a changé depuis la dernière installation
 (copie `venv/.requirements-installed`) - sans cela, mettre Azimut à jour sur un ancien venv planterait
-au lancement (module manquant). Tout paquet propre à un
+au lancement (module manquant). Sous macOS, le venv est créé sous le nom `venv.nosync` et `venv` n'est
+qu'un lien vers lui : iCloud Drive ne synchronise jamais un nom en `.nosync`, alors qu'un dossier
+Documents synchronisé avec « Optimiser le stockage » retirait du disque les milliers de fichiers du venv
+(chaque lancement les retéléchargeait, plusieurs minutes). Tout paquet propre à un
 seul OS ajouté un jour à `requirements.txt` doit porter un marqueur
 `sys_platform == "..."`, sinon `pip install` échoue ailleurs.
 

@@ -16,9 +16,19 @@ python_convient() {
 }
 
 if [ -x "venv/bin/python" ] && ! python_convient "venv/bin/python"; then
-    dialogue "L'environnement Python d'Azimut a été créé avec une version trop ancienne (Python 3.9 minimum). Supprimer le dossier « venv » du projet, puis relancer Azimut."
+    dialogue "L'environnement Python d'Azimut a été créé avec une version trop ancienne (Python 3.9 minimum). Supprimer les dossiers « venv » et « venv.nosync » du projet, puis relancer Azimut."
     exit 1
 fi
+
+# L'environnement est créé sous le nom « venv.nosync », et « venv » n'est qu'un lien vers lui :
+# iCloud Drive ne synchronise jamais un nom en .nosync. Sans cela, dans un dossier Documents
+# synchronisé avec « Optimiser le stockage », macOS retire du disque les milliers de fichiers
+# du venv, et chaque lancement doit les retélécharger un par un (plusieurs minutes, impossible
+# hors ligne). Le lien est fait par Python : voir plus bas pour les outils système.
+creer_venv() {
+    "$1" -m venv venv.nosync >>/tmp/azimut-install.log 2>&1 \
+        && "$1" -c 'import os; os.path.lexists("venv") and os.remove("venv"); os.symlink("venv.nosync", "venv")' >>/tmp/azimut-install.log 2>&1
+}
 
 # Premier lancement : installation automatique de l'environnement Python.
 # Un Python récent (python.org, Homebrew) est préféré à celui d'Apple
@@ -28,12 +38,11 @@ if [ ! -x "venv/bin/python" ]; then
     cree=""
     for candidat in /Library/Frameworks/Python.framework/Versions/Current/bin/python3 \
                     /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do
-        if [ -x "$candidat" ] && python_convient "$candidat" \
-           && "$candidat" -m venv venv >>/tmp/azimut-install.log 2>&1; then
+        if [ -x "$candidat" ] && python_convient "$candidat" && creer_venv "$candidat"; then
             cree="oui"
             break
         fi
-        rm -rf venv
+        rm -rf venv venv.nosync
     done
     if [ -z "$cree" ]; then
         dialogue "Python 3.9 ou plus est introuvable. Installer Python depuis python.org/downloads (ou taper python3 dans le Terminal et accepter l'installation des outils de développement proposée par macOS), puis relancer Azimut."

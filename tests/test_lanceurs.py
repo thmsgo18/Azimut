@@ -48,6 +48,36 @@ class TestLanceurs(unittest.TestCase):
         self.assertIn("-m pip install", code)
         self.assertIn('elif ! ./venv/bin/python -c "import serveur"', code)  # un pip qui échoue ne bloque pas un environnement sain
 
+    def test_les_lanceurs_macos_creent_le_venv_hors_icloud(self):
+        """Vécu : dans ~/Documents synchronisé par iCloud (« Optimiser le stockage »), macOS avait retiré
+        du disque 3 800 fichiers du venv ; chaque lancement les retéléchargeait un par un (plusieurs
+        minutes, impossible hors ligne). Un nom en .nosync n'est jamais synchronisé : « venv » n'est
+        plus qu'un lien vers « venv.nosync »."""
+        for lanceur in (LANCEURS_SH[0], LANCEURS_SH[2]):
+            with self.subTest(lanceur.name):
+                texte = lanceur.read_text(encoding="utf-8")
+                self.assertIn("-m venv venv.nosync", texte)
+                self.assertIn('os.symlink("venv.nosync", "venv")', texte)
+        gitignore = (PROJET / ".gitignore").read_text(encoding="utf-8").splitlines()
+        self.assertIn("venv", gitignore)  # sans barre finale : pour git, un lien n'est pas un dossier
+        self.assertIn("venv.nosync/", gitignore)
+        zip_script = (PROJET / "Créer un zip à partager.command").read_text(encoding="utf-8")
+        self.assertIn('"venv.nosync/*"', zip_script)
+
+    @unittest.skipIf(sys.platform.startswith("win"), "lien symbolique : lanceurs macOS seulement")
+    def test_le_lien_venv_est_cree_par_python_meme_s_il_en_reste_un_casse(self):
+        """Le lien est fait par Python (les outils système sont refusés depuis le Dock) et remplace un
+        ancien lien cassé (venv.nosync supprimé à la main)."""
+        texte = LANCEURS_SH[0].read_text(encoding="utf-8")
+        commande = re.search(r"-c '([^']*os\.symlink[^']*)'", texte).group(1)
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = Path(dossier)
+            (racine / "venv.nosync" / "bin").mkdir(parents=True)
+            (racine / "venv").symlink_to("disparu")
+            subprocess.run([sys.executable, "-c", commande], cwd=racine, check=True)
+            self.assertTrue((racine / "venv").is_symlink())
+            self.assertTrue((racine / "venv" / "bin").is_dir())
+
     def test_chaque_lanceur_a_un_mode_installer_seulement_pour_la_ci(self):
         """La CI exécute vraiment les lanceurs sur les 3 systèmes, sans ouvrir de fenêtre."""
         for lanceur in TOUS:

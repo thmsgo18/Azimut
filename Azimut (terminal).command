@@ -13,22 +13,25 @@ python_convient() {
 
 if [ -x "venv/bin/python" ] && ! python_convient "venv/bin/python"; then
     echo "✗ L'environnement Python (dossier venv) a été créé avec une version trop ancienne"
-    echo "  (Python 3.9 minimum). Le supprimer (rm -rf venv) puis relancer ce fichier."
+    echo "  (Python 3.9 minimum). Le supprimer (rm -rf venv venv.nosync) puis relancer ce fichier."
     read -r -p "Appuyer sur Entrée pour fermer…"
     exit 1
 fi
 
+# Environnement créé sous le nom « venv.nosync » (« venv » n'est qu'un lien) : iCloud Drive ne
+# synchronise jamais un nom en .nosync, et ne retire donc pas ses fichiers du disque (voir Azimut.app).
 if [ ! -x "venv/bin/python" ]; then
     echo "Première installation : création de l'environnement Python…"
     cree=""
     for candidat in /Library/Frameworks/Python.framework/Versions/Current/bin/python3 \
                     /opt/homebrew/bin/python3 /usr/local/bin/python3 python3 /usr/bin/python3; do
         if command -v "$candidat" >/dev/null 2>&1 && python_convient "$candidat" \
-           && "$candidat" -m venv venv; then
+           && "$candidat" -m venv venv.nosync \
+           && "$candidat" -c 'import os; os.path.lexists("venv") and os.remove("venv"); os.symlink("venv.nosync", "venv")'; then
             cree="oui"
             break
         fi
-        rm -rf venv
+        rm -rf venv venv.nosync
     done
     if [ -z "$cree" ]; then
         echo ""

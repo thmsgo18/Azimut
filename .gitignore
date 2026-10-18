@@ -4,8 +4,10 @@
 *.db-wal
 *.db-shm
 
-# Environnement Python
-venv/
+# Environnement Python (sous macOS : « venv » est un lien vers « venv.nosync », jamais
+# synchronisé par iCloud Drive - voir les lanceurs)
+venv
+venv.nosync/
 __pycache__/
 *.pyc
 
