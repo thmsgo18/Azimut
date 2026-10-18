@@ -173,17 +173,21 @@ lister_lettres(entreprise_id=None, candidature_id=None, recherche=None) / recupe
 modifier_lettre(id, titre=, langue=, generale=, candidature_ids=) / lier_candidatures(id, ids) / supprimer_lettre(id)
 ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiches(...) / recuperer_fiche(id)
 modifier_fiche(...) / supprimer_fiche(id)          # `donnees` = dict décrit dans fiches_pdf.py (meta, postes, questions…)
+# Les libellés fixes du PDF d'une fiche (et le préfixe de son titre par défaut) suivent sa `langue` : « en »,
+# « English »… -> anglais, vide ou autre -> français. Le PDF est fabriqué une fois, à la création.
 
 # notes_entretien.py - prise de notes liée à une entreprise OU à une offre précise (plusieurs par cible)
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / recuperer_note(id)
 modifier_note(id, titre=, contenu=, date_entretien=, entreprise=, candidature_id=) / supprimer_note(id)
 assurer_note_entretien(candidature_id) -> id | None   # la note de la date d'entretien de l'offre : créée (vide,
-    # « Entretien - poste »), ou l'ancienne note restée vide déplacée à la nouvelle date ; jamais de doublon, jamais
-    # une note remplie déplacée. Appelée toute seule par ajouter_candidature / modifier_candidature (voir plus bas).
+    # « Entretien - poste », « Interview - poste » si l'interface est en anglais), ou l'ancienne note restée vide
+    # déplacée à la nouvelle date ; jamais de doublon, jamais une note remplie déplacée. Appelée toute seule par
+    # ajouter_candidature / modifier_candidature (voir plus bas).
 
 # notes_pdf.py - export PDF d'une note (reportlab, pur Python) : le Markdown est mis en page comme à l'écran
-notes_pdf.generer_pdf(note, chemin_sortie=None) -> octets     # `note` = recuperer_note(id) ; CLI : cli.py notes pdf ID
+notes_pdf.generer_pdf(note, chemin_sortie=None, langue=None) -> octets   # `note` = recuperer_note(id) ;
+    # libellés fixes en `langue` (route et CLI : celle de l'interface) ; CLI : cli.py notes pdf ID [--langue en]
 
 # agent.py + generation.py - génération par IA (jamais d'écriture depuis agent.py)
 agent.generer_lettre_motivation(entreprise_nom, cv_texte, offres=None, langue=None, generale=False) -> texte
@@ -219,8 +223,17 @@ restaurer(chemin_zip) -> résumé                     # vérifie tout d'abord ; 
     # données local (et la clé API si l'archive n'en a pas) ; migre une ancienne base ; rien ne bouge si ça échoue avant
     # le remplacement. Ne jamais extraire une archive avec extractall : entrées listées par le manifeste seulement.
 
+# langues.py - langue des textes fabriqués par le serveur (l'interface, elle, traduit via static/langues/*.js).
+# Les valeurs stockées (statuts...) restent TOUJOURS en français en base ; seul leur affichage change.
+normaliser_langue(valeur) -> "fr" | "en" / langue_interface() / traduire_valeur(valeur, langue)
+
+# evenements.py - journal d'une candidature : phrases stockées en français (modèles PHRASES, à ne jamais modifier),
+# lister_evenements ajoute `code` + `parametres` relus depuis la phrase, pour que l'interface la traduise
+# (section « historique » de static/langues/*.js = mêmes modèles, vérifié par les tests).
+
 # entretien.py / recherche.py / statistiques.py / sauvegarde.py
-generer_fiche_entretien(candidature_id) -> Markdown   # « Récapitulatif » de la candidature (préparation liée incluse)
+generer_fiche_entretien(candidature_id, langue="fr") -> Markdown   # « Récapitulatif » de la candidature (préparation
+                                           # liée incluse) ; l'API passe la langue de l'interface
 rechercher(texte) -> {candidatures, entreprises, notes, documents, lettres, fiches}
 stats_avancees() / sauvegarder_base()                  # copie cohérente (API de sauvegarde SQLite)
 ```

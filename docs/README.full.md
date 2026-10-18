@@ -312,7 +312,7 @@ ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiche
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
 assurer_note_entretien(candidature_id) -> id | None   # the note for the job's interview date (created automatically, see below)
-notes_pdf.generer_pdf(note, chemin_sortie=None) -> bytes   # PDF export of a note; CLI: cli.py notes pdf ID
+notes_pdf.generer_pdf(note, chemin_sortie=None, langue=None) -> bytes   # PDF export of a note; CLI: cli.py notes pdf ID
 
 # documents.py - any file, linked to ONE company and to ONE OR MORE of its jobs
 importer_document(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None, generale=None, type_document=None) -> id
@@ -372,6 +372,7 @@ azimut/
   extraction.py     # text of a PDF / Word / text file (résumé, indexing of imported documents)
   recherche.py      # multi-type global search
   statistiques.py   # funnel, delays, sources, weekly chart, weekly goal
+  langues.py        # language of server-made text (PDFs, automatic note titles, summary): fr by default, or en
   reglages.py       # local settings (masked API key, AI provider, data folder, companion code)
   sauvegarde.py     # dated copies of the database, rotation
   sauvegarde_complete.py # full backup (database + files) as one .zip, and its safe restore

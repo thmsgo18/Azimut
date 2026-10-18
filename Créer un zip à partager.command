@@ -21,6 +21,7 @@ zip -r -q "$DESTINATION" . \
     -x ".git/*" \
     -x "import_temp/*" \
     -x "sauvegardes/*" \
+    -x "videos/*" \
     -x "azimut-sauvegarde-*.zip" \
     -x ".restauration-*" -x ".restauration-*/*" \
     -x "__pycache__/*" -x "*/__pycache__/*" \

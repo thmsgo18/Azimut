@@ -26,13 +26,14 @@ def ajouter_fiche(
 ):
     """Enregistre une fiche à partir de données structurées (format décrit dans
     fiches_pdf.py) : le PDF est fabriqué et rangé dans le dossier fiches/, le
-    texte est indexé pour la recherche. Retourne l'id de la fiche créée."""
+    texte est indexé pour la recherche. Les libellés fixes du PDF suivent `langue`
+    (français si elle est vide ou non reconnue). Retourne l'id de la fiche créée."""
     donnees = fiches_pdf.valider_donnees(donnees)
     return pieces_liees.ajouter(
-        TYPE_FICHE, entreprise_nom, fiches_pdf.texte_fiche(donnees),
+        TYPE_FICHE, entreprise_nom, fiches_pdf.texte_fiche(donnees, langue),
         candidature_ids=candidature_ids, titre=titre, langue=langue, generale=generale,
         source=source, modele_ia=modele_ia,
-        fabriquer_fichier=lambda chemin: fiches_pdf.generer_pdf_fiche(donnees, chemin),
+        fabriquer_fichier=lambda chemin: fiches_pdf.generer_pdf_fiche(donnees, chemin, langue),
         chemin_db=chemin_db,
     )
 

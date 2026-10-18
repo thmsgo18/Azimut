@@ -11,6 +11,7 @@ Toute écriture passe par ces fonctions - jamais de SQL direct depuis l'extérie
 from datetime import datetime
 
 import db
+import langues
 from entreprises import ajouter_ou_recuperer_entreprise
 from exceptions import EntiteIntrouvable, ValeurNonAutorisee
 from valeurs import normaliser, normaliser_date
@@ -89,9 +90,12 @@ _SELECTION = (
 )
 
 
-def titre_note_entretien(poste):
+TITRES_NOTE_ENTRETIEN = {"fr": "Entretien - {poste}", "en": "Interview - {poste}"}
+
+
+def titre_note_entretien(poste, langue="fr"):
     """Le titre des notes créées automatiquement pour la date d'un entretien."""
-    return f"Entretien - {poste}"
+    return TITRES_NOTE_ENTRETIEN[langues.normaliser_langue(langue)].format(poste=poste)
 
 
 def assurer_note_entretien(candidature_id, chemin_db=None):
@@ -100,7 +104,8 @@ def assurer_note_entretien(candidature_id, chemin_db=None):
     - pas de date d'entretien, ou une note de l'offre porte déjà cette date : rien à faire ;
     - une note créée automatiquement et jamais remplie (titre « Entretien - poste », vide)
       existe pour une ancienne date : elle prend la nouvelle (entretien reporté) ;
-    - sinon : une nouvelle note vide, datée du jour de l'entretien, liée à l'offre.
+    - sinon : une nouvelle note vide, datée du jour de l'entretien, liée à l'offre, titrée dans
+      la langue de l'interface (« Interview - poste » en anglais).
 
     Ce que l'utilisateur a écrit n'est jamais déplacé ni supprimé. Retourne l'id de la note
     créée ou déplacée, ou None."""
@@ -113,16 +118,20 @@ def assurer_note_entretien(candidature_id, chemin_db=None):
         conn.close()
     if ligne is None:
         raise EntiteIntrouvable(f"Aucune candidature avec l'id {candidature_id}.")
-    date, titre = ligne["date_entretien"], titre_note_entretien(ligne["poste"])
+    date = ligne["date_entretien"]
     if not date:
         return None
     existantes = lister_notes(candidature_id=candidature_id, chemin_db=chemin_db)
     if any(n["date_entretien"] == date for n in existantes):
         return None
+    # La note automatique se reconnaît dans toutes les langues : la langue de l'interface a pu
+    # changer depuis sa création.
+    titres_auto = {titre_note_entretien(ligne["poste"], langue) for langue in langues.LANGUES}
     for note in existantes:
-        if note["titre"] == titre and not (note["contenu"] or "").strip():
+        if note["titre"] in titres_auto and not (note["contenu"] or "").strip():
             modifier_note(note["id"], date_entretien=date, chemin_db=chemin_db)
             return note["id"]
+    titre = titre_note_entretien(ligne["poste"], langues.langue_interface(chemin_db))
     return ajouter_note(candidature_id=candidature_id, titre=titre, date_entretien=date, chemin_db=chemin_db)
 
 

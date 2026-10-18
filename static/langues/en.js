@@ -35,6 +35,8 @@ window.LANGUES.en = {
     recherche: "Search",
     cv: "Résumé",
     reglages: "Settings",
+    titre_fenetre: "Azimut - application tracker",
+    logo_sous_titre: "Application tracker",
     nouvelle_candidature: "New application",
     exporter_excel: "Export to Excel",
     importer_excel: "Import an Excel file",
@@ -607,6 +609,16 @@ window.LANGUES.en = {
     telecharger_md: "Download as .md",
   },
 
+  /* Application history: same templates as PHRASES in evenements.py
+     (checked by the tests). Statuses go through tv(). */
+  historique: {
+    creation: "Application created - status “{statut}”",
+    statut: "Status: {avant} → {apres}",
+    reponse: "Reply received on {date}",
+    entretien: "Interview scheduled on {date}",
+    relance: "Follow-up sent (#{numero})",
+  },
+
   branchements: {
     export_en_cours: "Excel export downloading…",
     import_impossible: "Import failed.",
@@ -635,6 +647,7 @@ window.LANGUES.en = {
     "Entretien": "Interview",
     "Refus": "Rejected",
     "Accepté": "Accepted",
+    "Relancée": "Followed up",   // retiré, mais encore dans le journal des anciennes bases
     // libellés d'échéance (agenda.py)
     "Début souhaité": "Desired start",
     // libellés d'entonnoir (statistiques.py)

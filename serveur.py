@@ -36,6 +36,7 @@ import fiches
 import generation
 import import_csv
 import import_excel
+import langues
 import lettres
 import notes_entretien
 import notes_pdf
@@ -319,7 +320,7 @@ def api_entretien(numero):
             "candidature_id": numero,
             "entreprise": cand["entreprise"],
             "poste": cand["poste"],
-            "markdown": entretien.generer_fiche_entretien(numero),
+            "markdown": entretien.generer_fiche_entretien(numero, langue=langues.langue_interface()),
         }
     )
 
@@ -327,8 +328,10 @@ def api_entretien(numero):
 @app.route("/api/entretien/<int:numero>/telecharger")
 def api_entretien_telecharger(numero):
     cand = candidatures.recuperer_candidature(numero)
-    fiche = entretien.generer_fiche_entretien(numero)
-    nom = _nom_fichier_ascii(f"entretien-{cand['entreprise']}.md")
+    langue = langues.langue_interface()
+    fiche = entretien.generer_fiche_entretien(numero, langue=langue)
+    prefixe = "interview" if langue == "en" else "entretien"
+    nom = _nom_fichier_ascii(f"{prefixe}-{cand['entreprise']}.md")
     return send_file(
         io.BytesIO(fiche.encode("utf-8")),
         mimetype="text/markdown",
@@ -708,10 +711,11 @@ def api_notes_modifier(numero):
 
 @app.route("/api/notes/<int:numero>/pdf")
 def api_notes_pdf(numero):
-    """La note (Markdown) mise en page en PDF, à télécharger."""
+    """La note (Markdown) mise en page en PDF, à télécharger - libellés dans la langue de l'interface."""
     note = notes_entretien.recuperer_note(numero)
+    pdf = notes_pdf.generer_pdf(note, langue=langues.langue_interface())
     return send_file(
-        io.BytesIO(notes_pdf.generer_pdf(note)), mimetype="application/pdf", as_attachment=True,
+        io.BytesIO(pdf), mimetype="application/pdf", as_attachment=True,
         download_name=_nom_fichier_ascii(f"{note['titre']}.pdf"),
     )
 

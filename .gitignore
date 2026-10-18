@@ -31,3 +31,6 @@ azimut-sauvegarde-*.zip
 
 # Fichiers macOS
 .DS_Store
+
+# Vidéos de présentation (HyperFrames : musique, captures, rendus - lourd)
+/videos/

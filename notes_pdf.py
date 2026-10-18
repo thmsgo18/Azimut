@@ -7,6 +7,9 @@ ligne simple est conservé (« Entrée » = nouvelle ligne), comme à l'écran.
 
 Le texte est échappé avant d'être mis en forme : rien de ce qui est tapé n'est interprété comme
 une balise. Un lien n'est actif que s'il commence par http://, https:// ou mailto:.
+
+Les quelques libellés fixes (date de l'entretien, note vide) suivent la langue demandée - celle de
+l'interface au moment de l'export (voir LIBELLES).
 """
 
 import io
@@ -21,6 +24,7 @@ from reportlab.platypus import (
     HRFlowable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
 )
 
+from langues import date_affichee, normaliser_langue
 from pdf_commun import compatible_police_pdf, echapper_xml
 
 ENCRE = colors.HexColor("#1c1c1e")
@@ -30,6 +34,11 @@ ACCENT = colors.HexColor("#3b6fd8")
 FOND_CODE = colors.HexColor("#f3f3f6")
 
 LARGEUR_UTILE = A4[0] - 4 * cm  # marges de 2 cm
+
+LIBELLES = {
+    "fr": {"sans_titre": "Note d'entretien", "entretien_du": "Entretien du {date}", "vide": "(note vide)"},
+    "en": {"sans_titre": "Interview note", "entretien_du": "Interview on {date}", "vide": "(empty note)"},
+}
 
 STYLES = {
     "corps": ParagraphStyle("corps", fontName="Helvetica", fontSize=10.2, leading=14.4,
@@ -360,12 +369,6 @@ def blocs(source, base=None):
 
 # --- document ---------------------------------------------------------------
 
-def _date_fr(iso):
-    if iso and re.match(r"^\d{4}-\d{2}-\d{2}", str(iso)):
-        return f"{iso[8:10]}/{iso[5:7]}/{iso[0:4]}"
-    return ""
-
-
 class _CanvasNumerote(canvas.Canvas):
     """Pied de page « titre - page n / N » (le total n'est connu qu'à la fin)."""
 
@@ -398,16 +401,16 @@ def nom_de_fichier(titre):
     return f"{_slugifier(titre, 'note')}.pdf"
 
 
-def generer_pdf(note, chemin_sortie=None):
+def generer_pdf(note, chemin_sortie=None, langue=None):
     """Le PDF d'une note (dict de notes_entretien.recuperer_note). Écrit dans `chemin_sortie` si
-    fourni, et retourne toujours le contenu (octets)."""
-    titre = (note.get("titre") or "").strip() or "Note d'entretien"
+    fourni, et retourne toujours le contenu (octets). `langue` : celle des libellés fixes."""
+    libelles = LIBELLES[normaliser_langue(langue)]
+    titre = (note.get("titre") or "").strip() or libelles["sans_titre"]
     meta = [note.get("entreprise") or ""]
     if note.get("poste"):
         meta.append(note["poste"])
-    date = _date_fr(note.get("date_entretien"))
-    if date:
-        meta.append(f"Entretien du {date}")
+    if re.match(r"^\d{4}-\d{2}-\d{2}", str(note.get("date_entretien") or "")):
+        meta.append(libelles["entretien_du"].format(date=date_affichee(note["date_entretien"])))
     elements = [
         _paragraphe(echapper_xml(titre), STYLES["titre_note"]),
         _paragraphe(echapper_xml("  ·  ".join(m for m in meta if m)), STYLES["meta"]),
@@ -415,7 +418,7 @@ def generer_pdf(note, chemin_sortie=None):
     ]
     corps = blocs(note.get("contenu") or "")
     if not corps:
-        corps = [_paragraphe("<i>(note vide)</i>", STYLES["meta"])]
+        corps = [_paragraphe(f"<i>{echapper_xml(libelles['vide'])}</i>", STYLES["meta"])]
     elements += corps
 
     memoire = io.BytesIO()

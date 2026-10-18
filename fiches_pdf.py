@@ -26,6 +26,10 @@ du texte déjà prêt à afficher ; les champs `html` n'acceptent que <p>, <b>, 
 Les cartes sont empilées (jamais côte à côte) et découpées ligne par ligne :
 une carte longue passe simplement sur la page suivante, sans jamais perdre de
 contenu.
+
+Les libellés fixes (en-tête, titres de section, pied de page) suivent la langue
+de la fiche (`langue` : « en », « English »... -> anglais ; vide ou autre ->
+français, la langue dans laquelle l'IA rédige par défaut) : voir LIBELLES.
 """
 
 import re
@@ -40,6 +44,7 @@ from reportlab.pdfgen import canvas
 from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from exceptions import ValeurNonAutorisee
+from langues import normaliser_langue
 from pdf_commun import compatible_police_pdf, echapper_xml
 
 PALETTE = {
@@ -49,6 +54,44 @@ PALETTE = {
 ORDRE_PALETTE = list(PALETTE)
 MARINE, VERT, ENCRE, GRIS, FILET = "#1B3A6B", "#0E6E5D", "#23303F", "#6B7785", "#DDE3EA"
 LARGEUR_UTILE = A4[0] - 30 * mm
+
+# Libellés fixes de la fiche, par langue (le contenu, lui, vient des données).
+LIBELLES = {
+    "fr": {
+        "marque": "FICHE DE PRÉPARATION D'ENTRETIEN",
+        "titre_document": "Fiche entretien - {entreprise}",
+        "titre_texte": "Fiche d'entretien - {entreprise}",
+        "entreprise": "Présentation de l'entreprise",
+        "poste": "Poste",
+        "poste_vise": "Le poste visé",
+        "postes_vises": "Les {n} postes visés",
+        "postes_vises_texte": "Postes visés",
+        "stack": "Stack / contexte :",
+        "offre_en_ligne": "Offre en ligne :",
+        "questions": "Questions",
+        "questions_a_poser": "Questions à poser",
+        "a_retenir": "À retenir :",
+        "preparee_par": "Fiche préparée par {nom}",
+        "page": "page {page} / {total}",
+    },
+    "en": {
+        "marque": "INTERVIEW PREPARATION SHEET",
+        "titre_document": "Interview sheet - {entreprise}",
+        "titre_texte": "Interview sheet - {entreprise}",
+        "entreprise": "Company overview",
+        "poste": "Role",
+        "poste_vise": "The role",
+        "postes_vises": "The {n} roles",
+        "postes_vises_texte": "Roles",
+        "stack": "Stack / context:",
+        "offre_en_ligne": "Job posting online:",
+        "questions": "Questions",
+        "questions_a_poser": "Questions to ask",
+        "a_retenir": "Key takeaway:",
+        "preparee_par": "Sheet prepared by {nom}",
+        "page": "page {page} / {total}",
+    },
+}
 
 _S = {
     "corps": ParagraphStyle("corps", fontName="Helvetica", fontSize=9.3, leading=12.6,
@@ -202,8 +245,8 @@ def _carte(lignes, couleur_barre=None, fond="#FFFFFF"):
     return tableau
 
 
-def _entete(meta):
-    gauche = [Paragraph("FICHE DE PRÉPARATION D'ENTRETIEN", _S["entete_marque"]),
+def _entete(meta, libelles):
+    gauche = [Paragraph(echapper_xml(libelles["marque"]), _S["entete_marque"]),
               Paragraph(_t(meta["company"]), _S["entete_nom"])]
     if meta.get("subtitle"):
         gauche.append(Paragraph(_t(meta["subtitle"]), _S["entete_sous"]))
@@ -246,8 +289,8 @@ def _titre_carte(titre, couleur):
     return Paragraph(_t(titre), style)
 
 
-def _section_entreprise(apercu):
-    elements = [Paragraph("Présentation de l'entreprise", _S["section"])]
+def _section_entreprise(apercu, libelles):
+    elements = [Paragraph(echapper_xml(libelles["entreprise"]), _S["section"])]
     tuiles = _tuiles(apercu.get("stats") or [])
     if tuiles is not None:
         elements += [tuiles, Spacer(1, 7)]
@@ -268,36 +311,39 @@ def _section_entreprise(apercu):
     return elements
 
 
-def _carte_poste(poste, indice):
+def _carte_poste(poste, indice, libelles):
     couleur = _couleur(poste.get("color_key"), indice, poste.get("color_hex"))
     lignes = []
     etiquette = " · ".join(x for x in (poste.get("code_label"), poste.get("subdomaine")) if x)
     if etiquette:
         lignes.append(Paragraph(_t(etiquette).upper(),
                                 ParagraphStyle("e", parent=_S["etiquette"], textColor=couleur)))
-    lignes.append(_titre_carte(poste.get("title") or "Poste", couleur))
+    lignes.append(_titre_carte(poste.get("title") or libelles["poste"], couleur))
     if poste.get("lead"):
         lignes.append(Paragraph(_t(poste["lead"]), _S["corps"]))
     if poste.get("stack"):
-        lignes.append(Paragraph(f"<b>Stack / contexte :</b> {_t(poste['stack'])}", _S["corps"]))
+        lignes.append(Paragraph(
+            f"<b>{echapper_xml(libelles['stack'])}</b> {_t(poste['stack'])}", _S["corps"]
+        ))
     for mission in poste.get("missions") or []:
         if str(mission).strip():
             lignes.append(Paragraph(_t(mission), _S["puce"], bulletText="•"))
     if poste.get("link"):
         lien = str(poste["link"]).strip()
         lignes.append(Paragraph(
-            f'<font color="{MARINE}">Offre en ligne : <a href="{echapper_xml(lien)}">{echapper_xml(lien)}</a></font>',
+            f'<font color="{MARINE}">{echapper_xml(libelles["offre_en_ligne"])} '
+            f'<a href="{echapper_xml(lien)}">{echapper_xml(lien)}</a></font>',
             _S["petit"],
         ))
     return _carte(lignes, couleur_barre=couleur)
 
 
-def _section_questions(blocs, titre):
+def _section_questions(blocs, titre, libelles):
     elements = [Paragraph(_t(titre), _S["section"])]
     for indice, bloc in enumerate(blocs):
         couleur = _couleur(None, indice + 1)
         entete = Paragraph(
-            _t(bloc.get("theme") or "Questions"),
+            _t(bloc.get("theme") or libelles["questions"]),
             ParagraphStyle("th", parent=_S["carte_titre"], fontSize=10, textColor=couleur),
         )
         lignes = []
@@ -317,10 +363,11 @@ def _section_questions(blocs, titre):
 class _CanvasNumerote(canvas.Canvas):
     """Canvas en deux passes : le pied de page connaît le nombre total de pages."""
 
-    def __init__(self, *args, pied="", **kwargs):
+    def __init__(self, *args, pied="", modele_page="page {page} / {total}", **kwargs):
         super().__init__(*args, **kwargs)
         self._etats = []
         self._pied = pied
+        self._modele_page = modele_page
 
     def showPage(self):
         self._etats.append(dict(self.__dict__))
@@ -332,8 +379,8 @@ class _CanvasNumerote(canvas.Canvas):
             self.__dict__.update(etat)
             self.setFont("Helvetica", 7.5)
             self.setFillColor(colors.HexColor("#9AA5B1"))
-            texte = f"{self._pied} - page {self._pageNumber} / {total}" if self._pied else \
-                f"page {self._pageNumber} / {total}"
+            numero = self._modele_page.format(page=self._pageNumber, total=total)
+            texte = f"{self._pied} - {numero}" if self._pied else numero
             self.drawCentredString(A4[0] / 2, 10 * mm, texte)
             super().showPage()
         super().save()
@@ -361,62 +408,70 @@ def valider_donnees(donnees):
     return propre
 
 
-def generer_pdf_fiche(donnees, chemin_sortie):
-    """Écrit la fiche à chemin_sortie et retourne le chemin en chaîne."""
+def generer_pdf_fiche(donnees, chemin_sortie, langue=None):
+    """Écrit la fiche à chemin_sortie et retourne le chemin en chaîne. `langue` :
+    celle de la fiche, pour ses libellés fixes (voir LIBELLES)."""
     donnees = valider_donnees(donnees)
+    libelles = LIBELLES[normaliser_langue(langue)]
     meta = donnees["meta"]
     postes = donnees["postes"]
     element_postes = [Paragraph(
         _t(donnees.get("postes_heading")
-           or ("Le poste visé" if len(postes) == 1 else f"Les {len(postes)} postes visés")),
+           or (libelles["poste_vise"] if len(postes) == 1
+               else libelles["postes_vises"].format(n=len(postes)))),
         _S["section"],
     )]
     for indice, poste in enumerate(postes):
-        element_postes += [_carte_poste(poste, indice), Spacer(1, 7)]
+        element_postes += [_carte_poste(poste, indice, libelles), Spacer(1, 7)]
 
-    elements = [_entete(meta), Spacer(1, 8)]
+    elements = [_entete(meta, libelles), Spacer(1, 8)]
     if donnees["company_overview"]:
-        elements += _section_entreprise(donnees["company_overview"])
+        elements += _section_entreprise(donnees["company_overview"], libelles)
     elements += element_postes
     if donnees["question_blocks"]:
         elements += _section_questions(
-            donnees["question_blocks"], donnees.get("questions_heading") or "Questions à poser"
+            donnees["question_blocks"],
+            donnees.get("questions_heading") or libelles["questions_a_poser"], libelles,
         )
     if str(donnees.get("footer_tip") or "").strip():
         elements += [Spacer(1, 4), _carte(
-            [Paragraph(f"<b>À retenir :</b> {_t(donnees['footer_tip'])}", _S["corps"])], fond="#EAF5F1"
+            [Paragraph(f"<b>{echapper_xml(libelles['a_retenir'])}</b> {_t(donnees['footer_tip'])}",
+                       _S["corps"])],
+            fond="#EAF5F1",
         )]
 
     pied = " - ".join(x for x in (
-        f"Fiche préparée par {meta['footer_name']}" if meta.get("footer_name") else "",
+        libelles["preparee_par"].format(nom=meta["footer_name"]) if meta.get("footer_name") else "",
         meta.get("footer_context") or meta["company"],
     ) if x)
     document = SimpleDocTemplate(
         str(chemin_sortie), pagesize=A4,
         topMargin=16 * mm, bottomMargin=20 * mm, leftMargin=15 * mm, rightMargin=15 * mm,
-        title=compatible_police_pdf(f"Fiche entretien - {meta['company']}"),
+        title=compatible_police_pdf(libelles["titre_document"].format(entreprise=meta["company"])),
     )
     document.build(
         elements,
         canvasmaker=lambda *args, **kwargs: _CanvasNumerote(
-            *args, pied=compatible_police_pdf(pied), **kwargs
+            *args, pied=compatible_police_pdf(pied), modele_page=libelles["page"], **kwargs
         ),
     )
     return str(chemin_sortie)
 
 
-def texte_fiche(donnees):
+def texte_fiche(donnees, langue=None):
     """La fiche en texte brut (Markdown simple) : sert à l'indexer pour la
-    recherche et à en montrer un aperçu sans ouvrir le PDF."""
+    recherche et à en montrer un aperçu sans ouvrir le PDF. Mêmes libellés
+    que le PDF (voir LIBELLES)."""
     donnees = valider_donnees(donnees)
+    libelles = LIBELLES[normaliser_langue(langue)]
     meta = donnees["meta"]
-    lignes = [f"# Fiche d'entretien - {meta['company']}"]
+    lignes = ["# " + libelles["titre_texte"].format(entreprise=meta["company"])]
     for cle in ("subtitle", "interview_date", "location", "mode", "website"):
         if meta.get(cle):
             lignes.append(str(meta[cle]))
     apercu = donnees["company_overview"]
     if apercu:
-        lignes += ["", "## Présentation de l'entreprise"]
+        lignes += ["", "## " + libelles["entreprise"]]
         for stat in apercu.get("stats") or []:
             if isinstance(stat, dict) and stat.get("big"):
                 lignes.append(f"- {stat['big']} {stat.get('label') or ''}".rstrip())
@@ -429,22 +484,22 @@ def texte_fiche(donnees):
                     lignes.append(texte_brut_depuis_html(carte["html"]))
         if apercu.get("source_note"):
             lignes += ["", str(apercu["source_note"])]
-    lignes += ["", "## " + str(donnees.get("postes_heading") or "Postes visés")]
+    lignes += ["", "## " + str(donnees.get("postes_heading") or libelles["postes_vises_texte"])]
     for poste in donnees["postes"]:
-        lignes += ["", f"### {poste.get('title') or 'Poste'}"]
+        lignes += ["", f"### {poste.get('title') or libelles['poste']}"]
         for cle in ("lead", "stack"):
             if poste.get(cle):
                 lignes.append(str(poste[cle]))
         lignes += [f"- {m}" for m in poste.get("missions") or [] if str(m).strip()]
     if donnees["question_blocks"]:
-        lignes += ["", "## " + str(donnees.get("questions_heading") or "Questions à poser")]
+        lignes += ["", "## " + str(donnees.get("questions_heading") or libelles["questions_a_poser"])]
         for bloc in donnees["question_blocks"]:
-            lignes += ["", f"### {bloc.get('theme') or 'Questions'}"]
+            lignes += ["", f"### {bloc.get('theme') or libelles['questions']}"]
             for question in bloc.get("questions") or []:
                 if isinstance(question, dict) and question.get("text"):
                     lignes.append(f"- {question['text']}")
                     if question.get("why"):
                         lignes.append(f"  ({question['why']})")
     if str(donnees.get("footer_tip") or "").strip():
-        lignes += ["", f"À retenir : {donnees['footer_tip']}"]
+        lignes += ["", f"{libelles['a_retenir']} {donnees['footer_tip']}"]
     return "\n".join(lignes).strip()

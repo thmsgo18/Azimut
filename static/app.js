@@ -293,7 +293,7 @@ function barres(donnees, ordre) {
     .map(
       ([libelle, valeur]) => `
       <div class="ligne-barre">
-        <span class="libelle" title="${echapper(libelle)}">${echapper(libelle)}</span>
+        <span class="libelle" title="${echapperAttribut(tv(libelle))}">${echapper(tv(libelle))}</span>
         <div class="piste"><div class="remplissage${valeur === 0 ? " vide" : ""}" style="width:${(valeur / maximum) * 100}%"></div></div>
         <span class="valeur">${valeur}</span>
       </div>`
@@ -1076,6 +1076,19 @@ function pastilleStatutDetail(statut) {
     </span>`;
 }
 
+/* Un événement du journal dans la langue de l'interface. La base garde la phrase
+   française ; le serveur en relit le modèle (code) et les paramètres (statuts
+   canoniques, date ISO - voir evenements.py). Phrase non reconnue : telle quelle. */
+function texteEvenement(evenement) {
+  if (!evenement.code) return evenement.description;
+  const parametres = { ...evenement.parametres };
+  for (const cle of ["statut", "avant", "apres"]) {
+    if (parametres[cle]) parametres[cle] = tv(parametres[cle]);
+  }
+  if (parametres.date) parametres.date = dateFr(parametres.date);
+  return t(`historique.${evenement.code}`, parametres);
+}
+
 function annexesCandidature(numero, lettresLiees, fichesLiees, notesLiees, docs, journal) {
   const lignesDocs = docs.map((doc) => `
     <div class="ligne-liee" onclick="ouvrirApercuPiece('documents', ${doc.id})">
@@ -1086,7 +1099,7 @@ function annexesCandidature(numero, lettresLiees, fichesLiees, notesLiees, docs,
   const lignesJournal = journal.map((evenement) => `
     <div class="ligne-journal">
       <span class="journal-date">${dateFr(evenement.horodatage.slice(0, 10))} ${echapper(evenement.horodatage.slice(11, 16))}</span>
-      <span>${echapper(evenement.description)}</span>
+      <span>${echapper(texteEvenement(evenement))}</span>
     </div>`).join("");
   return `
     ${sectionPreparation(lettresLiees, fichesLiees, notesLiees, [], `nouvelleNotePourOffre(${numero})`)}

@@ -12,39 +12,24 @@ from valeurs import normaliser, valider_champs
 INTERVALLE_SAUVEGARDE_AUTO = 4  # une sauvegarde auto tous les N candidatures (en plus de celle au lancement)
 
 
-def _date_fr(iso):
-    try:
-        annee, mois, jour = str(iso).split("-")
-        return f"{jour}/{mois}/{annee}"
-    except (ValueError, AttributeError):
-        return str(iso)
-
-
 def _journaliser_modifications(conn, id_candidature, avant, champs):
     """Événements automatiques déduits d'une modification (statut, dates)."""
     if "statut" in champs and champs["statut"] != avant["statut"]:
         evenements.enregistrer(
-            conn, id_candidature, "statut",
-            f"Statut : {avant['statut']} → {champs['statut']}",
+            conn, id_candidature, "statut", avant=avant["statut"], apres=champs["statut"],
         )
     if (
         "date_reponse" in champs
         and champs["date_reponse"]
         and champs["date_reponse"] != avant["date_reponse"]
     ):
-        evenements.enregistrer(
-            conn, id_candidature, "reponse",
-            f"Réponse reçue le {_date_fr(champs['date_reponse'])}",
-        )
+        evenements.enregistrer(conn, id_candidature, "reponse", date=champs["date_reponse"])
     if (
         "date_entretien" in champs
         and champs["date_entretien"]
         and champs["date_entretien"] != avant["date_entretien"]
     ):
-        evenements.enregistrer(
-            conn, id_candidature, "entretien",
-            f"Entretien planifié le {_date_fr(champs['date_entretien'])}",
-        )
+        evenements.enregistrer(conn, id_candidature, "entretien", date=champs["date_entretien"])
 
 
 def verifier_doublon_candidature(entreprise_nom, poste, chemin_db=None):
@@ -104,8 +89,7 @@ def ajouter_candidature(entreprise_nom, poste, chemin_db=None, note_entretien=Tr
             f"INSERT INTO candidatures ({colonnes}) VALUES ({jokers})", tuple(valides.values())
         )
         evenements.enregistrer(
-            conn, curseur.lastrowid, "creation",
-            f"Candidature créée - statut « {valides.get('statut', 'À préparer')} »",
+            conn, curseur.lastrowid, "creation", statut=valides.get("statut", "À préparer"),
         )
         conn.commit()
         nouvel_id = curseur.lastrowid

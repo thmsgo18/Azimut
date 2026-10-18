@@ -29,6 +29,7 @@ import export_excel
 import fiches
 import import_csv
 import import_excel
+import langues
 import lettres
 import notes_entretien
 import notes_pdf
@@ -234,6 +235,9 @@ def construire_analyseur():
     preparer = actions.add_parser("preparer", help="Générer le récapitulatif de la candidature (Markdown)")
     preparer.add_argument("id", type=int, help="Numéro de la candidature")
     preparer.add_argument("--sortie", help="Enregistrer le récapitulatif dans un fichier .md")
+    preparer.add_argument(
+        "--langue", choices=langues.LANGUES, help="Langue du récapitulatif (défaut : celle de l'interface)"
+    )
 
     # --- CV ---
     cv_p = sections.add_parser(
@@ -373,6 +377,9 @@ def construire_analyseur():
     pdf = actions.add_parser("pdf", help="Exporter une note d'entretien en PDF")
     pdf.add_argument("id", type=int, help="Numéro de la note")
     pdf.add_argument("--sortie", help="Fichier PDF à écrire (défaut : titre de la note, dans le dossier courant)")
+    pdf.add_argument(
+        "--langue", choices=langues.LANGUES, help="Langue des libellés du PDF (défaut : celle de l'interface)"
+    )
 
     supprimer = actions.add_parser("supprimer", help="Supprimer une note d'entretien")
     supprimer.add_argument("id", type=int, help="Numéro de la note")
@@ -599,7 +606,9 @@ def executer(args):
         _executer_sauvegarde(args, chemin_db)
 
     elif args.section == "entretien":
-        fiche = entretien.generer_fiche_entretien(args.id, chemin_db=chemin_db)
+        fiche = entretien.generer_fiche_entretien(
+            args.id, chemin_db=chemin_db, langue=args.langue or langues.langue_interface(chemin_db)
+        )
         if args.sortie:
             chemin = Path(args.sortie).expanduser()
             chemin.parent.mkdir(parents=True, exist_ok=True)
@@ -854,7 +863,7 @@ def _executer_notes(args, chemin_db):
     elif args.action == "pdf":
         note = notes_entretien.recuperer_note(args.id, chemin_db=chemin_db)
         sortie = Path(args.sortie).expanduser() if args.sortie else Path(notes_pdf.nom_de_fichier(note['titre']))
-        notes_pdf.generer_pdf(note, sortie)
+        notes_pdf.generer_pdf(note, sortie, langue=args.langue or langues.langue_interface(chemin_db))
         print(f"✓ Note n°{args.id} exportée : {sortie}")
     elif args.action == "supprimer":
         notes_entretien.supprimer_note(args.id, chemin_db=chemin_db)

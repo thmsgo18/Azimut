@@ -24,6 +24,7 @@ from typing import Optional
 
 import db
 import reglages
+from langues import normaliser_langue
 from entreprises import _trouver_par_nom, ajouter_ou_recuperer_entreprise
 from exceptions import EntiteIntrouvable, ValeurNonAutorisee
 from extraction import EXTENSIONS_TEXTE, extraire_texte
@@ -46,6 +47,7 @@ class TypePiece:
     sous_dossier: str        # dossier de données où ranger les fichiers
     libelle: str             # « lettre », « fiche » : pour les messages d'erreur
     prefixe_titre: str = ""  # devant le titre par défaut (« Fiche d'entretien - »)
+    prefixe_titre_en: str = ""  # le même, pour une pièce en anglais (« Interview sheet - »)
     colonnes_supplementaires: tuple = ()  # colonnes propres au type (« type_document »)
     extensions: Optional[frozenset] = None  # formats acceptés à l'import ; None = tous
     taille_max: Optional[int] = None      # octets ; None = TAILLE_MAX_FICHIER
@@ -68,6 +70,7 @@ TYPE_FICHE = TypePiece(
     sous_dossier="fiches",
     libelle="fiche",
     prefixe_titre="Fiche d'entretien - ",
+    prefixe_titre_en="Interview sheet - ",
     extensions=frozenset(EXTENSIONS_TEXTE),
 )
 
@@ -164,9 +167,11 @@ def _postes(conn, candidature_ids):
     ]
 
 
-def _titre_par_defaut(type_piece, nom_entreprise, postes):
+def _titre_par_defaut(type_piece, nom_entreprise, postes, langue=None):
+    """« Fiche d'entretien - Entreprise - Poste » ; le préfixe suit la langue de la pièce."""
     base = f"{nom_entreprise} - {postes[0]}" if postes else nom_entreprise
-    return type_piece.prefixe_titre + base
+    anglais = normaliser_langue(langue) == "en"
+    return (type_piece.prefixe_titre_en if anglais else type_piece.prefixe_titre) + base
 
 
 def _generale(generale, candidature_ids):
@@ -245,7 +250,7 @@ def ajouter(
     conn = db.ouvrir(chemin_db)
     try:
         entreprise_id, nom, ids, postes = _preparer(conn, entreprise_nom, candidature_ids, chemin_db)
-        titre_final = (str(titre).strip() if titre else "") or _titre_par_defaut(type_piece, nom, postes)
+        titre_final = (str(titre).strip() if titre else "") or _titre_par_defaut(type_piece, nom, postes, langue)
 
         chemin_fichier = nom_fichier = None
         if fabriquer_fichier is not None:
@@ -320,7 +325,8 @@ def importer(
         destination.write_bytes(contenu_fichier)
         titre_final = (
             (str(titre).strip() if titre else "")
-            or (nom_original if type_piece.titre_depuis_fichier else _titre_par_defaut(type_piece, nom, postes))
+            or (nom_original if type_piece.titre_depuis_fichier
+                else _titre_par_defaut(type_piece, nom, postes, langue))
         )
         piece_id = _inserer(
             conn, type_piece, entreprise_id, titre_final, texte, str(destination), nom_original,

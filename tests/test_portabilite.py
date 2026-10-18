@@ -19,6 +19,7 @@ from pathlib import Path
 
 PROJET = Path(__file__).resolve().parent.parent
 NODE = shutil.which("node")
+sys.path.insert(0, str(PROJET))
 
 
 class TestCliEncodageUtf8(unittest.TestCase):
@@ -97,6 +98,8 @@ class TestCoherenceLangues(unittest.TestCase):
         console.log(JSON.stringify({
           fr: aplatir(window.LANGUES.fr),
           en: aplatir(window.LANGUES.en),
+          historique: { fr: window.LANGUES.fr.historique, en: window.LANGUES.en.historique },
+          valeurs_en: window.LANGUES.en.valeurs,
         }));
         """
         resultat = subprocess.run(
@@ -107,6 +110,27 @@ class TestCoherenceLangues(unittest.TestCase):
         donnees = json.loads(resultat.stdout)
         cls.cles_fr = set(donnees["fr"])
         cls.cles_en = set(donnees["en"])
+        cls.historique = donnees["historique"]
+        cls.valeurs_en = donnees["valeurs_en"]
+
+    def test_historique_identique_aux_modeles_du_journal(self):
+        """L'interface affiche le journal avec les modèles de static/langues/*.js, le récapitulatif
+        avec ceux d'evenements.py : les deux doivent dire exactement la même chose."""
+        import evenements
+
+        self.assertEqual(self.historique, evenements.PHRASES)
+
+    def test_valeurs_traduites_cote_serveur_identiques_a_l_interface(self):
+        """Une valeur (statut, mode de travail...) se traduit de la même façon à l'écran (tv())
+        et dans ce que fabrique le serveur (récapitulatif, journal) : langues.VALEURS_EN."""
+        import langues
+
+        differentes = {
+            valeur: (anglais, self.valeurs_en.get(valeur))
+            for valeur, anglais in langues.VALEURS_EN.items()
+            if self.valeurs_en.get(valeur) != anglais
+        }
+        self.assertEqual(differentes, {}, "langues.VALEURS_EN et en.js > valeurs divergent")
 
     def test_toute_cle_francaise_a_une_traduction_anglaise(self):
         manquantes = self.cles_fr - self.cles_en
@@ -172,7 +196,8 @@ class TestCoherenceLangues(unittest.TestCase):
             for nom in ("app.js", "preparation.js", "cv.js", "index.html")
         )
         # Clés construites dynamiquement : leur préfixe suffit à les considérer comme utilisées.
-        dynamiques = ("preparation.type_", "entretiens.cible_", "valeurs.")
+        # (`historique.*` = les modèles de evenements.PHRASES, comparés plus bas.)
+        dynamiques = ("preparation.type_", "entretiens.cible_", "valeurs.", "historique.")
         inutilisees = []
         for cle in sorted(self.cles_fr):
             if cle.startswith(dynamiques):

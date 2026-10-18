@@ -166,6 +166,9 @@ le projet), puis :
   seule entreprise), ou utiliser `--poste "Intitulé exact"` pour une seule offre.
 - `--generale` : la fiche porte aussi sur l'entreprise en général.
 - `--titre "…"` pour un titre différent du titre automatique.
+- `--langue en` si la fiche est rédigée en anglais : les libellés fixes du PDF
+  (en-tête, titres de section, pied de page) passent alors en anglais. Sans
+  `--langue`, ils restent en français.
 
 La commande fabrique le PDF, le range dans le dossier de données et affiche son
 chemin ; la fiche apparaît aussitôt dans Azimut (cliquer sur « Actualiser » si

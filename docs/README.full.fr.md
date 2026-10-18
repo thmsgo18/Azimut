@@ -312,7 +312,7 @@ ajouter_fiche(entreprise_nom, donnees, ...) / importer_fiche(...) / lister_fiche
 ajouter_note(entreprise_nom=None, candidature_id=None, titre=None, contenu="", date_entretien=None) -> id
 lister_notes(entreprise_id=None, candidature_id=None, recherche=None) / modifier_note(id, **champs) / supprimer_note(id)
 assurer_note_entretien(candidature_id) -> id | None   # la note de la date d'entretien de l'offre (créée automatiquement, voir plus bas)
-notes_pdf.generer_pdf(note, chemin_sortie=None) -> octets   # export PDF d'une note ; CLI : cli.py notes pdf ID
+notes_pdf.generer_pdf(note, chemin_sortie=None, langue=None) -> octets   # export PDF d'une note ; CLI : cli.py notes pdf ID
 
 # documents.py - tout fichier, lié à UNE entreprise et à UNE OU PLUSIEURS de ses offres
 importer_document(entreprise_nom, nom_fichier, contenu_bytes, candidature_ids=None, titre=None, generale=None, type_document=None) -> id
@@ -372,6 +372,7 @@ azimut/
   extraction.py     # texte d'un PDF / Word / texte (CV, indexation des documents importés)
   recherche.py      # recherche globale multi-types
   statistiques.py   # entonnoir, délais, sources, courbe hebdomadaire, objectif
+  langues.py        # langue des textes du serveur (PDF, titres de notes auto, récapitulatif) : fr par défaut, ou en
   reglages.py       # réglages locaux (clé API masquée, fournisseur IA, dossier, code compagnon)
   sauvegarde.py     # copies datées de la base, rotation
   sauvegarde_complete.py # sauvegarde complète (base + fichiers) en un .zip, et sa restauration sûre

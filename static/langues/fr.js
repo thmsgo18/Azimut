@@ -35,6 +35,8 @@ window.LANGUES.fr = {
     recherche: "Recherche",
     cv: "CV",
     reglages: "Réglages",
+    titre_fenetre: "Azimut - suivi de candidatures",
+    logo_sous_titre: "Suivi de candidatures",
     nouvelle_candidature: "Nouvelle candidature",
     exporter_excel: "Exporter en Excel",
     importer_excel: "Importer un Excel",
@@ -605,6 +607,16 @@ window.LANGUES.fr = {
     creer_quand_meme: "Créer quand même",
     recap_titre: "Récapitulatif de la candidature",
     telecharger_md: "Télécharger en .md",
+  },
+
+  /* Phrases du journal d'une candidature : les mêmes modèles que PHRASES dans
+     evenements.py (vérifié par les tests). Les statuts passent par tv(). */
+  historique: {
+    creation: "Candidature créée - statut « {statut} »",
+    statut: "Statut : {avant} → {apres}",
+    reponse: "Réponse reçue le {date}",
+    entretien: "Entretien planifié le {date}",
+    relance: "Relance effectuée (n°{numero})",
   },
 
   branchements: {
