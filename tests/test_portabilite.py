@@ -103,7 +103,7 @@ class TestCoherenceLangues(unittest.TestCase):
         }));
         """
         resultat = subprocess.run(
-            [NODE, "-e", script], capture_output=True, text=True, cwd=PROJET,
+            [NODE, "-e", script], capture_output=True, text=True, encoding="utf-8", cwd=PROJET,
         )
         if resultat.returncode != 0:
             raise RuntimeError(f"Impossible de charger les fichiers de langue : {resultat.stderr}")
@@ -236,7 +236,7 @@ class TestSyntaxeJavascript(unittest.TestCase):
         for fichier in fichiers:
             with self.subTest(fichier=fichier.relative_to(PROJET)):
                 resultat = subprocess.run(
-                    [NODE, "--check", str(fichier)], capture_output=True, text=True,
+                    [NODE, "--check", str(fichier)], capture_output=True, text=True, encoding="utf-8",
                 )
                 self.assertEqual(
                     resultat.returncode, 0,
