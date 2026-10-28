@@ -46,6 +46,7 @@ class TypePiece:
     colonne_lien: str        # colonne de table_liens qui pointe vers la pièce
     sous_dossier: str        # dossier de données où ranger les fichiers
     libelle: str             # « lettre », « fiche » : pour les messages d'erreur
+    feminin: bool = True     # accord des messages (« Aucune lettre », « Aucun document »)
     prefixe_titre: str = ""  # devant le titre par défaut (« Fiche d'entretien - »)
     prefixe_titre_en: str = ""  # le même, pour une pièce en anglais (« Interview sheet - »)
     colonnes_supplementaires: tuple = ()  # colonnes propres au type (« type_document »)
@@ -82,6 +83,7 @@ TYPE_DOCUMENT = TypePiece(
     colonne_lien="document_id",
     sous_dossier="documents",
     libelle="document",
+    feminin=False,
     colonnes_supplementaires=("type_document",),
     taille_max=TAILLE_MAX_DOCUMENT,
     titre_depuis_fichier=True,
@@ -241,7 +243,7 @@ def ajouter(
     Retourne l'id de la pièce créée.
     """
     if not contenu or not str(contenu).strip():
-        raise ValeurNonAutorisee(f"Le contenu de la {type_piece.libelle} est vide.")
+        raise ValeurNonAutorisee(f"Le contenu {'de la' if type_piece.feminin else 'du'} {type_piece.libelle} est vide.")
     if source not in SOURCES:
         raise ValeurNonAutorisee(
             f"Source inconnue : {source!r}. Valeurs possibles : {', '.join(SOURCES)}."
@@ -419,7 +421,9 @@ def recuperer(type_piece, id_piece, chemin_db=None):
             (id_piece,),
         ).fetchone()
         if ligne is None:
-            raise EntiteIntrouvable(f"Aucune {type_piece.libelle} avec l'id {id_piece}.")
+            raise EntiteIntrouvable(
+                f"{'Aucune' if type_piece.feminin else 'Aucun'} {type_piece.libelle} avec l'id {id_piece}."
+            )
         return _enrichir(conn, type_piece, ligne)
     finally:
         conn.close()
@@ -442,7 +446,9 @@ def modifier(type_piece, id_piece, chemin_db=None, **champs):
             f"SELECT entreprise_id, generale FROM {type_piece.table} WHERE id = ?", (id_piece,)
         ).fetchone()
         if ligne is None:
-            raise EntiteIntrouvable(f"Aucune {type_piece.libelle} avec l'id {id_piece}.")
+            raise EntiteIntrouvable(
+                f"{'Aucune' if type_piece.feminin else 'Aucun'} {type_piece.libelle} avec l'id {id_piece}."
+            )
         maj = {}
         if "titre" in champs:
             titre = str(champs["titre"] or "").strip()

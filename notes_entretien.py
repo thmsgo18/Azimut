@@ -30,10 +30,14 @@ def _resoudre_cible(conn, entreprise_nom, candidature_id, chemin_db):
     déduit), soit une entreprise (entreprise_nom). Les deux ensemble sont
     acceptés seulement s'ils sont cohérents."""
     if candidature_id not in (None, ""):
+        try:
+            candidature_id = int(candidature_id)
+        except (TypeError, ValueError):
+            raise ValeurNonAutorisee(f"Numéro de candidature invalide : {candidature_id!r}.")
         ligne = conn.execute(
             "SELECT c.id, c.poste, c.entreprise_id, e.nom FROM candidatures c "
             "JOIN entreprises e ON e.id = c.entreprise_id WHERE c.id = ?",
-            (int(candidature_id),),
+            (candidature_id,),
         ).fetchone()
         if ligne is None:
             raise EntiteIntrouvable(f"Aucune candidature avec l'id {candidature_id}.")

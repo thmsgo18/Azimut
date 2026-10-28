@@ -80,10 +80,14 @@ class TestServeur(unittest.TestCase):
             entreprise="Mistral AI", poste="Stage RAG", statut="Réponse reçue",
             sous_domaine="RAG / Agents de recherche",
         )
+        # Une offre encore « À préparer » n'attend pas de réponse : hors du taux (comme dans Statistiques).
+        self._ajouter(entreprise="Brouillon SA", poste="Stage", statut="À préparer")
         stats = self.client.get("/api/stats").get_json()
-        self.assertEqual(stats["total"], 2)
+        self.assertEqual(stats["total"], 3)
         self.assertEqual(stats["par_statut"]["Envoyée"], 1)
         self.assertEqual(stats["taux_reponse"], 50)
+        avancees = self.client.get("/api/stats/avancees").get_json()
+        self.assertEqual(avancees["entonnoir"][1]["taux"], stats["taux_reponse"])
         self.assertEqual(stats["par_domaine"]["RAG / Agents de recherche"], 1)
 
     def test_entreprises_avec_compteurs(self):

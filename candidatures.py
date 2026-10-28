@@ -359,3 +359,24 @@ def enregistrer_etat_lien(id_candidature, etat, chemin_db=None):
         conn.commit()
     finally:
         conn.close()
+
+
+def enregistrer_etats_liens(etats, chemin_db=None):
+    """Enregistre d'un coup les résultats d'une vérification de liens ({id: etat}), en UNE
+    écriture : l'interface surveille la date de la base pour se rafraîchir, et une écriture par
+    lien la faisait se recharger sans cesse pendant la vérification. Une candidature supprimée
+    entre-temps est simplement ignorée."""
+    from datetime import datetime
+
+    if not etats:
+        return
+    horodatage = datetime.now().isoformat(timespec="seconds")
+    conn = db.ouvrir(chemin_db)
+    try:
+        conn.executemany(
+            "UPDATE candidatures SET lien_dernier_etat = ?, lien_dernier_controle = ? WHERE id = ?",
+            [(etat, horodatage, id_candidature) for id_candidature, etat in etats.items()],
+        )
+        conn.commit()
+    finally:
+        conn.close()

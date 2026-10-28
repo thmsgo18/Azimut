@@ -46,16 +46,25 @@ def _sans_bruit(texte):
 
 def score_similarite(a, b):
     """Score 0..1 combinant ressemblance globale et mots partagés."""
-    na, nb = _sans_bruit(a), _sans_bruit(b)
+    return _score_formes((_sans_bruit(a), normaliser(a)), (_sans_bruit(b), normaliser(b)))
+
+
+def _score_formes(forme_a, forme_b, seuil=0.0):
+    """score_similarite à partir des formes (sans bruit, normalisée) déjà calculées. Avec un
+    `seuil`, la comparaison caractère à caractère (la plus coûteuse) est sautée quand même sa
+    borne haute ne l'atteint pas : le score n'est alors exact que s'il atteint le seuil."""
+    na, nb = forme_a[0], forme_b[0]
     if not na or not nb:
         # Intitulés réduits au bruit (« Stage H/F ») : comparer la version brute.
-        na, nb = normaliser(a), normaliser(b)
+        na, nb = forme_a[1], forme_b[1]
         if not na or not nb:
             return 0.0
-    sequence = SequenceMatcher(None, na, nb).ratio()
     mots_a, mots_b = set(na.split()), set(nb.split())
     jaccard = len(mots_a & mots_b) / len(mots_a | mots_b) if mots_a | mots_b else 0.0
-    return round(max(sequence, jaccard), 3)
+    comparateur = SequenceMatcher(None, na, nb)
+    if comparateur.real_quick_ratio() < seuil or comparateur.quick_ratio() < seuil:
+        return round(jaccard, 3)
+    return round(max(comparateur.ratio(), jaccard), 3)
 
 
 def candidatures_similaires(entreprise_nom, poste, lien_offre=None, chemin_db=None):
@@ -128,15 +137,17 @@ def paires_entreprises_suspectes(chemin_db=None):
     page de nettoyage/fusion. Retourne [{a: {id, nom}, b: {id, nom}, score}, ...],
     triées par score décroissant."""
     liste = lister_entreprises(chemin_db=chemin_db)
+    # Chaque nom n'est normalisé qu'une fois (et non à chacune des n² comparaisons).
+    formes = [(_sans_bruit(e["nom"]), normaliser(e["nom"])) for e in liste]
     paires = []
     for i, a in enumerate(liste):
-        na = normaliser(a["nom"])
-        for b in liste[i + 1 :]:
-            nb = normaliser(b["nom"])
+        na = formes[i][1]
+        for j in range(i + 1, len(liste)):
+            b, nb = liste[j], formes[j][1]
             if not na or not nb or na == nb:
                 continue
             contenu = na in nb or nb in na
-            score = 1.0 if contenu else score_similarite(a["nom"], b["nom"])
+            score = 1.0 if contenu else _score_formes(formes[i], formes[j], seuil=0.7)
             if score >= 0.7:
                 paires.append(
                     {

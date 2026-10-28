@@ -127,6 +127,17 @@ function echapperAttribut(texte) {
   return echapper(texte).replace(/"/g, "&quot;");
 }
 
+/* Adresse d'un lien vers l'extérieur (offre, site d'entreprise), déjà échappée pour un attribut
+   href : « mistral.ai » devient https://mistral.ai (sinon un lien relatif qui rouvre Azimut), et
+   tout autre schéma que http(s) (javascript:, file:…) est refusé - il s'exécuterait dans la
+   fenêtre de l'application, qui a accès au pont vers le système. */
+function hrefExterne(adresse) {
+  const brut = String(adresse || "").trim();
+  if (/^https?:\/\//i.test(brut)) return echapperAttribut(brut);
+  if (/^[a-z][a-z0-9+.-]*:/i.test(brut) && !/^[^:/]+:\d/.test(brut)) return "#";
+  return echapperAttribut(`https://${brut}`);
+}
+
 function dateFr(iso) {
   if (!iso) return "";
   const [annee, mois, jour] = String(iso).split("-");
@@ -198,7 +209,14 @@ const ACTIVATIONS = {
   cv: activerCv,
 };
 
+/* Numéro du dernier affichage demandé. Chaque vue attend le serveur : cliquer « Candidatures »
+   puis aussitôt « Lettres » faisait arriver les candidatures (plus longues à charger) APRÈS les
+   lettres, et la page affichait les candidatures sous l'entrée « Lettres ». Un affichage dépassé
+   par un plus récent n'écrit plus rien. */
+let dernierRendu = 0;
+
 async function rendre() {
+  const jeton = ++dernierRendu;
   const brut = location.hash.replace(/^#\//, "");
   const conteneur = document.getElementById("vue");
   try {
@@ -211,7 +229,9 @@ async function rendre() {
       document.querySelectorAll(".nav a").forEach((lien) => {
         lien.classList.toggle("actif", lien.dataset.vue === "entretiens");
       });
-      conteneur.innerHTML = await vueEditeurNote(numero);
+      const page = await vueEditeurNote(numero);
+      if (jeton !== dernierRendu) return;
+      conteneur.innerHTML = page;
       activerEditeurNote(numero);
       return;
     }
@@ -219,9 +239,12 @@ async function rendre() {
     document.querySelectorAll(".nav a").forEach((lien) => {
       lien.classList.toggle("actif", lien.dataset.vue === nom);
     });
-    conteneur.innerHTML = await VUES[nom]();
+    const page = await VUES[nom]();
+    if (jeton !== dernierRendu) return;
+    conteneur.innerHTML = page;
     if (ACTIVATIONS[nom]) ACTIVATIONS[nom]();
   } catch (erreur) {
+    if (jeton !== dernierRendu) return;
     conteneur.innerHTML = `<div class="etat-vide"><div class="titre">${echapper(t("commun.page_illisible_titre"))}</div><p>${echapper(erreur.message)}</p></div>`;
   }
 }
@@ -424,7 +447,7 @@ function selecteurStatut(cand) {
 function boutonLienOffre(cand) {
   if (!cand.lien_offre) return `<span class="cellule-secondaire">-</span>`;
   return `
-    <a class="btn-lien-offre" href="${echapperAttribut(cand.lien_offre)}" target="_blank" rel="noopener"
+    <a class="btn-lien-offre" href="${hrefExterne(cand.lien_offre)}" target="_blank" rel="noopener"
        title="${echapperAttribut(cand.lien_offre)}">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
       ${t("candidatures.voir_offre")}
@@ -434,7 +457,7 @@ function boutonLienOffre(cand) {
 function optionsSelect(liste, selection, avecVide = true) {
   const vide = avecVide ? `<option value="">-</option>` : "";
   return vide + liste
-    .map((v) => `<option value="${echapper(v)}"${v === selection ? " selected" : ""}>${echapper(tv(v))}</option>`)
+    .map((v) => `<option value="${echapperAttribut(v)}"${v === selection ? " selected" : ""}>${echapper(tv(v))}</option>`)
     .join("");
 }
 
@@ -446,11 +469,11 @@ async function vueCandidatures() {
       <input type="text" id="filtre-texte" placeholder="${t("candidatures.rechercher_placeholder")}" value="${echapper(etat.filtres.texte)}">
       <select id="filtre-statut">
         <option value="">${t("candidatures.tous_statuts")}</option>
-        ${v.statuts.map((s) => `<option${etat.filtres.statut === s ? " selected" : ""}>${echapper(tv(s))}</option>`).join("")}
+        ${v.statuts.map((s) => `<option value="${echapperAttribut(s)}"${etat.filtres.statut === s ? " selected" : ""}>${echapper(tv(s))}</option>`).join("")}
       </select>
       <select id="filtre-domaine">
         <option value="">${t("candidatures.tous_sous_domaines")}</option>
-        ${v.sous_domaines.map((d) => `<option${etat.filtres.sous_domaine === d ? " selected" : ""}>${echapper(tv(d))}</option>`).join("")}
+        ${v.sous_domaines.map((d) => `<option value="${echapperAttribut(d)}"${etat.filtres.sous_domaine === d ? " selected" : ""}>${echapper(tv(d))}</option>`).join("")}
       </select>
     </div>`;
 
@@ -1253,7 +1276,7 @@ async function ouvrirDetailCandidature(numero) {
   let nbNotes = annexes[2].length;
 
   const lienOffre = () => (cand.lien_offre
-    ? `<a class="btn btn-mini" id="detail-ouvrir-offre" href="${echapperAttribut(cand.lien_offre)}" target="_blank" rel="noopener">${t("candidatures.voir_offre")}</a>${cand.lien_dernier_etat === "mort" ? ` <span class="puce puce-lien-mort">${t("candidatures.lien_mort")}</span>` : ""}`
+    ? `<a class="btn btn-mini" id="detail-ouvrir-offre" href="${hrefExterne(cand.lien_offre)}" target="_blank" rel="noopener">${t("candidatures.voir_offre")}</a>${cand.lien_dernier_etat === "mort" ? ` <span class="puce puce-lien-mort">${t("candidatures.lien_mort")}</span>` : ""}`
     : "");
 
   const corps = `
@@ -1340,6 +1363,9 @@ async function ouvrirDetailCandidature(numero) {
     apres: async (nom) => {
       if (nom === "statut") {
         zone.racine.querySelector("#detail-statut").innerHTML = pastilleStatutDetail(cand.statut);
+        // Le premier statut de réponse date la réponse côté serveur : le champ doit le montrer.
+        const champReponse = zone.racine.querySelector("#detail-date_reponse");
+        if (champReponse) champReponse.value = cand.date_reponse || "";
         await rafraichirAnnexes();
       }
       if (nom === "lien_offre") zone.racine.querySelector("#detail-lien-actions").innerHTML = lienOffre();
@@ -1442,7 +1468,7 @@ async function vueEntreprises() {
       (ent) => `
     <div class="carte carte-entreprise" onclick="ouvrirDetailEntreprise(${ent.id})">
       <div class="nom">${echapper(ent.nom)}</div>
-      ${ent.site_web ? `<a class="site" href="${echapper(ent.site_web)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${echapper(ent.site_web)}</a>` : ""}
+      ${ent.site_web ? `<a class="site" href="${hrefExterne(ent.site_web)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${echapper(ent.site_web)}</a>` : ""}
       <div class="contexte">${echapper(ent.contexte_actus || t("entreprises.pas_de_contexte"))}</div>
       <div class="compteurs">
         <span class="puce">${pluriel("entreprises.nb_candidatures", ent.nb_candidatures)}</span>
@@ -1608,7 +1634,7 @@ async function ouvrirDetailEntreprise(numero) {
   }
 
   const lienSite = () => (ent.site_web
-    ? `<a class="btn btn-mini" href="${echapperAttribut(/^https?:\/\//i.test(ent.site_web) ? ent.site_web : `https://${ent.site_web}`)}" target="_blank" rel="noopener">${t("entreprises.ouvrir_site")}</a>`
+    ? `<a class="btn btn-mini" href="${hrefExterne(ent.site_web)}" target="_blank" rel="noopener">${t("entreprises.ouvrir_site")}</a>`
     : "");
 
   const corps = `
@@ -1857,7 +1883,7 @@ async function vueStats() {
             <span onclick="ouvrirDetailCandidature(${l.id})" style="cursor:pointer;">
               <strong>${echapper(l.entreprise)}</strong> - ${echapper(l.poste)}
             </span>
-            <a class="lien-detail" href="${echapper(l.lien_offre)}" target="_blank" rel="noopener">${t("statistiques.voir_offre")}</a>
+            <a class="lien-detail" href="${hrefExterne(l.lien_offre)}" target="_blank" rel="noopener">${t("statistiques.voir_offre")}</a>
           </div>`).join("") : ""}
         <div class="actions-reglages">
           <button class="btn btn-accent" id="btn-verifier-liens">${t("statistiques.verifier_maintenant")}</button>
@@ -2857,11 +2883,11 @@ window.addEventListener("unhandledrejection", (evenement) => {
 
 (async function demarrer() {
   try {
-    etat.valeurs = await api("/api/valeurs");
-    try {
-      etat.ia = await api("/api/reglages");
-      etat.langue = (etat.ia && etat.ia.langue) || "fr";
-    } catch { etat.ia = null; }
+    // Les deux en même temps (le premier affichage attend les deux).
+    const [valeurs, reglages] = await Promise.all([api("/api/valeurs"), api("/api/reglages").catch(() => null)]);
+    etat.valeurs = valeurs;
+    etat.ia = reglages;
+    etat.langue = (reglages && reglages.langue) || "fr";
     document.documentElement.lang = etat.langue;
     traduireStatique();
     await rendre();

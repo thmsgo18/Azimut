@@ -29,6 +29,64 @@ class TestServeurRobustesse(unittest.TestCase):
         db.CHEMIN_DB = self.chemin_origine
         self.dossier.cleanup()
 
+    # --- requêtes venues d'autres pages web ---
+
+    def test_nom_de_domaine_etranger_refuse(self):
+        """DNS rebinding : un domaine qui pointe vers 127.0.0.1 ne doit rien pouvoir lire."""
+        reponse = self.client.get("/api/candidatures", headers={"Host": "attaquant.example:8765"})
+        self.assertEqual(reponse.status_code, 403)
+        self.assertIn("erreur", reponse.get_json())
+        for hote in ("127.0.0.1:8765", "localhost:8765", "[::1]:8765", "localhost"):
+            self.assertEqual(self.client.get("/api/valeurs", headers={"Host": hote}).status_code, 200, hote)
+
+    def test_ecriture_depuis_une_autre_origine_refusee(self):
+        corps = {"entreprise": "AgentikCo", "poste": "Stage"}
+        etrangere = self.client.post(
+            "/api/candidatures", json=corps,
+            headers={"Host": "127.0.0.1:8765", "Origin": "https://attaquant.example"},
+        )
+        self.assertEqual(etrangere.status_code, 403)
+        nulle = self.client.post("/api/candidatures", json=corps, headers={"Origin": "null"})
+        self.assertEqual(nulle.status_code, 403)
+        self.assertEqual(self.client.get("/api/candidatures").get_json(), [])
+        # L'interface elle-même (même origine) et le Raccourci (sans Origin) passent.
+        interface = self.client.post(
+            "/api/candidatures", json=corps,
+            headers={"Host": "127.0.0.1:8765", "Origin": "http://127.0.0.1:8765"},
+        )
+        self.assertEqual(interface.status_code, 201)
+        raccourci = self.client.post("/api/rapide/offre", json={"lien": "https://agentik.co/jobs/2"})
+        self.assertEqual(raccourci.status_code, 201)
+
+    def test_identifiants_non_numeriques_400(self):
+        numero = self.client.post("/api/candidatures", json={"entreprise": "AgentikCo", "poste": "Stage"}).get_json()["id"]
+        for methode, url, corps in (
+            ("post", "/api/entretiens", {"candidature_ids": ["abc"]}),
+            ("post", "/api/notes", {"candidature_id": "abc"}),
+            ("post", "/api/entreprises/fusionner", {"conserver": "x", "supprimer": "y"}),
+        ):
+            reponse = getattr(self.client, methode)(url, json=corps)
+            self.assertEqual(reponse.status_code, 400, url)
+        # Un seul numéro en texte n'est plus lu chiffre par chiffre (« 12 » -> offres 1 et 2).
+        entretien = self.client.post("/api/entretiens", json={"candidature_ids": str(numero)})
+        self.assertEqual(entretien.status_code, 201)
+        self.assertEqual([o["id"] for o in entretien.get_json()["candidatures"]], [numero])
+
+    def test_liste_et_recherche_sans_textes_longs_ni_secrets(self):
+        self.client.post("/api/candidatures", json={
+            "entreprise": "AgentikCo", "poste": "Stage agents", "texte_offre": "Texte intégral de l'offre",
+            "notes": "Contact RH", "portail_mdp": "secret",
+        })
+        element = self.client.get("/api/candidatures").get_json()[0]
+        for champ in ("texte_offre", "notes", "portail_mdp"):
+            self.assertNotIn(champ, element)
+        trouve = self.client.get("/api/recherche?q=integral").get_json()["candidatures"][0]
+        self.assertNotIn("texte_offre", trouve)
+        self.assertIn("intégral", trouve["extrait"])
+        # La fenêtre de détail, elle, les reçoit toujours.
+        self.assertEqual(self.client.get(f"/api/candidatures/{element['id']}").get_json()["texte_offre"],
+                         "Texte intégral de l'offre")
+
     # --- corps de requêtes malformés ---
 
     def test_post_sans_corps(self):

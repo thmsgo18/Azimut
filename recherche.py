@@ -5,6 +5,8 @@ Correspondance insensible à la casse et aux accents ; chaque résultat indique
 les champs où le texte a été trouvé et un court extrait.
 """
 
+import unicodedata
+
 from candidatures import lister_candidatures
 from documents import lister_documents
 from entreprises import lister_entreprises
@@ -56,14 +58,33 @@ CHAMPS_RECHERCHE = {
 }
 
 
+def _occurrence(texte, requete_normalisee):
+    """(début, fin) de la première occurrence dans le texte d'origine, trouvée comme la
+    correspondance elle-même (valeurs.normaliser : sans accents ni casse, espaces réduits) -
+    sinon « developpeur » trouvé dans « Développeur » donnait un extrait sans le mot."""
+    caracteres, origines = [], []
+    for indice, caractere in enumerate(texte):
+        if caractere.isspace():
+            if caracteres and caracteres[-1] != " ":
+                caracteres.append(" ")
+                origines.append(indice)
+            continue
+        decompose = unicodedata.normalize("NFD", caractere)
+        for morceau in "".join(c for c in decompose if unicodedata.category(c) != "Mn").casefold():
+            caracteres.append(morceau)
+            origines.append(indice)
+    position = "".join(caracteres).find(requete_normalisee)
+    if position < 0 or not requete_normalisee:
+        return 0, 0
+    return origines[position], origines[position + len(requete_normalisee) - 1] + 1
+
+
 def _extrait(texte, requete, marge=45):
     """Petit extrait du texte autour de la première occurrence (best effort)."""
     texte = str(texte)
-    position = texte.casefold().find(requete.casefold())
-    if position < 0:
-        position = 0
+    position, fin_occurrence = _occurrence(texte, normaliser(requete))
     debut = max(0, position - marge)
-    fin = min(len(texte), position + len(requete) + marge)
+    fin = min(len(texte), fin_occurrence + marge)
     morceau = texte[debut:fin].replace("\n", " ").strip()
     prefixe = "…" if debut > 0 else ""
     suffixe = "…" if fin < len(texte) else ""

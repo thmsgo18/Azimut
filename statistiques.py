@@ -21,6 +21,15 @@ def _a_recu_reponse(cand):
     return bool(cand["date_reponse"]) or cand["statut"] in STATUTS_AVEC_REPONSE
 
 
+def taux_de_reponse(liste):
+    """Part (en %) des candidatures envoyées - pas celles encore « À préparer » - qui ont reçu
+    une réponse : le même chiffre au tableau de bord et dans l'entonnoir des statistiques."""
+    envoyees = [c for c in liste if c["statut"] != "À préparer"]
+    if not envoyees:
+        return 0
+    return round(sum(1 for c in envoyees if _a_recu_reponse(c)) / len(envoyees) * 100)
+
+
 def stats_avancees(chemin_db=None):
     liste = lister_candidatures(chemin_db=chemin_db)
     premiers_entretiens = premier_entretien_par_candidature(chemin_db=chemin_db)

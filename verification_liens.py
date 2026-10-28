@@ -10,12 +10,16 @@ n'est pas détecté, c'est un choix délibéré de prudence.
 
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
-from candidatures import enregistrer_etat_lien, lister_candidatures
+from candidatures import enregistrer_etats_liens, lister_candidatures
 
 STATUTS_A_VERIFIER = ("À préparer", "Envoyée", "Réponse reçue", "Entretien")
 DELAI_MINIMUM_ENTRE_CONTROLES = timedelta(hours=24)
+# Requêtes menées en même temps : un lien lent (jusqu'à 2 x 8 s) ne retarde plus tous les autres,
+# sans pour autant bombarder un même site (beaucoup d'offres viennent de LinkedIn).
+VERIFICATIONS_SIMULTANEES = 6
 AGENT_UTILISATEUR = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
@@ -71,9 +75,13 @@ def verifier_tous_les_liens(chemin_db=None, forcer=False):
 
     Retourne : {verifies, actifs, morts, inconnus, liens_morts: [...]}."""
     resume = {"verifies": 0, "actifs": 0, "morts": 0, "inconnus": 0, "liens_morts": []}
-    for cand in _candidatures_a_verifier(chemin_db, forcer):
-        etat, code = verifier_lien(cand["lien_offre"])
-        enregistrer_etat_lien(cand["id"], etat, chemin_db=chemin_db)
+    a_verifier = list(_candidatures_a_verifier(chemin_db, forcer))
+    with ThreadPoolExecutor(max_workers=VERIFICATIONS_SIMULTANEES) as groupe:
+        resultats = list(groupe.map(lambda cand: verifier_lien(cand["lien_offre"]), a_verifier))
+    enregistrer_etats_liens(
+        {cand["id"]: etat for cand, (etat, _) in zip(a_verifier, resultats)}, chemin_db=chemin_db
+    )
+    for cand, (etat, code) in zip(a_verifier, resultats):
         resume["verifies"] += 1
         if etat == "actif":
             resume["actifs"] += 1

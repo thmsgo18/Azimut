@@ -163,5 +163,30 @@ class TestApiBureau(unittest.TestCase):
         self.assertIsNone(pont.choisir_chemin("dossier"))
 
 
+class TestLancementBureau(unittest.TestCase):
+    """La fenêtre s'ouvre avant que le serveur soit chargé : app_bureau ne doit pas l'importer."""
+
+    def test_port_prefere_identique_au_serveur(self):
+        import app_bureau
+        import serveur
+
+        self.assertEqual(app_bureau.PORT_PREFERE, serveur.PORT)
+
+    def test_page_attente_echappe_l_erreur(self):
+        import app_bureau
+
+        self.assertNotIn("<script>", app_bureau._page_attente(ValueError("<script>alert(1)</script>")))
+        self.assertIn("&lt;script&gt;", app_bureau._page_attente(ValueError("<script>")))
+
+    def test_attente_s_arrete_des_qu_un_demarrage_echoue(self):
+        import time
+
+        import app_bureau
+
+        debut = time.monotonic()
+        self.assertFalse(app_bureau._attendre_serveur("http://127.0.0.1:9", delai=5, erreurs=[ImportError("x")]))
+        self.assertLess(time.monotonic() - debut, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

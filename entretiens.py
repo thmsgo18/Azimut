@@ -60,7 +60,12 @@ def valider(type_entretien=None, date_entretien=None, heure=None):
 
 def _offres(conn, candidature_ids):
     """Les candidatures visées (au moins une, toutes de la même entreprise) -> (entreprise_id, lignes)."""
-    ids = list(dict.fromkeys(int(i) for i in (candidature_ids or [])))
+    if isinstance(candidature_ids, (int, str)):
+        candidature_ids = [candidature_ids]
+    try:
+        ids = list(dict.fromkeys(int(i) for i in (candidature_ids or [])))
+    except (TypeError, ValueError):
+        raise ValeurNonAutorisee("Liste d'offres invalide : des numéros de candidature sont attendus.")
     if not ids:
         raise ValeurNonAutorisee("Choisir au moins une offre pour cet entretien.")
     lignes = []

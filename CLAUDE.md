@@ -125,6 +125,7 @@ recuperer_candidature(id)
 rattraper_dates_reponse(appliquer=False) / rattraper_sources(appliquer=False)   # anciennes données : date de
     # réponse relue dans le journal, source déduite du lien (« Autre » seulement) ; CLI : candidatures completer
 enregistrer_etat_lien(id, etat)            # "actif"/"mort"/"inconnu" - usage interne (voir ci-dessous)
+enregistrer_etats_liens({id: etat})        # idem, plusieurs en UNE écriture (l'interface se rafraîchit à chaque écriture)
 
 # entretiens.py - plusieurs entretiens par candidature, chacun : type (ou aucun), date, heure facultative ;
 # un entretien est lié à UNE entreprise et à une ou plusieurs de ses offres (entretien commun à 3 offres =
@@ -141,7 +142,8 @@ resume(entretien) -> « 19/10/2026 14:30 - RH »
 
 # verification_liens.py - ping HTTP conservateur des liens d'offres (jamais de faux positif)
 verifier_lien(url) -> (etat, code_http)              # "actif" / "mort" (404/410 seulement) / "inconnu"
-verifier_tous_les_liens(forcer=False) -> résumé       # saute les liens vérifiés il y a <24h sauf forcer=True
+verifier_tous_les_liens(forcer=False) -> résumé       # saute les liens vérifiés il y a <24h sauf forcer=True ;
+                                                      # 6 requêtes en parallèle, résultats écrits en une fois
 etat_liens() -> résumé                                # lecture seule, ne relance aucune requête
 
 # rapide.py - brouillon depuis un lien/texte externe (Raccourci macOS, etc.)

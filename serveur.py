@@ -20,8 +20,12 @@ import mimetypes
 import unicodedata
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import Flask, Response, jsonify, request, send_file
+
+# Les modules qui chargent openpyxl (export_excel, import_excel) ou reportlab (notes_pdf) sont
+# importés dans leur route : ils pèsent sur le lancement de l'application pour une seule action.
 
 import candidatures
 import cvs
@@ -32,15 +36,12 @@ import entreprises
 import entretien
 import entretiens
 import evenements
-import export_excel
 import fiches
 import generation
 import import_csv
-import import_excel
 import langues
 import lettres
 import notes_entretien
-import notes_pdf
 import rapide
 import recherche
 import reglages
@@ -56,7 +57,6 @@ from valeurs import (
     SOUS_DOMAINES,
     STATUTS,
     SITES_OFFRES,
-    STATUTS_AVEC_REPONSE,
     TYPES_CANDIDATURE,
     TYPES_DOCUMENT,
     TYPES_ENTRETIEN,
@@ -67,6 +67,29 @@ PORT = 8765
 app = Flask(__name__, static_folder="static", static_url_path="")
 # Plafond d'un envoi (fichier, import) : au-delà, refusé avant d'être lu en mémoire.
 app.config["MAX_CONTENT_LENGTH"] = 60 * 1024 * 1024
+
+
+# --- requêtes venues d'ailleurs ---
+
+HOTES_LOCAUX = ("127.0.0.1", "localhost", "::1")
+
+
+@app.before_request
+def _requetes_locales_seulement():
+    """Le serveur n'écoute que sur 127.0.0.1, mais une page web ouverte dans un navigateur peut
+    quand même lui adresser des requêtes :
+    - par un nom de domaine qui pointe vers 127.0.0.1 (« DNS rebinding »), elle lirait les données
+      (mots de passe de portail compris) : l'en-tête Host doit donc être une adresse locale ;
+    - par un formulaire envoyé depuis son site (fichier à importer...), elle écrirait dans la base :
+      une écriture qui annonce une autre origine que l'interface d'Azimut est refusée.
+    Le Raccourci de capture rapide et la fenêtre de bureau n'envoient pas d'Origin étrangère."""
+    if urlsplit(f"//{request.host}").hostname not in HOTES_LOCAUX:
+        return jsonify({"erreur": "Accès refusé : Azimut ne répond qu'aux adresses locales."}), 403
+    origine = request.headers.get("Origin")
+    if request.method not in ("GET", "HEAD", "OPTIONS") and origine is not None:
+        if urlsplit(origine).netloc != request.host:
+            return jsonify({"erreur": "Accès refusé : requête venue d'une autre page que l'interface d'Azimut."}), 403
+    return None
 
 
 # --- gestion d'erreurs : messages français, codes HTTP propres ---
@@ -155,14 +178,23 @@ def api_valeurs():
 
 # --- candidatures ---
 
+# Champs longs ou secrets : la fenêtre de détail les lit dans /api/candidatures/<id>, aucune liste
+# n'en a besoin (les textes d'offre faisaient de la liste plus d'un Mo, rechargé à chaque affichage).
+CHAMPS_HORS_LISTES = ("texte_offre", "notes", "portail_mdp", "portail_identifiant", "contenu", "contexte_actus")
+
+
+def _allege(elements):
+    return [{c: v for c, v in element.items() if c not in CHAMPS_HORS_LISTES} for element in elements]
+
+
 @app.route("/api/candidatures")
 def api_candidatures_lister():
-    return jsonify(
+    return jsonify(_allege(
         candidatures.lister_candidatures(
             statut=request.args.get("statut"),
             sous_domaine=request.args.get("sous_domaine"),
         )
-    )
+    ))
 
 
 @app.route("/api/candidatures", methods=["POST"])
@@ -307,9 +339,11 @@ def api_entreprises_fusionner():
         raise ValeurNonAutorisee(
             "Les deux entreprises à fusionner doivent être précisées (conserver, supprimer)."
         )
-    resultat = entreprises.fusionner_entreprises(
-        int(donnees["conserver"]), int(donnees["supprimer"])
-    )
+    try:
+        conserver, supprimer = int(donnees["conserver"]), int(donnees["supprimer"])
+    except (TypeError, ValueError):
+        raise ValeurNonAutorisee("Les entreprises à fusionner sont désignées par leur numéro.")
+    resultat = entreprises.fusionner_entreprises(conserver, supprimer)
     return jsonify(resultat)
 
 
@@ -327,7 +361,6 @@ def api_stats():
         if cand["sous_domaine"]:
             par_domaine[cand["sous_domaine"]] = par_domaine.get(cand["sous_domaine"], 0) + 1
 
-    avec_reponse = sum(par_statut[s] for s in STATUTS_AVEC_REPONSE)
     # Un entretien commun à plusieurs offres n'apparaît qu'une fois (avec ses offres).
     entretiens_a_venir = entretiens.lister_entretiens(a_venir=True)
     return jsonify(
@@ -338,7 +371,8 @@ def api_stats():
             "total_lettres": len(lettres.lister_lettres()),
             "total_fiches": len(fiches.lister_fiches()),
             "total_notes": len(notes_entretien.lister_notes()),
-            "taux_reponse": round(avec_reponse / len(liste) * 100) if liste else 0,
+            # Sur les candidatures envoyées : une offre encore « À préparer » n'attend pas de réponse.
+            "taux_reponse": statistiques.taux_de_reponse(liste),
             "en_cours": sum(par_statut[s] for s in ("Envoyée", "Réponse reçue")),
             "entretiens_a_venir": entretiens_a_venir[:5],
             "nb_entretiens_a_venir": len(entretiens_a_venir),
@@ -581,7 +615,7 @@ def _nom_entreprise_pour(candidature_ids, entreprise_nom):
     return candidatures.recuperer_candidature(candidature_ids[0])["entreprise"]
 
 
-def _routes_pieces(prefixe, module, type_libelle, extras=(), avec_langue=True):
+def _routes_pieces(prefixe, module, type_libelle, extras=(), avec_langue=True, feminin=True):
     """Déclare les routes d'un type de pièce (« lettres », « fiches » ou
     « documents »). `extras` : champs propres au type (« type_document »),
     acceptés à l'import et à la modification ; `avec_langue` : le type a une langue."""
@@ -614,7 +648,7 @@ def _routes_pieces(prefixe, module, type_libelle, extras=(), avec_langue=True):
     @app.route(f"/api/{prefixe}/<int:numero>", methods=["DELETE"], endpoint=f"{prefixe}_supprimer")
     def supprimer(numero):
         module["supprimer"](numero)
-        return jsonify({"message": f"{type_libelle} n°{numero} supprimée."})
+        return jsonify({"message": f"{type_libelle} n°{numero} {'supprimée' if feminin else 'supprimé'}."})
 
     @app.route(f"/api/{prefixe}/importer", methods=["POST"], endpoint=f"{prefixe}_importer")
     def importer():
@@ -677,7 +711,7 @@ _routes_pieces("documents", {
     "lister": documents.lister_documents, "recuperer": documents.recuperer_document,
     "modifier": documents.modifier_document, "supprimer": documents.supprimer_document,
     "importer": documents.importer_document,
-}, "Document", extras=("type_document",), avec_langue=False)
+}, "Document", extras=("type_document",), avec_langue=False, feminin=False)
 
 SKILLS_TELECHARGEABLES = ("lettre-motivation", "fiche-entretien")
 
@@ -755,6 +789,8 @@ def api_notes_modifier(numero):
 @app.route("/api/notes/<int:numero>/pdf")
 def api_notes_pdf(numero):
     """La note (Markdown) mise en page en PDF, à télécharger - libellés dans la langue de l'interface."""
+    import notes_pdf
+
     note = notes_entretien.recuperer_note(numero)
     pdf = notes_pdf.generer_pdf(note, langue=langues.langue_interface())
     return send_file(
@@ -797,7 +833,9 @@ def api_agent_analyser():
 
 @app.route("/api/recherche")
 def api_recherche():
-    return jsonify(recherche.rechercher(request.args.get("q", "")))
+    # Chaque résultat porte déjà son extrait : les textes complets n'ont rien à faire dans la réponse.
+    resultats = recherche.rechercher(request.args.get("q", ""))
+    return jsonify({type_: _allege(elements) for type_, elements in resultats.items()})
 
 
 @app.route("/api/stats/avancees")
@@ -944,6 +982,8 @@ def api_sauvegarde_complete_annuler():
 
 @app.route("/api/import/excel", methods=["POST"])
 def api_import_excel():
+    import import_excel
+
     fichier = request.files.get("fichier")
     if fichier is None or not fichier.filename:
         raise ValeurNonAutorisee("Aucun fichier reçu - choisir un export Excel (.xlsx).")
@@ -1020,6 +1060,8 @@ def api_import_csv_confirmer():
 
 @app.route("/api/export/excel")
 def api_export_excel():
+    import export_excel
+
     with tempfile.TemporaryDirectory() as dossier:
         chemin = export_excel.exporter_excel(Path(dossier) / "suivi_candidatures.xlsx")
         with open(chemin, "rb") as fichier:

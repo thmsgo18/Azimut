@@ -10,8 +10,15 @@ ce module fixe le type de pièce et le rendu PDF d'une lettre.
 """
 
 import pieces_liees
-from lettres_pdf import generer_pdf
 from pieces_liees import SOURCES, TYPE_LETTRE  # noqa: F401  (SOURCES ré-exporté)
+
+
+def generer_pdf(*args, **kwargs):
+    """Rendu PDF d'une lettre (lettres_pdf.generer_pdf). Chargé à la première lettre
+    fabriquée seulement : reportlab est lourd, et le lancement d'Azimut n'en a pas besoin."""
+    from lettres_pdf import generer_pdf as generer
+
+    return generer(*args, **kwargs)
 
 
 def dossier_lettres(chemin_db=None):

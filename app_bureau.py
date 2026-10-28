@@ -5,6 +5,11 @@ pour l'utilisateur ; la fenêtre (WKWebView via pywebview) affiche l'interface.
 Fermer la fenêtre arrête l'application.
 
 Lancement : double-clic sur Azimut.app (ou ./venv/bin/python app_bureau.py).
+
+Pour un lancement rapide, la fenêtre s'ouvre tout de suite sur une page d'attente
+pendant que le serveur se charge dans un fil à part (importer serveur.py et ses
+modules est le plus long du démarrage avec l'ouverture du moteur web, et les deux
+avancent en même temps) ; l'interface la remplace dès que le serveur répond.
 """
 
 import os
@@ -16,8 +21,9 @@ from pathlib import Path
 
 import webview
 
-from serveur import PORT as PORT_PREFERE
-from serveur import app
+# Le même que serveur.PORT (vérifié par les tests) : importer serveur.py ici retarderait
+# l'ouverture de la fenêtre de tout le chargement du serveur.
+PORT_PREFERE = 8765
 
 
 def _port_libre():
@@ -40,16 +46,86 @@ def _port_libre():
     return port
 
 
-def _attendre_serveur(url, delai=10):
-    """Attend que le serveur interne réponde avant d'ouvrir la fenêtre."""
+def _attendre_serveur(url, delai=30, erreurs=()):
+    """Attend que le serveur interne réponde ; s'arrête aussitôt si son démarrage a
+    échoué (`erreurs` : la liste remplie par _demarrer_serveur)."""
     limite = time.monotonic() + delai
-    while time.monotonic() < limite:
+    while time.monotonic() < limite and not erreurs:
         try:
             with urllib.request.urlopen(url + "/api/valeurs", timeout=1):
                 return True
         except OSError:
-            time.sleep(0.1)
+            time.sleep(0.05)
     return False
+
+
+def _demarrer_serveur(port):
+    """Sauvegarde la base puis charge et lance le serveur interne, dans un fil à part.
+    Retourne la liste où une erreur de démarrage est déposée (import impossible...)."""
+    erreurs = []
+
+    def servir():
+        try:
+            import sauvegarde
+
+            # Sauvegarde automatique à chaque lancement (rotation), avant toute requête.
+            try:
+                sauvegarde.sauvegarder_base()
+            except OSError:
+                pass  # une sauvegarde impossible ne doit pas empêcher l'appli de démarrer
+            from serveur import app
+
+            app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)
+        except Exception as erreur:
+            erreurs.append(erreur)
+
+    threading.Thread(target=servir, daemon=True).start()
+    return erreurs
+
+
+def _fond_systeme():
+    """Couleur de fond de la fenêtre avant le premier affichage : celle de l'interface
+    dans le thème du système (sinon un éclair blanc précède l'interface en mode sombre)."""
+    try:
+        from Foundation import NSUserDefaults
+
+        if NSUserDefaults.standardUserDefaults().stringForKey_("AppleInterfaceStyle") == "Dark":
+            return "#0e0e10"
+    except Exception:
+        pass  # hors macOS : fond clair, comme l'interface par défaut
+    return "#f7f7f5"
+
+
+def _page_attente(erreur=None):
+    """Page affichée pendant le chargement du serveur (le logo seul, sans texte à traduire),
+    ou le message d'erreur si le serveur n'a pas pu démarrer. Couleurs de static/style.css."""
+    import html
+
+    message = ""
+    if erreur is not None:
+        message = (
+            "<p>Azimut n'a pas pu démarrer. / Azimut could not start.</p>"
+            f"<pre>{html.escape(str(erreur) or type(erreur).__name__)}</pre>"
+        )
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  :root {{ color-scheme: light dark; --page: #f7f7f5; --encre: #16161a; --accent: #2a78d6; }}
+  @media (prefers-color-scheme: dark) {{ :root {{ --page: #0e0e10; --encre: #f4f4f2; --accent: #3987e5; }} }}
+  html, body {{ margin: 0; height: 100%; background: var(--page); color: var(--encre);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; }}
+  body {{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }}
+  .pastille {{ width: 56px; height: 56px; border-radius: 14px; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; animation: pouls 1.4s ease-in-out infinite; }}
+  @keyframes pouls {{ 50% {{ opacity: 0.6; }} }}
+  pre {{ max-width: 80vw; white-space: pre-wrap; opacity: 0.7; }}
+</style></head><body>
+  <div class="pastille"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 0 1 6.36 2.64"></path>
+    <circle cx="12" cy="12" r="9" opacity="0.35"></circle>
+    <polygon points="16.5 7.5 13.6 13.6 7.5 16.5 10.4 10.4 16.5 7.5" fill="currentColor" stroke="none"></polygon>
+  </svg></div>
+  {message}
+</body></html>"""
 
 
 def _habiller_application_macos():
@@ -190,40 +266,38 @@ def _proposer_dossier_au_premier_lancement():
     ApiBureau().choisir_dossier_donnees()
 
 
-def principal():
-    # Sauvegarde automatique de la base à chaque lancement (rotation sur 10).
-    try:
-        import sauvegarde
-
-        sauvegarde.sauvegarder_base()
-    except OSError:
-        pass  # une sauvegarde impossible ne doit pas empêcher l'appli de démarrer
-
-    port = _port_libre()
-    url = f"http://127.0.0.1:{port}"
-    serveur_thread = threading.Thread(
-        target=lambda: app.run(
-            host="127.0.0.1", port=port, debug=False, use_reloader=False
-        ),
-        daemon=True,
-    )
-    serveur_thread.start()
-    _attendre_serveur(url)
+def _apres_ouverture(fenetre, url, erreurs):
+    """Fil lancé avec la fenêtre : dès que le serveur répond, l'interface remplace la page
+    d'attente, puis les tâches de fond démarrent."""
+    if not _attendre_serveur(url, erreurs=erreurs):
+        fenetre.load_html(_page_attente(
+            erreurs[0] if erreurs else "Le serveur interne ne répond pas. / The internal server does not respond."
+        ))
+        return
+    fenetre.load_url(url)
     threading.Thread(target=_verification_liens_en_arriere_plan, daemon=True).start()
     _demarrer_compagnon_si_active()
+    _proposer_dossier_au_premier_lancement()
+
+
+def principal():
+    port = _port_libre()
+    url = f"http://127.0.0.1:{port}"
+    erreurs = _demarrer_serveur(port)
 
     _habiller_application_macos()
     # Autorise les téléchargements (export Excel, fiche .md) depuis la fenêtre.
     webview.settings["ALLOW_DOWNLOADS"] = True
-    webview.create_window(
+    fenetre = webview.create_window(
         "Azimut - suivi de candidatures",
-        url,
+        html=_page_attente(),
         width=1280,
         height=840,
         min_size=(980, 640),
+        background_color=_fond_systeme(),
         js_api=ApiBureau(url),
     )
-    webview.start(_proposer_dossier_au_premier_lancement, debug=False)
+    webview.start(_apres_ouverture, (fenetre, url, erreurs), debug=False)
 
 
 if __name__ == "__main__":

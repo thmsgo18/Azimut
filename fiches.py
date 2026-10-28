@@ -9,7 +9,6 @@ motivation) ; ce module fixe le type de pièce et le rendu PDF d'une fiche
 générée (voir fiches_pdf.py pour le format des données).
 """
 
-import fiches_pdf
 import pieces_liees
 from pieces_liees import SOURCES, TYPE_FICHE  # noqa: F401  (SOURCES ré-exporté)
 
@@ -28,6 +27,8 @@ def ajouter_fiche(
     fiches_pdf.py) : le PDF est fabriqué et rangé dans le dossier fiches/, le
     texte est indexé pour la recherche. Les libellés fixes du PDF suivent `langue`
     (français si elle est vide ou non reconnue). Retourne l'id de la fiche créée."""
+    import fiches_pdf  # reportlab : chargé à la première fiche, pas au lancement d'Azimut
+
     donnees = fiches_pdf.valider_donnees(donnees)
     return pieces_liees.ajouter(
         TYPE_FICHE, entreprise_nom, fiches_pdf.texte_fiche(donnees, langue),

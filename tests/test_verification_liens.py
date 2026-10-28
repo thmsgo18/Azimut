@@ -112,6 +112,28 @@ class TestVerifierTousLesLiens(unittest.TestCase):
         self.assertEqual(resume["actifs"], 1)
         self.assertEqual(espion.call_count, 1)
 
+    def test_tous_les_resultats_en_une_seule_ecriture(self):
+        """L'interface se rafraîchit à chaque écriture en base : une écriture par lien la
+        rechargeait en boucle pendant les minutes qui suivaient le lancement."""
+        for numero, code in enumerate((200, 404, 500)):
+            ajouter_candidature(
+                f"Entreprise {numero}", "Stage", statut="Envoyée",
+                lien_offre=f"https://exemple.fr/{code}", chemin_db=self.chemin_db,
+            )
+
+        def _fake(requete, timeout=None):
+            code = int(requete.full_url.rsplit("/", 1)[1])
+            return _urlopen_qui_repond(code)(requete, timeout)
+
+        with patch("urllib.request.urlopen", side_effect=_fake), \
+                patch.object(vl, "enregistrer_etats_liens", wraps=vl.enregistrer_etats_liens) as ecriture:
+            resume = vl.verifier_tous_les_liens(chemin_db=self.chemin_db)
+        self.assertEqual(ecriture.call_count, 1)
+        self.assertEqual((resume["actifs"], resume["morts"], resume["inconnus"]), (1, 1, 1))
+        etats = {recuperer_candidature(i, chemin_db=self.chemin_db)["lien_offre"][-3:]:
+                 recuperer_candidature(i, chemin_db=self.chemin_db)["lien_dernier_etat"] for i in (1, 2, 3)}
+        self.assertEqual(etats, {"200": "actif", "404": "mort", "500": "inconnu"})
+
     def test_lien_mort_enregistre_et_liste(self):
         ajouter_candidature(
             "AgentikCo", "Stage", statut="Envoyée", lien_offre="https://exemple.fr/parti",
