@@ -15,6 +15,13 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
         python-version: ["3.9", "3.13"]
+        # ubuntu-latest (26.04) ne propose plus Python 3.9 : il est testé sous Linux sur la 24.04.
+        exclude:
+          - os: ubuntu-latest
+            python-version: "3.9"
+        include:
+          - os: ubuntu-24.04
+            python-version: "3.9"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
