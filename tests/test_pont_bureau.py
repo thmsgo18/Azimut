@@ -8,6 +8,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 from unittest.mock import MagicMock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -186,6 +187,96 @@ class TestLancementBureau(unittest.TestCase):
         debut = time.monotonic()
         self.assertFalse(app_bureau._attendre_serveur("http://127.0.0.1:9", delai=5, erreurs=[ImportError("x")]))
         self.assertLess(time.monotonic() - debut, 1)
+
+    def test_attente_s_arrete_si_le_fil_du_serveur_est_termine(self):
+        import threading
+        import time
+
+        import app_bureau
+
+        fil = threading.Thread(target=lambda: None)
+        fil.start()
+        fil.join()
+        # Vécu en CI Windows : un port fermé n'y est pas refusé tout de suite, chaque tentative
+        # va jusqu'à son délai (1 s). Un fil déjà arrêté ne doit donc déclencher aucune tentative.
+        with mock.patch.object(app_bureau.urllib.request, "urlopen") as urlopen:
+            debut = time.monotonic()
+            self.assertFalse(app_bureau._attendre_serveur("http://127.0.0.1:9", delai=5, fil=fil))
+        self.assertLess(time.monotonic() - debut, 1)
+        urlopen.assert_not_called()
+
+    def test_demarrage_lent_n_est_pas_une_panne(self):
+        """Vécu : iCloud rapatriait les fichiers du programme, le serveur a mis plus de 30 s -
+        l'ancienne attente abandonnait et laissait « ne répond pas » alors qu'il démarrait."""
+        import threading
+        import time
+
+        import app_bureau
+
+        self.assertGreaterEqual(app_bureau.DELAI_DEMARRAGE, 120)
+        arret = threading.Event()
+        fil = threading.Thread(target=arret.wait)  # un serveur qui charge encore
+        fil.start()
+        self.addCleanup(arret.set)
+        appels = []
+        with mock.patch.object(app_bureau, "DELAI_AVANT_MESSAGE", 0.1):
+            debut = time.monotonic()
+            self.assertFalse(app_bureau._attendre_serveur(
+                "http://127.0.0.1:9", delai=0.5, fil=fil, patience=lambda: appels.append(1)))
+        self.assertGreaterEqual(time.monotonic() - debut, 0.5)  # a attendu, fil vivant
+        self.assertEqual(appels, [1])  # l'explication n'est affichée qu'une fois
+
+    def test_un_serveur_qui_repond_par_une_erreur_http_est_demarre(self):
+        import urllib.error
+
+        import app_bureau
+
+        erreur = urllib.error.HTTPError("http://127.0.0.1:9/api/valeurs", 500, "Erreur", {}, None)
+        with mock.patch.object(app_bureau.urllib.request, "urlopen", side_effect=erreur):
+            self.assertTrue(app_bureau._attendre_serveur("http://127.0.0.1:9", delai=1))
+
+    def test_page_de_patience(self):
+        import app_bureau
+
+        self.assertIn("plus long que d'habitude", app_bureau._page_attente(patience=True))
+        self.assertNotIn("plus long", app_bureau._page_attente())
+        self.assertIn("pas pu démarrer", app_bureau._page_attente(ValueError("x"), patience=True))
+
+    def test_prerecuperation_lit_les_fichiers_du_programme(self):
+        import sys
+        import tempfile
+        from pathlib import Path
+
+        import app_bureau
+
+        with tempfile.TemporaryDirectory() as dossier:
+            racine = Path(dossier)
+            (racine / "serveur.py").write_text("x = 1\n")
+            (racine / "base.db").write_bytes(b"jamais lue")
+            (racine / "__pycache__").mkdir()
+            (racine / "__pycache__" / f"serveur.{sys.implementation.cache_tag}.pyc").write_bytes(b"...")
+            (racine / "__pycache__" / "serveur.cpython-27.pyc").write_bytes(b"...")
+            (racine / "static" / "langues").mkdir(parents=True)
+            (racine / "static" / "app.js").write_text("")
+            (racine / "static" / "langues" / "fr.js").write_text("")
+            lus = []
+            vrai_open = open
+
+            def open_espion(chemin, *args, **kwargs):
+                lus.append(Path(chemin).name)
+                return vrai_open(chemin, *args, **kwargs)
+
+            with mock.patch("builtins.open", open_espion):
+                self.assertEqual(app_bureau._prerecuperer_fichiers(racine), 4)
+            self.assertEqual(sorted(lus), sorted([
+                "serveur.py", f"serveur.{sys.implementation.cache_tag}.pyc", "app.js", "fr.js"]))
+
+    def test_prerecuperation_ne_leve_jamais(self):
+        import app_bureau
+
+        self.assertEqual(app_bureau._prerecuperer_fichiers("/dossier/qui/n/existe/pas"), 0)
+        with mock.patch("builtins.open", side_effect=PermissionError("refusé")):
+            app_bureau._prerecuperer_fichiers()  # fichiers illisibles : rien ne remonte
 
 
 if __name__ == "__main__":
