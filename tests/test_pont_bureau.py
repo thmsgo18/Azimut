@@ -197,9 +197,13 @@ class TestLancementBureau(unittest.TestCase):
         fil = threading.Thread(target=lambda: None)
         fil.start()
         fil.join()
-        debut = time.monotonic()
-        self.assertFalse(app_bureau._attendre_serveur("http://127.0.0.1:9", delai=5, fil=fil))
+        # Vécu en CI Windows : un port fermé n'y est pas refusé tout de suite, chaque tentative
+        # va jusqu'à son délai (1 s). Un fil déjà arrêté ne doit donc déclencher aucune tentative.
+        with mock.patch.object(app_bureau.urllib.request, "urlopen") as urlopen:
+            debut = time.monotonic()
+            self.assertFalse(app_bureau._attendre_serveur("http://127.0.0.1:9", delai=5, fil=fil))
         self.assertLess(time.monotonic() - debut, 1)
+        urlopen.assert_not_called()
 
     def test_demarrage_lent_n_est_pas_une_panne(self):
         """Vécu : iCloud rapatriait les fichiers du programme, le serveur a mis plus de 30 s -

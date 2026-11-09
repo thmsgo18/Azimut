@@ -94,14 +94,16 @@ def _attendre_serveur(url, delai=DELAI_DEMARRAGE, erreurs=(), fil=None, patience
     appelle `patience()` une fois si l'attente dépasse DELAI_AVANT_MESSAGE secondes."""
     debut = time.monotonic()
     while time.monotonic() - debut < delai and not erreurs:
+        # Avant chaque tentative : sous Windows, un port fermé n'est pas refusé tout de suite
+        # (la connexion va jusqu'à son délai), il ne faut pas attendre pour un fil déjà arrêté.
+        if fil is not None and not fil.is_alive():
+            return False
         try:
             with urllib.request.urlopen(url + "/api/valeurs", timeout=1):
                 return True
         except urllib.error.HTTPError:
             return True  # il répond, même par une erreur : l'interface l'affichera mieux
         except OSError:
-            if fil is not None and not fil.is_alive():
-                return False
             if patience is not None and time.monotonic() - debut >= DELAI_AVANT_MESSAGE:
                 patience()
                 patience = None
