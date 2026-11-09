@@ -14,9 +14,12 @@ avancent en même temps) ; l'interface la remplace dès que le serveur répond.
 
 import os
 import socket
+import sys
 import threading
 import time
+import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import webview
@@ -24,6 +27,45 @@ import webview
 # Le même que serveur.PORT (vérifié par les tests) : importer serveur.py ici retarderait
 # l'ouverture de la fenêtre de tout le chargement du serveur.
 PORT_PREFERE = 8765
+
+# Un démarrage lent n'est pas une panne : tant que le fil du serveur travaille, on attend
+# (vécu : plus de 30 s quand iCloud Drive doit rapatrier les fichiers du programme).
+DELAI_DEMARRAGE = 300
+# Au-delà, la page d'attente explique pourquoi c'est plus long que d'habitude.
+DELAI_AVANT_MESSAGE = 6
+DOSSIER_PROGRAMME = Path(__file__).resolve().parent
+
+
+def _prerecuperer_fichiers(dossier=DOSSIER_PROGRAMME):
+    """Lit en parallèle les fichiers du programme (.py, .pyc de ce Python, static/) avant
+    qu'ils servent. Retourne le nombre de fichiers lus.
+
+    Un dossier synchronisé par iCloud Drive avec « Optimiser le stockage » voit macOS retirer
+    du disque les fichiers peu utilisés : chacun revient à sa première lecture, en 1 à 2 s,
+    et l'import de serveur.py les lit un par un (vécu : plus de 30 s). Lus tous ensemble, ils
+    reviennent en quelques secondes. Partout ailleurs, cette lecture de petits fichiers déjà
+    sur le disque ne coûte que quelques millisecondes. Ne lève jamais d'exception."""
+    dossier = Path(dossier)
+    try:
+        fichiers = list(dossier.glob("*.py"))
+        if sys.implementation.cache_tag:  # « cpython-313 » : seuls les .pyc de ce Python servent
+            fichiers += dossier.glob(f"__pycache__/*.{sys.implementation.cache_tag}.pyc")
+        fichiers += (f for f in (dossier / "static").rglob("*") if f.is_file())
+    except OSError:
+        return 0
+
+    def lire(chemin):
+        try:
+            with open(chemin, "rb") as fichier:
+                while fichier.read(1 << 20):
+                    pass
+        except OSError:
+            pass  # illisible : l'import dira lui-même ce qui ne va pas
+
+    # Mesuré sur iCloud Drive : 64 lectures simultanées rapatrient ~16 fichiers/s, 16 en rapatrient ~12/s.
+    with ThreadPoolExecutor(max_workers=64) as executeur:
+        list(executeur.map(lire, fichiers))
+    return len(fichiers)
 
 
 def _port_libre():
@@ -46,26 +88,35 @@ def _port_libre():
     return port
 
 
-def _attendre_serveur(url, delai=30, erreurs=()):
-    """Attend que le serveur interne réponde ; s'arrête aussitôt si son démarrage a
-    échoué (`erreurs` : la liste remplie par _demarrer_serveur)."""
-    limite = time.monotonic() + delai
-    while time.monotonic() < limite and not erreurs:
+def _attendre_serveur(url, delai=DELAI_DEMARRAGE, erreurs=(), fil=None, patience=None):
+    """Attend que le serveur interne réponde. S'arrête aussitôt si son démarrage a échoué
+    (`erreurs` : la liste remplie par _demarrer_serveur) ou si son fil `fil` s'est arrêté ;
+    appelle `patience()` une fois si l'attente dépasse DELAI_AVANT_MESSAGE secondes."""
+    debut = time.monotonic()
+    while time.monotonic() - debut < delai and not erreurs:
         try:
             with urllib.request.urlopen(url + "/api/valeurs", timeout=1):
                 return True
+        except urllib.error.HTTPError:
+            return True  # il répond, même par une erreur : l'interface l'affichera mieux
         except OSError:
+            if fil is not None and not fil.is_alive():
+                return False
+            if patience is not None and time.monotonic() - debut >= DELAI_AVANT_MESSAGE:
+                patience()
+                patience = None
             time.sleep(0.05)
     return False
 
 
 def _demarrer_serveur(port):
     """Sauvegarde la base puis charge et lance le serveur interne, dans un fil à part.
-    Retourne la liste où une erreur de démarrage est déposée (import impossible...)."""
+    Retourne ce fil et la liste où une erreur de démarrage est déposée (import impossible...)."""
     erreurs = []
 
     def servir():
         try:
+            _prerecuperer_fichiers()
             import sauvegarde
 
             # Sauvegarde automatique à chaque lancement (rotation), avant toute requête.
@@ -79,8 +130,9 @@ def _demarrer_serveur(port):
         except Exception as erreur:
             erreurs.append(erreur)
 
-    threading.Thread(target=servir, daemon=True).start()
-    return erreurs
+    fil = threading.Thread(target=servir, daemon=True)
+    fil.start()
+    return fil, erreurs
 
 
 def _fond_systeme():
@@ -96,9 +148,10 @@ def _fond_systeme():
     return "#f7f7f5"
 
 
-def _page_attente(erreur=None):
-    """Page affichée pendant le chargement du serveur (le logo seul, sans texte à traduire),
-    ou le message d'erreur si le serveur n'a pas pu démarrer. Couleurs de static/style.css."""
+def _page_attente(erreur=None, patience=False):
+    """Page affichée pendant le chargement du serveur (le logo seul, sans texte à traduire ;
+    avec `patience`, l'explication d'un démarrage plus long que d'habitude), ou le message
+    d'erreur si le serveur n'a pas pu démarrer. Couleurs de static/style.css."""
     import html
 
     message = ""
@@ -106,6 +159,12 @@ def _page_attente(erreur=None):
         message = (
             "<p>Azimut n'a pas pu démarrer. / Azimut could not start.</p>"
             f"<pre>{html.escape(str(erreur) or type(erreur).__name__)}</pre>"
+        )
+    elif patience:
+        message = (
+            "<p>Démarrage plus long que d'habitude… / Starting takes longer than usual…</p>"
+            "<pre>Azimut récupère ses fichiers (iCloud Drive, par exemple).\n"
+            "Azimut is fetching its files (iCloud Drive, for example).</pre>"
         )
     return f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
@@ -266,10 +325,13 @@ def _proposer_dossier_au_premier_lancement():
     ApiBureau().choisir_dossier_donnees()
 
 
-def _apres_ouverture(fenetre, url, erreurs):
+def _apres_ouverture(fenetre, url, fil, erreurs):
     """Fil lancé avec la fenêtre : dès que le serveur répond, l'interface remplace la page
     d'attente, puis les tâches de fond démarrent."""
-    if not _attendre_serveur(url, erreurs=erreurs):
+    def patience():
+        fenetre.load_html(_page_attente(patience=True))
+
+    if not _attendre_serveur(url, erreurs=erreurs, fil=fil, patience=patience):
         fenetre.load_html(_page_attente(
             erreurs[0] if erreurs else "Le serveur interne ne répond pas. / The internal server does not respond."
         ))
@@ -283,7 +345,7 @@ def _apres_ouverture(fenetre, url, erreurs):
 def principal():
     port = _port_libre()
     url = f"http://127.0.0.1:{port}"
-    erreurs = _demarrer_serveur(port)
+    fil, erreurs = _demarrer_serveur(port)
 
     _habiller_application_macos()
     # Autorise les téléchargements (export Excel, fiche .md) depuis la fenêtre.
@@ -297,7 +359,7 @@ def principal():
         background_color=_fond_systeme(),
         js_api=ApiBureau(url),
     )
-    webview.start(_apres_ouverture, (fenetre, url, erreurs), debug=False)
+    webview.start(_apres_ouverture, (fenetre, url, fil, erreurs), debug=False)
 
 
 if __name__ == "__main__":
